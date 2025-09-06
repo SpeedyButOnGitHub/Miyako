@@ -43,7 +43,7 @@ client.on("messageCreate", async (message) => {
       if (!target) return message.reply("<:VRLSad:1413770577080094802> You must mention a user or provide a valid user ID.");
       await showWarnings(message, target);
     } 
-    else if (["snipe", "snipes"].includes(command)) {
+    else if (["snipe", "snipes", "ds", "s"].includes(command)) {
       await handleSnipeCommands(client, message, command, args);
     } 
     else if (command === "config") {
