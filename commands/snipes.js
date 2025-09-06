@@ -5,6 +5,8 @@ const fs = require("fs");
 const SNIPES_FILE = "./config/snipes.json";
 
 const snipes = new Map();
+// Track last snipe message per channel for editing
+const lastSnipeMessage = new Map();
 
 // Load snipes from disk on startup
 function loadSnipes() {
@@ -12,7 +14,8 @@ function loadSnipes() {
     try {
       const raw = JSON.parse(fs.readFileSync(SNIPES_FILE));
       for (const [channelId, snipe] of Object.entries(raw)) {
-        // Only restore snipes that haven't expired
+        // Recalculate expiresAt based on timestamp
+        snipe.expiresAt = snipe.timestamp + 2 * 60 * 60 * 1000;
         if (snipe.expiresAt > Date.now()) snipes.set(channelId, snipe);
       }
     } catch {}
@@ -46,6 +49,28 @@ async function handleSnipeCommands(client, message, command, args) {
       snipes.delete(message.channel.id);
       saveSnipes();
       replyMsg = await message.reply(`${EMOJI_SUCCESS} Snipe deleted!`);
+
+      // Edit the last snipe message in this channel if it exists
+      const snipeMsg = lastSnipeMessage.get(message.channel.id);
+      if (snipeMsg && snipeMsg.editable) {
+        try {
+          // Clone the previous embed and only change the description
+          const oldEmbed = snipeMsg.embeds?.[0];
+          if (oldEmbed) {
+            const newEmbed = EmbedBuilder.from(oldEmbed)
+              .setDescription(`${EMOJI_ERROR} This snipe has been deleted.`);
+            await snipeMsg.edit({
+              content: null,
+              embeds: [newEmbed]
+            });
+          } else {
+            await snipeMsg.edit({
+              content: `${EMOJI_ERROR} This snipe has been deleted.`,
+              embeds: []
+            });
+          }
+        } catch {}
+      }
     } else {
       replyMsg = await message.reply(`${EMOJI_ERROR} No snipe to delete.`);
     }
@@ -78,20 +103,23 @@ async function handleSnipeCommands(client, message, command, args) {
       embed.setImage(snipe.attachments[0]);
     }
 
-    return message.reply({ embeds: [embed] });
+    const sentMsg = await message.reply({ embeds: [embed] });
+    lastSnipeMessage.set(message.channel.id, sentMsg);
+    return;
   }
 }
 
 function handleMessageDelete(message) {
   if (message.partial || message.author.bot) return;
   const member = message.member || message.guild.members.cache.get(message.author.id);
+  const timestamp = Date.now();
   snipes.set(message.channel.id, {
     content: message.content || "*No text content*",
     nickname: member ? member.displayName : message.author.username,
     avatarURL: member ? member.displayAvatarURL({ dynamic: true }) : message.author.displayAvatarURL({ dynamic: true }),
-    timestamp: Date.now(),
+    timestamp,
     attachments: Array.from(message.attachments.values()).map(a => a.url),
-    expiresAt: Date.now() + 2 * 60 * 60 * 1000
+    expiresAt: timestamp + 2 * 60 * 60 * 1000
   });
   saveSnipes();
 }
