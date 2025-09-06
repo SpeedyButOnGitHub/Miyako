@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
-const { isModerator } = require("./moderation");
+const { isModerator } = require("./moderation/index");
 const { handleMessageCreate } = require("./configMenu");
 const { OWNER_ID } = require("./moderation/permissions");
 
@@ -70,7 +70,14 @@ async function handleHelpCommand(client, message) {
     tag = `User ${user.id}`;
   }
 
-  embed.setFooter({ text: `Requested by ${tag}`, iconURL: avatarURL });
+  embed.setFooter({ 
+    text: `Requested by ${message.author.tag}`, 
+    iconURL: (message.member && message.member.user && typeof message.member.user.displayAvatarURL === "function")
+      ? message.member.user.displayAvatarURL({ dynamic: true })
+      : (typeof message.author.displayAvatarURL === "function"
+        ? message.author.displayAvatarURL({ dynamic: true })
+        : "https://cdn.discordapp.com/embed/avatars/0.png")
+  });
   embed.setTimestamp();
 
   // Buttons for categories and config

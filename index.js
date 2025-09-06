@@ -17,6 +17,7 @@ const { OWNER_ID, ALLOWED_ROLES, CHATBOX_BUTTON_ID } = require("./commands/moder
 
 const BOT_STATUS_FILE = "./config/botStatus.json";
 const STATUS_CHANNEL_ID = "1413966369296220233";
+const ACTIVE_MENUS_FILE = "./config/activeMenus.json";
 
 // Cooldowns and modifiers for XP
 const userCooldowns = new Map(); // userId -> timestamp
@@ -84,6 +85,23 @@ client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   await sendBotStatusMessage(client);
   client.guilds.cache.forEach(guild => updateStaffMessage(guild));
+
+  // Delete lingering config/help menu messages on restart
+  if (fs.existsSync(ACTIVE_MENUS_FILE)) {
+    try {
+      const menus = JSON.parse(fs.readFileSync(ACTIVE_MENUS_FILE));
+      for (const { channelId, messageId, commandId } of menus) {
+        const channel = await client.channels.fetch(channelId).catch(() => null);
+        if (channel) {
+          await channel.messages.delete(messageId).catch(() => {});
+          await channel.messages.delete(commandId).catch(() => {});
+        }
+      }
+      fs.writeFileSync(ACTIVE_MENUS_FILE, "[]");
+    } catch (err) {
+      console.error("[Startup Menu Cleanup Error]:", err);
+    }
+  }
 });
 
 // Get random XP value

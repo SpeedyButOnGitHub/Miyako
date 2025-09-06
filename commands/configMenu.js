@@ -2,6 +2,15 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentTyp
 const { config, saveConfig } = require("../utils/storage");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
 const { OWNER_ID } = require("./moderation/permissions");
+const fs = require("fs");
+
+const ACTIVE_MENUS_FILE = "./config/activeMenus.json";
+let activeMenus = [];
+if (fs.existsSync(ACTIVE_MENUS_FILE)) {
+  try {
+    activeMenus = JSON.parse(fs.readFileSync(ACTIVE_MENUS_FILE));
+  } catch { activeMenus = []; }
+}
 
 const BOT_PREFIX = "**🌙 Late Night Hours Staff Team**\n\n";
 
@@ -118,6 +127,15 @@ async function handleMessageCreate(client, message) {
     allowedMentions: { repliedUser: false }
   });
 
+  activeMenus.push({ channelId: mainMsg.channel.id, messageId: mainMsg.id, commandId: message.id });
+  fs.writeFileSync(ACTIVE_MENUS_FILE, JSON.stringify(activeMenus, null, 2));
+
+  // Delete both after 5 minutes
+  setTimeout(() => {
+    mainMsg.delete().catch(() => {});
+    message.delete().catch(() => {});
+  }, 5 * 60 * 1000);
+
   const collector = mainMsg.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 5 * 60 * 1000
@@ -183,14 +201,6 @@ async function handleMessageCreate(client, message) {
           .setLabel("⬅️ Back to Main")
           .setStyle(ButtonStyle.Secondary)
       );
-      // Add Help Menu button to category view
-      settingsRow.addComponents(
-        new ButtonBuilder()
-          .setCustomId("config_help")
-          .setLabel("Help Menu")
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji("❓")
-      );
 
       return await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
     }
@@ -225,14 +235,6 @@ async function handleMessageCreate(client, message) {
           .setCustomId("back_main")
           .setLabel("⬅️ Back to Main")
           .setStyle(ButtonStyle.Secondary)
-      );
-      // Add Help Menu button to category view
-      settingsRow.addComponents(
-        new ButtonBuilder()
-          .setCustomId("config_help")
-          .setLabel("Help Menu")
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji("❓")
       );
 
       return await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });

@@ -3,7 +3,7 @@ const { CONFIG_LOG_CHANNEL } = require("./logChannels");
 
 async function logMessageDelete(client, message) {
   const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
-  if (!channel || !message.guild || message.author.bot) return;
+  if (!channel || !message.guild || !message.author || message.author.bot) return;
 
   const embed = new EmbedBuilder()
     .setTitle("Message Deleted")
