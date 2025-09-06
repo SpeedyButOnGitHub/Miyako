@@ -100,6 +100,7 @@ const shutdownSignals = ["SIGINT", "SIGTERM"];
 shutdownSignals.forEach(signal => {
   process.on(signal, async () => {
     if (client.isReady()) {
+      await setStatusChannelName(client, false);
       await sendBotShutdownMessage(client);
     }
     process.exit(0);
@@ -110,6 +111,7 @@ shutdownSignals.forEach(signal => {
 process.on("uncaughtException", async (err) => {
   console.error("Uncaught Exception:", err);
   if (client.isReady()) {
+    await setStatusChannelName(client, false);
     await sendBotShutdownMessage(client);
   }
   process.exit(1);
@@ -139,6 +141,8 @@ client.once("ready", async () => {
       console.error("[Startup Menu Cleanup Error]:", err);
     }
   }
+
+  await setStatusChannelName(client, true);
 });
 
 // Get random XP value
@@ -332,4 +336,15 @@ client.on("guildMemberRemove", (member) => {
   updateStaffMessage(member.guild);
   logMemberLeave(client, member);
 });
+
+// Set status channel name based on online/offline
+async function setStatusChannelName(client, online) {
+  const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
+  if (!channel || !channel.setName) return;
+  const name = online
+    ? "🟢︱𝙼𝚒𝚢𝚊𝚔𝚘𝚜-𝙲𝚑𝚊𝚖𝚋𝚎𝚛"
+    : "🔴︱𝙼𝚒𝚢𝚊𝚔𝚘𝚜-𝙲𝚑𝚊𝚖𝚋𝚎𝚛";
+  await channel.setName(name).catch(() => {});
+}
+
 
