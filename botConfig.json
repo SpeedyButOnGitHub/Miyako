@@ -1,0 +1,20 @@
+{
+  "snipingWhitelist": [],
+  "moderatorRoles": [],
+  "warnings": {
+    "432610292342587392": [
+      {
+        "moderator": "349282473085239298",
+        "reason": null,
+        "date": 1757167025711
+      }
+    ]
+  },
+  "escalation": {
+    "muteThreshold": 2,
+    "muteDuration": 7200000,
+    "kickThreshold": 3
+  },
+  "defaultMuteDuration": 3600000,
+  "modLogChannelId": "1232701768383729791"
+}
