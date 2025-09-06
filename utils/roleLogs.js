@@ -1,8 +1,8 @@
-const { EmbedBuilder } = require("discord.js");
-const { ROLE_LOG_CHANNEL } = require("./logChannels");
+import { EmbedBuilder } from "discord.js";
+import { CONFIG_LOG_CHANNEL } from "./logChannels.js";
 
 async function logRoleChange(client, member, role, action) {
-  const channel = await client.channels.fetch(ROLE_LOG_CHANNEL).catch(() => null);
+  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
   if (!channel) return;
 
   const embed = new EmbedBuilder()

@@ -94,6 +94,3 @@ async function sendModLog(client, target, moderator, action, reason = null, isPu
 }
 
 export { sendModLog };
-
-const logMsg = await sendModLog(client, member, message.author, "muted", finalReason, true, formatDuration(finalDuration));
-if (isTesting && logMsg && logMsg.id) testLogMessageIds.push(logMsg.id);

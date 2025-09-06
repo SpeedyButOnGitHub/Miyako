@@ -37,5 +37,4 @@ if (fs.existsSync(CONFIG_FILE)) {
 // Save config function
 const saveConfig = () => fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 
-module.exports = { config, saveConfig };
 export { config, saveConfig };

@@ -1,5 +1,5 @@
-const { ROLES, ROLE_ORDER, ROLE_EMOJIS, CHANNEL_ID } = require("../config/roles");
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+import { ROLES, ROLE_ORDER, ROLE_EMOJIS, CHANNEL_ID } from "../config/roles.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 
 const BOT_PREFIX = "**🌙 Late Night Hours Staff Team**\n\n";
 
