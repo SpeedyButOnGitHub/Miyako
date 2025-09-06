@@ -5,7 +5,7 @@ const { handleMessageCreate, handleConfigCommand } = require("./commands/configM
 const { handleModerationCommands, showWarnings, handleWarningButtons } = require("./commands/moderation");
 const { handleSnipeCommands, handleMessageDelete } = require("./commands/snipes");
 const { handleHelpCommand } = require("./commands/help");
-const { updateStaffMessage } = require("./utils/helpers");
+const { updateStaffMessage } = require("./utils/staffTeam");
 const { OWNER_ID } = require("./commands/moderation/permissions");
 
 const client = new Client({
