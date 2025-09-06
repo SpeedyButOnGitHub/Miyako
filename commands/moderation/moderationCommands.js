@@ -1,10 +1,10 @@
-import { sendModLog } from "../../utils/modLogs.js";
-import { replySuccess, replyError } from "./replies.js";
-import { sendUserDM } from "./dm.js";
-import { isModerator } from "./permissions.js";
-import { config, saveConfig } from "../../utils/storage.js";
+import { sendModLog } from "../../utils/modLogs";
+import { replySuccess, replyError } from "./replies";
+import { sendUserDM } from "./dm";
+import { isModerator } from "./permissions";
+import { config, saveConfig } from "../../utils/storage";
 import ms from "ms";
-import { parseDurationAndReason } from "../../utils/time.js";
+import { parseDurationAndReason } from "../../utils/time";
 import { testLogMessageIds } from "../test.js";
 
 const OWNER_ID = process.env.OWNER_ID || "349282473085239298";
@@ -50,7 +50,7 @@ async function findTarget(message, args) {
   return { target, user, reasonArgs };
 }
 
-async function  handleModerationCommands(client, message, command, args) {
+async function handleModerationCommands(client, message, command, args) {
   if (!isModerator(message.member)) return replyError(message, "You are not allowed to use this command.");
 
   const { target, user, reasonArgs } = await findTarget(message, args);
@@ -233,4 +233,6 @@ async function  handleModerationCommands(client, message, command, args) {
   }
 }
 
-export { handleModerationCommands };
+module.exports = {
+  handleModerationCommands
+};

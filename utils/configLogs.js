@@ -1,7 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 import { CONFIG_LOG_CHANNEL } from "./logChannels.js";
 
-async function logConfigChange(client, user, change) {
+async function logConfigChange(client, config) {
   const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
   if (!channel) return;
 
@@ -15,4 +15,6 @@ async function logConfigChange(client, user, change) {
   await channel.send({ embeds: [embed] });
 }
 
-export { logConfigChange };
+module.exports = {
+  logConfigChange
+};

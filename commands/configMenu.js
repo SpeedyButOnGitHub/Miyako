@@ -1,7 +1,7 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
-import { config, saveConfig } from "../utils/storage.js";
-import { EMOJI_SUCCESS, EMOJI_ERROR } from "./moderation/replies.js";
-import { OWNER_ID } from "./moderation/permissions.js";
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
+const { config, saveConfig } = require("../utils/storage");
+const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
+const { OWNER_ID } = require("./moderation/permissions");
 
 const BOT_PREFIX = "**🌙 Late Night Hours Staff Team**\n\n";
 
@@ -373,4 +373,7 @@ async function handleConfigCommand(client, message) {
   );
 }
 
-export { handleMessageCreate, handleConfigCommand };
+module.exports = {
+  handleMessageCreate,
+  handleConfigCommand
+};

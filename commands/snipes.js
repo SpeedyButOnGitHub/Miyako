@@ -1,7 +1,7 @@
-import { config } from "../utils/storage.js";
-import { EmbedBuilder } from "discord.js";
-import { EMOJI_SUCCESS, EMOJI_ERROR } from "./moderation/replies.js";
-import fs from "fs/promises";
+const { config } = require("../utils/storage");
+const { EmbedBuilder } = require("discord.js");
+const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
+const fs = require("fs/promises");
 const SNIPES_FILE = "./config/snipes.json";
 
 const snipes = new Map();
@@ -182,4 +182,7 @@ function handleMessageDelete(message) {
   saveSnipes();
 }
 
-export { handleSnipeCommands, handleMessageDelete };
+module.exports = {
+  handleSnipeCommands,
+  handleMessageDelete
+};

@@ -1,4 +1,4 @@
-import { EmbedBuilder } from "discord.js";
+const { EmbedBuilder } = require("discord.js");
 
 // Only log moderation actions in the user action channel
 const USER_ACTION_LOG_CHANNEL = "1232701768383729791";
@@ -93,4 +93,6 @@ async function sendModLog(client, target, moderator, action, reason = null, isPu
   return msg;
 }
 
-export { sendModLog };
+module.exports = {
+  sendModLog
+};

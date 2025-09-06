@@ -18,4 +18,6 @@ async function logRoleChange(client, member, role, action) {
   await channel.send({ embeds: [embed] });
 }
 
-export { logRoleChange };
+module.exports = {
+  logRoleChange
+};

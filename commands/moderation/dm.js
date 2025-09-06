@@ -1,4 +1,4 @@
-import { EmbedBuilder } from "discord.js";
+const { EmbedBuilder } = require("discord.js");
 
 async function sendUserDM(target, action, duration = null, reason = null, extra = null) {
   let description;
@@ -51,4 +51,6 @@ async function sendUserDM(target, action, duration = null, reason = null, extra 
   }
 }
 
-export { sendUserDM };
+module.exports = {
+  sendUserDM
+};

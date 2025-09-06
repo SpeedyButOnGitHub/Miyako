@@ -1,7 +1,7 @@
-import { ButtonStyle } from "discord.js";
-import { config } from "../../utils/storage.js";
+const { ButtonStyle } = require("discord.js");
+const { config } = require("../utils/storage");
 
-export const categories = {
+const categories = {
   Sniping: {
     description: "Settings for sniping commands",
     settings: {
@@ -32,4 +32,8 @@ export const categories = {
       }
     }
   }
+};
+
+module.exports = {
+  categories
 };

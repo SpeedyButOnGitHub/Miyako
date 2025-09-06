@@ -1,4 +1,4 @@
-import ms from "ms";
+const ms = require("ms");
 
 function parseDurationAndReason(args) {
   let duration = null;
@@ -15,4 +15,7 @@ function parseDurationAndReason(args) {
   return { duration, reason };
 }
 
-export { parseDurationAndReason, ms };
+module.exports = {
+  parseDurationAndReason,
+  ms
+};

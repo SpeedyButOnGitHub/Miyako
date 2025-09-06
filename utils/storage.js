@@ -1,4 +1,4 @@
-import fs from "fs";
+const fs = require("fs");
 const CONFIG_FILE = "./config/botConfig.json";
 
 // Define all required default options here
@@ -37,4 +37,7 @@ if (fs.existsSync(CONFIG_FILE)) {
 // Save config function
 const saveConfig = () => fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 
-export { config, saveConfig };
+module.exports = {
+  config,
+  saveConfig
+};

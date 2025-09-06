@@ -1,5 +1,5 @@
-import { EmbedBuilder } from "discord.js";
-import { getXP, getLevel, levels } from "../utils/levels.js";
+const { EmbedBuilder } = require("discord.js");
+const { getXP, getLevel, levels } = require("../utils/levels");
 
 function getLevelXP(level) {
   // This should match your level curve in utils/levels.js
@@ -41,4 +41,6 @@ async function handleLevelCommand(client, message) {
   await message.reply({ embeds: [embed] });
 }
 
-export { handleLevelCommand };
+module.exports = {
+  handleLevelCommand
+};

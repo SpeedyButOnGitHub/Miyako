@@ -1,5 +1,5 @@
-import { ROLES, ROLE_ORDER, ROLE_EMOJIS, CHANNEL_ID } from "../config/roles.js";
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+const { ROLES, ROLE_ORDER, ROLE_EMOJIS, CHANNEL_ID } = require("../config/roles");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 
 const BOT_PREFIX = "**🌙 Late Night Hours Staff Team**\n\n";
 
@@ -74,7 +74,7 @@ const updateStaffMessage = async (guild) => {
   } catch (err) { console.error("Failed to update staff message:", err); }
 };
 
-export {
+module.exports = {
   updateStaffMessage,
   ALLOWED_ROLES,
   CHATBOX_BUTTON_ID,

@@ -1,17 +1,17 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder } from "discord.js";
-import { OWNER_ID } from "./moderation/permissions.js";
-import { sendModLog } from "../utils/modLogs.js";
-import { config, saveConfig } from "../utils/storage.js";
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder } = require("discord.js");
+const { OWNER_ID } = require("./moderation/permissions");
+const { sendModLog } = require("../utils/modLogs");
+const { config, saveConfig } = require("../utils/storage");
 
 const TEST_CHANNEL_ID = "1413966369296220233";
 const MOD_LOG_CHANNEL_ID = "1232701768383729791";
 
 // Track test log message IDs in memory and export for use in moderationCommands.js
 let testLogMessageIds = [];
-config.testingMode = false;
-saveConfig();
-testLogMessageIds = [];
 
+/**
+ * Format a duration in ms to a readable string.
+ */
 function formatDuration(ms) {
   if (ms >= 24 * 60 * 60 * 1000) return `${Math.floor(ms / (24 * 60 * 60 * 1000))} day(s)`;
   if (ms >= 60 * 60 * 1000) return `${Math.floor(ms / (60 * 60 * 1000))} hour(s)`;
@@ -19,10 +19,16 @@ function formatDuration(ms) {
   return `${ms / 1000} seconds`;
 }
 
+/**
+ * Pick a random element from an array.
+ */
 function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+/**
+ * Get the test menu embed.
+ */
 function getTestEmbed(testingMode) {
   return new EmbedBuilder()
     .setTitle("🧪 Test Menu")
@@ -35,6 +41,9 @@ function getTestEmbed(testingMode) {
     );
 }
 
+/**
+ * Get the test menu button row.
+ */
 function getTestRow(testingMode) {
   return new ActionRowBuilder()
     .addComponents(
@@ -61,7 +70,9 @@ function getTestRow(testingMode) {
     );
 }
 
-// Helper to delete all test logs
+/**
+ * Delete all test logs from the moderation log channel.
+ */
 async function deleteTestLogs(client) {
   if (!testLogMessageIds.length) return;
   const channel = await client.channels.fetch(MOD_LOG_CHANNEL_ID).catch(() => null);
@@ -75,6 +86,9 @@ async function deleteTestLogs(client) {
   testLogMessageIds = [];
 }
 
+/**
+ * Handle the test command and menu.
+ */
 async function handleTestCommand(client, message) {
   if (message.author.id !== OWNER_ID) {
     return message.reply({ content: "Only the Owner can use this command.", ephemeral: true });
@@ -206,4 +220,7 @@ async function handleTestCommand(client, message) {
   });
 }
 
-export { handleTestCommand, testLogMessageIds, config, saveConfig };
+module.exports = {
+  handleTestCommand,
+  testLogMessageIds
+};

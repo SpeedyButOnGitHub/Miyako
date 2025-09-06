@@ -1,9 +1,9 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType, Message } from "discord.js";
-import { replyError, EMOJI_SUCCESS } from "./replies.js";
-import { sendUserDM } from "./dm.js";
-import { sendModLog } from "../../utils/modLogs.js";
-import { isModerator } from "./permissions.js";
-import { config, saveConfig } from "../../utils/storage.js";
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType, Message } = require("discord.js");
+const { replyError, EMOJI_SUCCESS } = require("./replies");
+const { sendUserDM } = require("./dm");
+const { sendModLog } = require("../../utils/modLogs");
+const { isModerator } = require("./permissions");
+const { config, saveConfig } = require("../../utils/storage");
 
 const WARNING_EXPIRY = 1000 * 60 * 60 * 24 * 60;
 
@@ -240,4 +240,8 @@ async function handleWarningButtons(client, interaction) {
   }
 }
 
-export { showWarnings, handleWarningButtons, cleanWarnings };
+module.exports = {
+  showWarnings,
+  handleWarningButtons,
+  cleanWarnings
+};

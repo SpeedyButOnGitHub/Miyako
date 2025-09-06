@@ -1,10 +1,7 @@
-import { Message, BaseInteraction } from "discord.js";
-import { config } from "../../utils/storage.js";
+const { Message, BaseInteraction } = require("discord.js");
+const { config } = require("../../utils/storage");
 
-const EMOJI_SUCCESS = "<a:kyoukoThumbsUp:1413767126547828757>";
-const EMOJI_ERROR = "<:VRLSad:1413770577080094802>";
-
-async function replySuccess(context, content) {
+function replySuccess(context, content) {
   if (context && typeof context.reply === "function" && context.constructor.name === "Message") {
     return context.reply(`${EMOJI_SUCCESS} ${content}`);
   } else if (context && typeof context.reply === "function" && typeof context.isRepliable === "function" && context.isRepliable()) {
@@ -16,7 +13,7 @@ async function replySuccess(context, content) {
   }
 }
 
-async function replyError(context, content) {
+function replyError(context, content) {
   if (context && typeof context.reply === "function" && context.constructor.name === "Message") {
     const msg = await context.reply(`${EMOJI_ERROR} ${content}`);
     // Only auto-delete if NOT in testing mode
@@ -41,4 +38,12 @@ async function replyError(context, content) {
   }
 }
 
-export { replySuccess, replyError, EMOJI_SUCCESS, EMOJI_ERROR };
+const EMOJI_SUCCESS = "✅";
+const EMOJI_ERROR = "❌";
+
+module.exports = {
+  replySuccess,
+  replyError,
+  EMOJI_SUCCESS,
+  EMOJI_ERROR
+};

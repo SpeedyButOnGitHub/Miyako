@@ -1,10 +1,10 @@
-import { isModerator, OWNER_ID } from "./permissions.js";
-import { replySuccess, replyError } from "./replies.js";
-import { sendUserDM } from "./dm.js";
-import { showWarnings, handleWarningButtons, cleanWarnings } from "./warnings.js";
-import { handleModerationCommands } from "./moderationCommands.js";
+const { isModerator, OWNER_ID } = require("./permissions");
+const { replySuccess, replyError } = require("./replies");
+const { sendUserDM } = require("./dm");
+const { showWarnings, handleWarningButtons, cleanWarnings } = require("./warnings");
+const { handleModerationCommands } = require("./moderationCommands");
 
-export {
+module.exports = {
   isModerator,
   OWNER_ID,
   replySuccess,
