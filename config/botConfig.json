@@ -2,6 +2,27 @@
   "snipingWhitelist": [],
   "moderatorRoles": [],
   "warnings": {
-    "432610292342587392": []
+    "432610292342587392": [
+      {
+        "moderator": "349282473085239298",
+        "reason": null,
+        "date": 1757169417183
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "meow",
+        "date": 1757169419775
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "meow",
+        "date": 1757169524085
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "meow",
+        "date": 1757169832353
+      }
+    ]
   }
 }
