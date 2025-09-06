@@ -1,8 +1,33 @@
 const { config } = require("../utils/storage");
 const { EmbedBuilder } = require("discord.js");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
+const fs = require("fs");
+const SNIPES_FILE = "./config/snipes.json";
 
 const snipes = new Map();
+
+// Load snipes from disk on startup
+function loadSnipes() {
+  if (fs.existsSync(SNIPES_FILE)) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(SNIPES_FILE));
+      for (const [channelId, snipe] of Object.entries(raw)) {
+        // Only restore snipes that haven't expired
+        if (snipe.expiresAt > Date.now()) snipes.set(channelId, snipe);
+      }
+    } catch {}
+  }
+}
+loadSnipes();
+
+// Save snipes to disk
+function saveSnipes() {
+  const obj = {};
+  for (const [channelId, snipe] of snipes.entries()) {
+    obj[channelId] = snipe;
+  }
+  fs.writeFileSync(SNIPES_FILE, JSON.stringify(obj, null, 2));
+}
 
 function formatTodayTime(date) {
   const d = new Date(date);
@@ -19,6 +44,7 @@ async function handleSnipeCommands(client, message, command, args) {
     let replyMsg;
     if (snipes.has(message.channel.id)) {
       snipes.delete(message.channel.id);
+      saveSnipes();
       replyMsg = await message.reply(`${EMOJI_SUCCESS} Snipe deleted!`);
     } else {
       replyMsg = await message.reply(`${EMOJI_ERROR} No snipe to delete.`);
@@ -67,6 +93,7 @@ function handleMessageDelete(message) {
     attachments: Array.from(message.attachments.values()).map(a => a.url),
     expiresAt: Date.now() + 2 * 60 * 60 * 1000
   });
+  saveSnipes();
 }
 
 module.exports = { handleSnipeCommands, handleMessageDelete };
