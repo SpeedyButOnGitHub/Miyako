@@ -150,217 +150,121 @@ async function handleMessageCreate(client, message) {
   activeMenus.push({ channelId: mainMsg.channel.id, messageId: mainMsg.id, commandId: message.id });
   fs.writeFileSync(ACTIVE_MENUS_FILE, JSON.stringify(activeMenus, null, 2));
 
-  // Delete both after 5 minutes
-  setTimeout(() => {
-    mainMsg.delete().catch(() => {});
-    message.delete().catch(() => {});
-  }, 5 * 60 * 1000);
+  // Collector management
+  let collector;
+  let collectorTimeout = 5 * 60 * 1000; // 5 minutes
 
-  const collector = mainMsg.createMessageComponentCollector({
-    componentType: ComponentType.Button,
-    time: 5 * 60 * 1000
-  });
+  function startCollector() {
+    if (collector) collector.stop("reset");
+    collector = mainMsg.createMessageComponentCollector({
+      componentType: ComponentType.Button,
+      time: collectorTimeout
+    });
 
-  collector.on("collect", async interaction => {
-    if (String(interaction.user.id) !== String(OWNER_ID)) {
-      await interaction.deferUpdate();
-      const errMsg = await interaction.followUp({ content: "Only the Owner can use this", ephemeral: true });
-      setTimeout(() => errMsg.delete().catch(() => {}), 3000);
-      return;
-    }
+    collector.on("collect", async interaction => {
+      if (String(interaction.user.id) !== String(OWNER_ID)) {
+        await interaction.deferUpdate();
+        const errMsg = await interaction.followUp({ content: "Only the Owner can use this", ephemeral: true });
+        setTimeout(() => errMsg.delete().catch(() => {}), 3000);
+        return;
+      }
 
-    // Help Menu button
-    if (interaction.customId === "config_help") {
-      await interaction.deferUpdate();
-      // Create a fake message object for help
-      const fakeHelpMsg = {
-        author: { id: interaction.user.id },
-        guild: interaction.guild,
-        channel: interaction.channel,
-        reply: (...args) => interaction.channel.send(...args)
-      };
-      const { handleHelpCommand } = require("./help");
-      await handleHelpCommand(client, fakeHelpMsg);
-      return;
-    }
+      // Help Menu button
+      if (interaction.customId === "config_help") {
+        await interaction.deferUpdate();
+        // Create a fake message object for help
+        const fakeHelpMsg = {
+          author: { id: interaction.user.id },
+          guild: interaction.guild,
+          channel: interaction.channel,
+          reply: (...args) => interaction.channel.send(...args)
+        };
+        const { handleHelpCommand } = require("./help");
+        await handleHelpCommand(client, fakeHelpMsg);
+        return startCollector();
+      }
 
-    // Back to main menu
-    if (interaction.customId === "back_main") {
-      return await interaction.update({ embeds: [mainEmbed], components: [mainRow] });
-    }
+      // Back to main menu
+      if (interaction.customId === "back_main") {
+        await interaction.update({ embeds: [mainEmbed], components: [mainRow] });
+        return startCollector();
+      }
 
-    // Back to category view
-    if (interaction.customId.startsWith("back_category_")) {
-      const categoryName = interaction.customId.replace("back_category_", "");
-      const category = configCategories[categoryName];
-      if (!category)
-        return interaction.reply({ content: `${EMOJI_ERROR} Category not found.`, ephemeral: true });
+      // Back to category view
+      if (interaction.customId.startsWith("back_category_")) {
+        const categoryName = interaction.customId.replace("back_category_", "");
+        const category = configCategories[categoryName];
+        if (!category)
+          return interaction.reply({ content: `${EMOJI_ERROR} Category not found.`, ephemeral: true });
 
-      const categoryEmbed = new EmbedBuilder()
-        .setTitle(`⚙️ ${categoryName} Settings`)
-        .setColor(0x5865F2)
-        .setDescription(
-          `**${category.description}**\n\n__Current settings:__\n` +
-          Object.entries(category.settings)
-            .map(([key, setting]) => `**${key}:**\n${setting.getDisplay()}`)
-            .join("\n\n")
-        );
+        const categoryEmbed = new EmbedBuilder()
+          .setTitle(`⚙️ ${categoryName} Settings`)
+          .setColor(0x5865F2)
+          .setDescription(
+            `**${category.description}**\n\n__Current settings:__\n` +
+            Object.entries(category.settings)
+              .map(([key, setting]) => `**${key}:**\n${setting.getDisplay()}`)
+              .join("\n\n")
+          );
 
-      const settingsRow = new ActionRowBuilder();
-      for (const key in category.settings) {
+        const settingsRow = new ActionRowBuilder();
+        for (const key in category.settings) {
+          settingsRow.addComponents(
+            new ButtonBuilder()
+              .setCustomId(`setting_${categoryName}_${key}`)
+              .setLabel(`⚙️ ${key}`)
+              .setStyle(ButtonStyle.Primary)
+          );
+        }
         settingsRow.addComponents(
           new ButtonBuilder()
-            .setCustomId(`setting_${categoryName}_${key}`)
-            .setLabel(`⚙️ ${key}`)
-            .setStyle(ButtonStyle.Primary)
-        );
-      }
-      settingsRow.addComponents(
-        new ButtonBuilder()
-          .setCustomId("back_main")
-          .setLabel("Back")
-          .setStyle(ButtonStyle.Secondary)
-      );
-
-      return await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
-    }
-
-    const parts = interaction.customId.split("_");
-    const [type, categoryName, settingKey, action] = parts;
-
-    // Open category
-    if (type === "category") {
-      const category = configCategories[categoryName];
-      const categoryEmbed = new EmbedBuilder()
-        .setTitle(`⚙️ ${categoryName} Settings`)
-        .setColor(0x5865F2)
-        .setDescription(
-          `**${category.description}**\n\n__Current settings:__\n` +
-          Object.entries(category.settings)
-            .map(([key, setting]) => `**${key}:**\n${setting.getDisplay()}`)
-            .join("\n\n")
-        );
-
-      const settingsRow = new ActionRowBuilder();
-      for (const key in category.settings) {
-        settingsRow.addComponents(
-          new ButtonBuilder()
-            .setCustomId(`setting_${categoryName}_${key}`)
-            .setLabel(`⚙️ ${key}`)
-            .setStyle(ButtonStyle.Primary)
-        );
-      }
-      settingsRow.addComponents(
-        new ButtonBuilder()
-          .setCustomId("back_main")
-          .setLabel("Back")
-          .setStyle(ButtonStyle.Secondary)
-      );
-
-      return await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
-    }
-
-    // Open setting
-    if (type === "setting") {
-      const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-      // Only add Help Menu button if NOT RoleLogBlacklist
-      if (!(categoryName === "Moderation" && settingKey === "RoleLogBlacklist")) {
-        row.addComponents(
-          new ButtonBuilder()
-            .setCustomId("config_help")
-            .setLabel("Help Menu")
+            .setCustomId("back_main")
+            .setLabel("Back")
             .setStyle(ButtonStyle.Secondary)
-            .setEmoji("❓")
         );
+
+        await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
+        return startCollector();
       }
-      return await interaction.update({ embeds: [embed], components: [row] });
-    }
 
-    // Handle add/remove actions
-    if (type === "settingButton") {
-      const setting = configCategories[categoryName]?.settings[settingKey];
-      if (!setting)
-        return interaction.reply({ content: `${EMOJI_ERROR} Setting not found.`, ephemeral: true });
+      const parts = interaction.customId.split("_");
+      const [type, categoryName, settingKey, action] = parts;
 
-      const promptMsg = await interaction.reply({
-        content: `Type ${action.includes("add") ? "IDs or mentions to add" : "IDs or mentions to remove"} (comma-separated).`,
-        ephemeral: true
-      });
+      // Open category
+      if (type === "category") {
+        const category = configCategories[categoryName];
+        const categoryEmbed = new EmbedBuilder()
+          .setTitle(`⚙️ ${categoryName} Settings`)
+          .setColor(0x5865F2)
+          .setDescription(
+            `**${category.description}**\n\n__Current settings:__\n` +
+            Object.entries(category.settings)
+              .map(([key, setting]) => `**${key}:**\n${setting.getDisplay()}`)
+              .join("\n\n")
+          );
 
-      const filter = m => m.author.id === interaction.user.id;
-      const collector = interaction.channel.createMessageCollector({ filter, time: 30000, max: 1 });
-
-      collector.on("collect", async m => {
-        const inputs = m.content
-          .split(",")
-          .map(s => s.trim().replace(/[<#&>]/g, ""))
-          .filter(Boolean);
-
-        if (categoryName === "Sniping") {
-          if (action === "addChannel")
-            inputs.forEach(id => {
-              if (!config.snipingWhitelist.includes(id)) config.snipingWhitelist.push(id);
-            });
-          else if (action === "removeChannel")
-            config.snipingWhitelist = config.snipingWhitelist.filter(id => !inputs.includes(id));
+        const settingsRow = new ActionRowBuilder();
+        for (const key in category.settings) {
+          settingsRow.addComponents(
+            new ButtonBuilder()
+              .setCustomId(`setting_${categoryName}_${key}`)
+              .setLabel(`⚙️ ${key}`)
+              .setStyle(ButtonStyle.Primary)
+          );
         }
+        settingsRow.addComponents(
+          new ButtonBuilder()
+            .setCustomId("back_main")
+            .setLabel("Back")
+            .setStyle(ButtonStyle.Secondary)
+        );
 
-        if (categoryName === "Moderation") {
-          const matchedRoles = [];
-          const invalidInputs = [];
-          inputs.forEach(input => {
-            const role = interaction.guild.roles.cache.find(
-              r => r.id === input || r.name.toLowerCase() === input.toLowerCase()
-            );
-            if (role) {
-              matchedRoles.push(role);
-            } else {
-              invalidInputs.push(input);
-            }
-          });
+        await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
+        return startCollector();
+      }
 
-          if (invalidInputs.length > 0) {
-            await interaction.followUp({
-              content: `${EMOJI_ERROR} Please type a valid role ping or id. Invalid: ${invalidInputs.map(i => `\`${i}\``).join(", ")}`,
-              ephemeral: true
-            });
-            m.delete().catch(() => {});
-            return;
-          }
-
-          if (action === "addRole")
-            matchedRoles.forEach(r => {
-              if (!config.moderatorRoles.includes(r.id)) config.moderatorRoles.push(r.id);
-            });
-          else if (action === "removeRole") {
-            const idsToRemove = matchedRoles.map(r => r.id);
-            config.moderatorRoles = config.moderatorRoles.filter(id => !idsToRemove.includes(id));
-          }
-        }
-
-        if (categoryName === "Moderation" && settingKey === "RoleLogBlacklist") {
-          const matchedRoles = [];
-          inputs.forEach(input => {
-            const role = interaction.guild.roles.cache.find(
-              r => r.id === input || r.name.toLowerCase() === input.toLowerCase()
-            );
-            if (role) matchedRoles.push(role);
-          });
-
-          if (action === "addBlacklistRole")
-            matchedRoles.forEach(r => {
-              if (!config.roleLogBlacklist.includes(r.id)) config.roleLogBlacklist.push(r.id);
-            });
-          else if (action === "removeBlacklistRole") {
-            const idsToRemove = matchedRoles.map(r => r.id);
-            config.roleLogBlacklist = config.roleLogBlacklist.filter(id => !idsToRemove.includes(id));
-          }
-          saveConfig();
-        }
-
-        saveConfig();
-
-        // Edit original message with updated config
+      // Open setting
+      if (type === "setting") {
         const { embed, row } = renderSettingEmbed(categoryName, settingKey);
         // Only add Help Menu button if NOT RoleLogBlacklist
         if (!(categoryName === "Moderation" && settingKey === "RoleLogBlacklist")) {
@@ -372,18 +276,171 @@ async function handleMessageCreate(client, message) {
               .setEmoji("❓")
           );
         }
-        await interaction.message.edit({ embeds: [embed], components: [row] });
+        await interaction.update({ embeds: [embed], components: [row] });
+        return startCollector();
+      }
 
-        await interaction.followUp({
-          content: `${EMOJI_SUCCESS} Settings updated successfully.`,
+      // Handle add/remove actions
+      if (type === "settingButton") {
+        const setting = configCategories[categoryName]?.settings[settingKey];
+        if (!setting)
+          return interaction.reply({ content: `${EMOJI_ERROR} Setting not found.`, ephemeral: true });
+
+        const promptMsg = await interaction.reply({
+          content: `Type ${action.includes("add") ? "IDs or mentions to add" : "IDs or mentions to remove"} (comma-separated).`,
           ephemeral: true
         });
-        m.delete().catch(() => {});
-      });
 
-      collector.on("end", () => promptMsg.delete().catch(() => {}));
-    }
-  });
+        const filter = m => m.author.id === interaction.user.id;
+        const msgCollector = interaction.channel.createMessageCollector({ filter, time: 30000, max: 1 });
+
+        msgCollector.on("collect", async m => {
+          const inputs = m.content
+            .split(",")
+            .map(s => s.trim().replace(/[<#&>]/g, ""))
+            .filter(Boolean);
+
+          if (categoryName === "Sniping") {
+            const matchedChannels = [];
+            const invalidChannels = [];
+            inputs.forEach(input => {
+              const channel = interaction.guild.channels.cache.get(input);
+              if (channel) {
+                matchedChannels.push(channel.id);
+              } else {
+                invalidChannels.push(input);
+              }
+            });
+
+            if (invalidChannels.length > 0) {
+              await interaction.followUp({
+                content: `${EMOJI_ERROR} Please type a valid channel ping or id. Invalid: ${invalidChannels.map(i => `\`${i}\``).join(", ")}`,
+                ephemeral: true
+              });
+              m.delete().catch(() => {});
+              return;
+            }
+
+            if (action === "addChannel")
+              matchedChannels.forEach(id => {
+                if (!config.snipingWhitelist.includes(id)) config.snipingWhitelist.push(id);
+              });
+            else if (action === "removeChannel")
+              config.snipingWhitelist = config.snipingWhitelist.filter(id => !matchedChannels.includes(id));
+          }
+
+          if (categoryName === "Moderation") {
+            const matchedRoles = [];
+            const invalidInputs = [];
+            inputs.forEach(input => {
+              const role = interaction.guild.roles.cache.find(
+                r => r.id === input || r.name.toLowerCase() === input.toLowerCase()
+              );
+              if (role) {
+                matchedRoles.push(role);
+              } else {
+                invalidInputs.push(input);
+              }
+            });
+
+            if (invalidInputs.length > 0) {
+              await interaction.followUp({
+                content: `${EMOJI_ERROR} Please type a valid role ping or id. Invalid: ${invalidInputs.map(i => `\`${i}\``).join(", ")}`,
+                ephemeral: true
+              });
+              m.delete().catch(() => {});
+              return;
+            }
+
+            if (action === "addRole")
+              matchedRoles.forEach(r => {
+                if (!config.moderatorRoles.includes(r.id)) config.moderatorRoles.push(r.id);
+              });
+            else if (action === "removeRole") {
+              const idsToRemove = matchedRoles.map(r => r.id);
+              config.moderatorRoles = config.moderatorRoles.filter(id => !idsToRemove.includes(id));
+            }
+          }
+
+          if (categoryName === "Moderation" && settingKey === "RoleLogBlacklist") {
+            const matchedRoles = [];
+            const invalidInputs = [];
+            inputs.forEach(input => {
+              const role = interaction.guild.roles.cache.find(
+                r => r.id === input || r.name.toLowerCase() === input.toLowerCase()
+              );
+              if (role) {
+                matchedRoles.push(role);
+              } else {
+                invalidInputs.push(input);
+              }
+            });
+
+            if (invalidInputs.length > 0) {
+              await interaction.followUp({
+                content: `${EMOJI_ERROR} Please type a valid role ping or id. Invalid: ${invalidInputs.map(i => `\`${i}\``).join(", ")}`,
+                ephemeral: true
+              });
+              m.delete().catch(() => {});
+              return;
+            }
+
+            if (action === "addBlacklistRole")
+              matchedRoles.forEach(r => {
+                if (!config.roleLogBlacklist.includes(r.id)) config.roleLogBlacklist.push(r.id);
+              });
+            else if (action === "removeBlacklistRole") {
+              const idsToRemove = matchedRoles.map(r => r.id);
+              config.roleLogBlacklist = config.roleLogBlacklist.filter(id => !idsToRemove.includes(id));
+            }
+            saveConfig();
+          }
+
+          saveConfig();
+
+          // Edit original message with updated config
+          const { embed, row } = renderSettingEmbed(categoryName, settingKey);
+          // Only add Help Menu button if NOT RoleLogBlacklist
+          if (!(categoryName === "Moderation" && settingKey === "RoleLogBlacklist")) {
+            row.addComponents(
+              new ButtonBuilder()
+                .setCustomId("config_help")
+                .setLabel("Help Menu")
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji("❓")
+            );
+          }
+          await interaction.message.edit({ embeds: [embed], components: [row] });
+
+          await interaction.followUp({
+            content: `${EMOJI_SUCCESS} Settings updated successfully.`,
+            ephemeral: true
+          });
+          m.delete().catch(() => {});
+        });
+
+        msgCollector.on("end", () => promptMsg.delete().catch(() => {}));
+        return startCollector();
+      }
+
+      // Reset collector timer after any button interaction
+      startCollector();
+    });
+
+    collector.on("end", async (_, reason) => {
+      if (reason !== "reset") {
+        await mainMsg.delete().catch(() => {});
+        await message.delete().catch(() => {});
+        // Remove from activeMenus.json
+        activeMenus = activeMenus.filter(
+          m => m.messageId !== mainMsg.id && m.commandId !== message.id
+        );
+        fs.writeFileSync(ACTIVE_MENUS_FILE, JSON.stringify(activeMenus, null, 2));
+      }
+    });
+  }
+
+  startCollector();
 }
 
 async function handleConfigCommand(client, message) {
