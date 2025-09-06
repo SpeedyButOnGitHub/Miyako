@@ -1,43 +1,70 @@
 const { config } = require("../utils/storage");
 const { EmbedBuilder } = require("discord.js");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
-const fs = require("fs");
+const fs = require("fs/promises");
 const SNIPES_FILE = "./config/snipes.json";
 
 const snipes = new Map();
 // Track last snipe message per channel for editing
 const lastSnipeMessage = new Map();
+// Track last snipe embed data for deleted messages
+const lastSnipeEmbedData = new Map();
 
 // Load snipes from disk on startup
-function loadSnipes() {
-  if (fs.existsSync(SNIPES_FILE)) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(SNIPES_FILE));
-      for (const [channelId, snipe] of Object.entries(raw)) {
-        // Recalculate expiresAt based on timestamp
-        snipe.expiresAt = snipe.timestamp + 2 * 60 * 60 * 1000;
-        if (snipe.expiresAt > Date.now()) snipes.set(channelId, snipe);
-      }
-    } catch {}
+async function loadSnipes() {
+  try {
+    const raw = JSON.parse(await fs.readFile(SNIPES_FILE, "utf8"));
+    for (const [channelId, snipe] of Object.entries(raw)) {
+      snipe.expiresAt = snipe.timestamp + 2 * 60 * 60 * 1000;
+      if (snipe.expiresAt > Date.now()) snipes.set(channelId, snipe);
+    }
+  } catch (err) {
+    // If file doesn't exist or is invalid, ignore
   }
 }
 loadSnipes();
 
 // Save snipes to disk
-function saveSnipes() {
+async function saveSnipes() {
   const obj = {};
   for (const [channelId, snipe] of snipes.entries()) {
     obj[channelId] = snipe;
   }
-  fs.writeFileSync(SNIPES_FILE, JSON.stringify(obj, null, 2));
+  try {
+    await fs.writeFile(SNIPES_FILE, JSON.stringify(obj, null, 2));
+  } catch (err) {
+    console.error("Failed to save snipes:", err);
+  }
 }
 
+// Format time as "Today at HH:MM"
 function formatTodayTime(date) {
   const d = new Date(date);
   const hours = d.getHours().toString().padStart(2, "0");
   const minutes = d.getMinutes().toString().padStart(2, "0");
   return `Today at ${hours}:${minutes}`;
 }
+
+// Clean up expired snipes and old snipe messages
+function cleanupSnipes() {
+  const now = Date.now();
+  for (const [channelId, snipe] of snipes.entries()) {
+    if (snipe.expiresAt < now) snipes.delete(channelId);
+  }
+  for (const [channelId, msg] of lastSnipeMessage.entries()) {
+    // Remove if message is deleted or too old
+    if (!msg || (msg.createdTimestamp && now - msg.createdTimestamp > 2 * 60 * 60 * 1000)) {
+      lastSnipeMessage.delete(channelId);
+    }
+  }
+  for (const [channelId, embedData] of lastSnipeEmbedData.entries()) {
+    // Remove if too old
+    if (embedData && embedData.timestamp && now - embedData.timestamp > 2 * 60 * 60 * 1000) {
+      lastSnipeEmbedData.delete(channelId);
+    }
+  }
+}
+setInterval(cleanupSnipes, 60 * 1000); // Clean up every minute
 
 async function handleSnipeCommands(client, message, command, args) {
   const content = message.content.toLowerCase();
@@ -47,7 +74,7 @@ async function handleSnipeCommands(client, message, command, args) {
     let replyMsg;
     if (snipes.has(message.channel.id)) {
       snipes.delete(message.channel.id);
-      saveSnipes();
+      await saveSnipes();
       replyMsg = await message.reply(`${EMOJI_SUCCESS} Snipe deleted!`);
 
       // Edit the last snipe message in this channel if it exists
@@ -57,7 +84,8 @@ async function handleSnipeCommands(client, message, command, args) {
           const oldEmbed = snipeMsg.embeds?.[0];
           if (oldEmbed) {
             const newEmbed = EmbedBuilder.from(oldEmbed)
-              .setDescription(`${EMOJI_ERROR} This snipe has been deleted.`);
+              .setDescription(`${EMOJI_ERROR} This snipe has been deleted.`)
+              .setColor(0xff0000);
             await snipeMsg.edit({
               content: null,
               embeds: [newEmbed]
@@ -68,10 +96,12 @@ async function handleSnipeCommands(client, message, command, args) {
               embeds: []
             });
           }
-        } catch {}
+        } catch (err) {
+          console.error("Failed to edit snipe message:", err);
+        }
       }
-      // Mark that the last snipe message was deleted
-      lastSnipeMessage.set(message.channel.id, null);
+      // Do NOT set lastSnipeMessage to null, keep it for future .snipe/.s
+      // Do NOT overwrite lastSnipeEmbedData here!
     } else {
       replyMsg = await message.reply(`${EMOJI_ERROR} No snipe to delete.`);
     }
@@ -89,13 +119,22 @@ async function handleSnipeCommands(client, message, command, args) {
     }
 
     const snipe = snipes.get(message.channel.id);
-    // If snipe was deleted, show the embed with "This snipe has been deleted"
+    // If snipe was deleted or expired, show the previous embed with the deleted message notice
     if (!snipe || Date.now() > snipe.expiresAt) {
       // Try to show the previous embed with the deleted message notice
       const snipeMsg = lastSnipeMessage.get(message.channel.id);
       if (snipeMsg && snipeMsg.embeds?.[0]) {
         const deletedEmbed = EmbedBuilder.from(snipeMsg.embeds[0])
-          .setDescription(`${EMOJI_ERROR} This snipe has been deleted.`);
+          .setDescription(`${EMOJI_ERROR} This snipe has been deleted.`)
+          .setColor(0xff0000);
+        return message.reply({ embeds: [deletedEmbed] });
+      }
+      // If we have saved embed data, reconstruct the deleted embed
+      const embedData = lastSnipeEmbedData.get(message.channel.id);
+      if (embedData) {
+        const deletedEmbed = new EmbedBuilder(embedData)
+          .setDescription(`${EMOJI_ERROR} This snipe has been deleted.`)
+          .setColor(0xff0000);
         return message.reply({ embeds: [deletedEmbed] });
       }
       return message.reply(`${EMOJI_ERROR} No message has been deleted in the past 2 hours.`);
@@ -104,7 +143,7 @@ async function handleSnipeCommands(client, message, command, args) {
     const embed = new EmbedBuilder()
       .setAuthor({ name: snipe.nickname, iconURL: snipe.avatarURL })
       .setDescription(snipe.content || "*No content (attachment or embed only)*")
-      .setColor(0x2f3136)
+      .setColor(0x5865F2) // Discord blurple for normal snipes
       .setFooter({ text: formatTodayTime(snipe.timestamp) });
 
     if (snipe.attachments && snipe.attachments.length > 0) {
@@ -113,12 +152,14 @@ async function handleSnipeCommands(client, message, command, args) {
 
     const sentMsg = await message.reply({ embeds: [embed] });
     lastSnipeMessage.set(message.channel.id, sentMsg);
+    // Save the embed data for deleted snipe fallback (only here!)
+    lastSnipeEmbedData.set(message.channel.id, { ...embed.data, timestamp: Date.now() });
     return;
   }
 }
 
+// Only snipe non-bot, non-self messages
 function handleMessageDelete(message) {
-  // Ignore partials, bot messages, and messages from this bot
   if (
     message.partial ||
     message.author.bot ||

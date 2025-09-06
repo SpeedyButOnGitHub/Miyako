@@ -1,3 +1,4 @@
 .env
 
 botConfig.json
+config/snipes.json
