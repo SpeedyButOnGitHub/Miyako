@@ -54,7 +54,6 @@ async function handleSnipeCommands(client, message, command, args) {
       const snipeMsg = lastSnipeMessage.get(message.channel.id);
       if (snipeMsg && snipeMsg.editable) {
         try {
-          // Clone the previous embed and only change the description
           const oldEmbed = snipeMsg.embeds?.[0];
           if (oldEmbed) {
             const newEmbed = EmbedBuilder.from(oldEmbed)
@@ -71,6 +70,8 @@ async function handleSnipeCommands(client, message, command, args) {
           }
         } catch {}
       }
+      // Mark that the last snipe message was deleted
+      lastSnipeMessage.set(message.channel.id, null);
     } else {
       replyMsg = await message.reply(`${EMOJI_ERROR} No snipe to delete.`);
     }
@@ -83,13 +84,20 @@ async function handleSnipeCommands(client, message, command, args) {
 
   // .snipe and .s both show the last deleted message
   if (content === ".snipe" || content === ".s") {
-    // whitelist check
     if (!config.snipingWhitelist.includes(message.channel.id)) {
       return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
     }
 
     const snipe = snipes.get(message.channel.id);
+    // If snipe was deleted, show the embed with "This snipe has been deleted"
     if (!snipe || Date.now() > snipe.expiresAt) {
+      // Try to show the previous embed with the deleted message notice
+      const snipeMsg = lastSnipeMessage.get(message.channel.id);
+      if (snipeMsg && snipeMsg.embeds?.[0]) {
+        const deletedEmbed = EmbedBuilder.from(snipeMsg.embeds[0])
+          .setDescription(`${EMOJI_ERROR} This snipe has been deleted.`);
+        return message.reply({ embeds: [deletedEmbed] });
+      }
       return message.reply(`${EMOJI_ERROR} No message has been deleted in the past 2 hours.`);
     }
 
@@ -110,7 +118,13 @@ async function handleSnipeCommands(client, message, command, args) {
 }
 
 function handleMessageDelete(message) {
-  if (message.partial || message.author.bot) return;
+  // Ignore partials, bot messages, and messages from this bot
+  if (
+    message.partial ||
+    message.author.bot ||
+    (message.client && message.author.id === message.client.user.id)
+  ) return;
+
   const member = message.member || message.guild.members.cache.get(message.author.id);
   const timestamp = Date.now();
   snipes.set(message.channel.id, {
