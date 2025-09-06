@@ -116,6 +116,7 @@ async function handleTestCommand(client, message) {
   const replyMsg = await message.reply({ embeds: [embed], components: [row] });
 
   const collector = replyMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 5 * 60 * 1000 });
+
   collector.on("collect", async interaction => {
     if (interaction.user.id !== OWNER_ID) {
       await interaction.reply({ content: "Only the Owner can use this.", ephemeral: true });
@@ -216,6 +217,12 @@ async function handleTestCommand(client, message) {
 
       await interaction.reply({ content: `Test event sent to <#${testingMode ? TEST_CHANNEL_ID : MOD_LOG_CHANNEL_ID}>!`, ephemeral: true });
     }
+  });
+
+  // Delete the menu message when time runs out
+  collector.on("end", async () => {
+    await replyMsg.delete().catch(() => {});
+    await message.delete().catch(() => {});
   });
 }
 
