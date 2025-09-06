@@ -11,8 +11,6 @@
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
-  "moderator": "1234567890",
-  "reason": "Test reason",
-  "date": 1720000000000,
-  "logMsgId": "1412345678901234567"
+  "testingMode": true,
+  "roleLogBlacklist": []
 }

@@ -5,6 +5,7 @@ const { config, saveConfig } = require("../utils/storage");
 
 const TEST_CHANNEL_ID = "1413966369296220233";
 const MOD_LOG_CHANNEL_ID = "1232701768383729791";
+const MEMBER_LEAVE_LOG_CHANNEL = "1232701769859993628";
 
 // Track test log message IDs in memory and export for use in moderationCommands.js
 let testLogMessageIds = [];
@@ -63,27 +64,16 @@ function getTestRow(testingMode) {
         .setStyle(ButtonStyle.Danger)
         .setEmoji("👢"),
       new ButtonBuilder()
+        .setCustomId("test_member_leave")
+        .setLabel("Test Member Leave")
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji("👋"),
+      new ButtonBuilder()
         .setCustomId("toggle_testing")
         .setLabel(testingMode ? "Disable Testing Mode" : "Enable Testing Mode")
         .setStyle(testingMode ? ButtonStyle.Danger : ButtonStyle.Success)
         .setEmoji(testingMode ? "🛑" : "🧪")
     );
-}
-
-/**
- * Delete all test logs from the moderation log channel.
- */
-async function deleteTestLogs(client) {
-  if (!testLogMessageIds.length) return;
-  const channel = await client.channels.fetch(MOD_LOG_CHANNEL_ID).catch(() => null);
-  if (!channel) return;
-  for (const msgId of testLogMessageIds) {
-    try {
-      const msg = await channel.messages.fetch(msgId).catch(() => null);
-      if (msg) await msg.delete().catch(() => {});
-    } catch {}
-  }
-  testLogMessageIds = [];
 }
 
 /**
@@ -107,8 +97,7 @@ async function handleTestCommand(client, message) {
     config.testingMode = enable;
     saveConfig();
     if (!enable) {
-      await message.reply("🧪 Testing mode is now **DISABLED**. Deleting test logs...");
-      await deleteTestLogs(client);
+      await message.reply("🧪 Testing mode is now **DISABLED**.");
     } else {
       await message.reply("🧪 Testing mode is now **ENABLED**.");
     }
@@ -126,7 +115,7 @@ async function handleTestCommand(client, message) {
 
   const replyMsg = await message.reply({ embeds: [embed], components: [row] });
 
-  const collector = replyMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000 });
+  const collector = replyMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 5 * 60 * 1000 });
   collector.on("collect", async interaction => {
     if (interaction.user.id !== OWNER_ID) {
       await interaction.reply({ content: "Only the Owner can use this.", ephemeral: true });
@@ -145,8 +134,7 @@ async function handleTestCommand(client, message) {
         embed = getTestEmbed(testingMode);
         row = getTestRow(testingMode);
         await interaction.update({ embeds: [embed], components: [row] });
-        await interaction.followUp({ content: "🧪 Testing mode is now **DISABLED**. Deleting test logs...", ephemeral: true });
-        await deleteTestLogs(client);
+        await interaction.followUp({ content: "🧪 Testing mode is now **DISABLED**.", ephemeral: true });
       } else {
         config.testingMode = true;
         saveConfig();
@@ -189,33 +177,44 @@ async function handleTestCommand(client, message) {
       action = "muted";
     } else if (interaction.customId === "test_kick") {
       action = "kicked";
+    } else if (interaction.customId === "test_member_leave") {
+      const members = [...message.guild.members.cache.values()].filter(m => !m.user.bot);
+      const subject = pickRandom(members);
+      const { logMemberLeave } = require("../utils/memberLogs");
+      const originalTestingMode = config.testingMode;
+      if (testingMode) {
+        config.testingMode = true;
+        await logMemberLeave(client, subject, true);
+        config.testingMode = originalTestingMode;
+        await interaction.reply({ content: `Test member leave log sent for <@${subject.id}> in <#${TEST_CHANNEL_ID}>!`, ephemeral: true });
+      } else {
+        config.testingMode = false;
+        await logMemberLeave(client, subject, true);
+        config.testingMode = originalTestingMode;
+        await interaction.reply({ content: `Test member leave log sent for <@${subject.id}> in <#${MEMBER_LEAVE_LOG_CHANNEL}>!`, ephemeral: true });
+      }
+      return;
     }
 
     if (action) {
-      const testChannel = await client.channels.fetch(TEST_CHANNEL_ID).catch(() => null);
-      if (testChannel) {
-        const embedObj = await sendModLog(
-          client,
-          subject,
-          message.author,
-          action,
-          reason,
-          true,
-          action === "muted" ? duration : null,
-          action === "warned" ? currentWarnings : null
-        );
-        // Track the log message ID if in testing mode
-        if (config.testingMode && embedObj && embedObj.id) {
-          testLogMessageIds.push(embedObj.id);
-        }
-        if (embedObj && embedObj.channel.id !== TEST_CHANNEL_ID) {
-          await testChannel.send({ embeds: [embedObj.embeds[0]] });
-          await embedObj.delete().catch(() => {});
-        }
-        await interaction.reply({ content: `Test event sent to <#${TEST_CHANNEL_ID}>!`, ephemeral: true });
-      } else {
-        await interaction.reply({ content: "Test channel not found.", ephemeral: true });
-      }
+      // Send mod log ONLY to the correct channel based on testing mode
+      const { sendModLog } = require("../utils/modLogs");
+      // Temporarily override config.testingMode for this log
+      const originalTestingMode = config.testingMode;
+      config.testingMode = testingMode;
+      await sendModLog(
+        client,
+        subject,
+        message.author,
+        action,
+        reason,
+        true,
+        action === "muted" ? duration : null,
+        action === "warned" ? currentWarnings : null
+      );
+      config.testingMode = originalTestingMode;
+
+      await interaction.reply({ content: `Test event sent to <#${testingMode ? TEST_CHANNEL_ID : MOD_LOG_CHANNEL_ID}>!`, ephemeral: true });
     }
   });
 }

@@ -12,6 +12,7 @@ const { handleLevelCommand } = require("./commands/level");
 const { logMessageDelete, logMessageEdit } = require("./utils/messageLogs");
 const { logRoleChange } = require("./utils/roleLogs");
 const { handleTestCommand } = require("./commands/test");
+const { logMemberLeave } = require("./utils/memberLogs");
 
 const { OWNER_ID, ALLOWED_ROLES, CHATBOX_BUTTON_ID } = require("./commands/moderation/permissions");
 
@@ -291,6 +292,9 @@ client.on("guildMemberUpdate", (oldMember, newMember) => {
   for (const role of removedRoles.values()) logRoleChange(client, newMember, role, "remove");
 });
 client.on("guildMemberAdd", (member) => updateStaffMessage(member.guild));
-client.on("guildMemberRemove", (member) => updateStaffMessage(member.guild));
+client.on("guildMemberRemove", (member) => {
+  updateStaffMessage(member.guild);
+  logMemberLeave(client, member);
+});
 
 client.login(process.env.DISCORD_TOKEN);

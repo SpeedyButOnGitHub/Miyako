@@ -307,12 +307,26 @@ async function handleMessageCreate(client, message) {
 
         if (categoryName === "Moderation") {
           const matchedRoles = [];
+          const invalidInputs = [];
           inputs.forEach(input => {
             const role = interaction.guild.roles.cache.find(
               r => r.id === input || r.name.toLowerCase() === input.toLowerCase()
             );
-            if (role) matchedRoles.push(role);
+            if (role) {
+              matchedRoles.push(role);
+            } else {
+              invalidInputs.push(input);
+            }
           });
+
+          if (invalidInputs.length > 0) {
+            await interaction.followUp({
+              content: `${EMOJI_ERROR} Please type a valid role ping or id. Invalid: ${invalidInputs.map(i => `\`${i}\``).join(", ")}`,
+              ephemeral: true
+            });
+            m.delete().catch(() => {});
+            return;
+          }
 
           if (action === "addRole")
             matchedRoles.forEach(r => {

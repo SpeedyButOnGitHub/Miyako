@@ -3,6 +3,8 @@ const { isModerator } = require("./moderation/index");
 const { handleMessageCreate } = require("./configMenu");
 const { OWNER_ID } = require("./moderation/permissions");
 
+const EMOJI_ERROR = "❌";
+
 const categories = [
   {
     name: "Moderation",
@@ -177,6 +179,11 @@ async function handleHelpCommand(client, message) {
       await interaction.update({ embeds: [embed], components: [row] });
       return;
     }
+
+    await interaction.followUp({
+      content: `${EMOJI_ERROR} Please provide a valid input.`,
+      ephemeral: true
+    });
   });
 }
 

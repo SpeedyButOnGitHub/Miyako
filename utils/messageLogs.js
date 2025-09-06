@@ -1,8 +1,12 @@
 const { EmbedBuilder } = require("discord.js");
+const { config } = require("./storage");
+
 const MESSAGE_LOG_CHANNEL = "1232701769859993622";
+const TEST_LOG_CHANNEL = "1413966369296220233";
 
 async function logMessageDelete(client, message) {
-  const channel = await client.channels.fetch(MESSAGE_LOG_CHANNEL).catch(() => null);
+  const logChannelId = config.testingMode ? TEST_LOG_CHANNEL : MESSAGE_LOG_CHANNEL;
+  const channel = await client.channels.fetch(logChannelId).catch(() => null);
   if (!channel || !message.guild || !message.author || message.author.bot) return;
 
   const embed = new EmbedBuilder()
@@ -17,7 +21,8 @@ async function logMessageDelete(client, message) {
 }
 
 async function logMessageEdit(client, oldMessage, newMessage) {
-  const channel = await client.channels.fetch(MESSAGE_LOG_CHANNEL).catch(() => null);
+  const logChannelId = config.testingMode ? TEST_LOG_CHANNEL : MESSAGE_LOG_CHANNEL;
+  const channel = await client.channels.fetch(logChannelId).catch(() => null);
   if (!channel || !oldMessage.guild || !oldMessage.author || oldMessage.author.bot) return;
   if (oldMessage.content === newMessage.content) return;
 

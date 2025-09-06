@@ -1,12 +1,14 @@
 const { EmbedBuilder } = require("discord.js");
-const { config } = require("./storage"); // Add this import
+const { config } = require("./storage");
 
 const ROLE_LOG_CHANNEL = "1232739307736010854";
+const TEST_LOG_CHANNEL = "1413966369296220233";
 
 async function logRoleChange(client, member, role, action) {
-  if (config.roleLogBlacklist.includes(role.id)) return; // Use config blacklist
+  if (config.roleLogBlacklist.includes(role.id)) return;
 
-  const channel = await client.channels.fetch(ROLE_LOG_CHANNEL).catch(err => {
+  const logChannelId = config.testingMode ? TEST_LOG_CHANNEL : ROLE_LOG_CHANNEL;
+  const channel = await client.channels.fetch(logChannelId).catch(err => {
     console.error("[Role Log Error]:", err);
     return null;
   });
