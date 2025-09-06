@@ -10,13 +10,23 @@ const lastSnipeMessage = new Map();
 // Track last snipe embed data for deleted messages
 const lastSnipeEmbedData = new Map();
 
+// Add a persistent deleted flag per channel
+const deletedSnipes = new Set();
+
 // Load snipes from disk on startup
 async function loadSnipes() {
   try {
     const raw = JSON.parse(await fs.readFile(SNIPES_FILE, "utf8"));
     for (const [channelId, snipe] of Object.entries(raw)) {
       snipe.expiresAt = snipe.timestamp + 2 * 60 * 60 * 1000;
-      if (snipe.expiresAt > Date.now()) snipes.set(channelId, snipe);
+      if (snipe.deleted) {
+        deletedSnipes.add(channelId);
+        // Save the embed data for deleted snipe fallback
+        if (snipe.embedData) lastSnipeEmbedData.set(channelId, snipe.embedData);
+      } else if (snipe.expiresAt > Date.now()) {
+        snipes.set(channelId, snipe);
+        if (snipe.embedData) lastSnipeEmbedData.set(channelId, snipe.embedData);
+      }
     }
   } catch (err) {
     // If file doesn't exist or is invalid, ignore
@@ -24,11 +34,20 @@ async function loadSnipes() {
 }
 loadSnipes();
 
-// Save snipes to disk
+// Save snipes to disk, including deleted flag and embedData
 async function saveSnipes() {
   const obj = {};
   for (const [channelId, snipe] of snipes.entries()) {
-    obj[channelId] = snipe;
+    obj[channelId] = { ...snipe, deleted: false, embedData: lastSnipeEmbedData.get(channelId) || null };
+  }
+  // Save deleted snipes as well
+  for (const channelId of deletedSnipes) {
+    if (!obj[channelId]) {
+      obj[channelId] = {
+        deleted: true,
+        embedData: lastSnipeEmbedData.get(channelId) || null
+      };
+    }
   }
   try {
     await fs.writeFile(SNIPES_FILE, JSON.stringify(obj, null, 2));
@@ -72,8 +91,10 @@ async function handleSnipeCommands(client, message, command, args) {
   // .ds deletes the previous snipe in this channel
   if (content === ".ds") {
     let replyMsg;
-    if (snipes.has(message.channel.id)) {
+    if (snipes.has(message.channel.id) || deletedSnipes.has(message.channel.id)) {
       snipes.delete(message.channel.id);
+      deletedSnipes.add(message.channel.id);
+      // Do NOT overwrite lastSnipeEmbedData here!
       await saveSnipes();
       replyMsg = await message.reply(`${EMOJI_SUCCESS} Snipe deleted!`);
 
@@ -101,7 +122,6 @@ async function handleSnipeCommands(client, message, command, args) {
         }
       }
       // Do NOT set lastSnipeMessage to null, keep it for future .snipe/.s
-      // Do NOT overwrite lastSnipeEmbedData here!
     } else {
       replyMsg = await message.reply(`${EMOJI_ERROR} No snipe to delete.`);
     }
@@ -118,9 +138,8 @@ async function handleSnipeCommands(client, message, command, args) {
       return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
     }
 
-    const snipe = snipes.get(message.channel.id);
-    // If snipe was deleted or expired, show the previous embed with the deleted message notice
-    if (!snipe || Date.now() > snipe.expiresAt) {
+    // If snipe was deleted, always show the deleted embed
+    if (deletedSnipes.has(message.channel.id)) {
       // Try to show the previous embed with the deleted message notice
       const snipeMsg = lastSnipeMessage.get(message.channel.id);
       if (snipeMsg && snipeMsg.embeds?.[0]) {
@@ -137,6 +156,12 @@ async function handleSnipeCommands(client, message, command, args) {
           .setColor(0xff0000);
         return message.reply({ embeds: [deletedEmbed] });
       }
+      return message.reply(`${EMOJI_ERROR} This snipe has been deleted.`);
+    }
+
+    const snipe = snipes.get(message.channel.id);
+    // If snipe expired, fallback to deleted logic
+    if (!snipe || Date.now() > snipe.expiresAt) {
       return message.reply(`${EMOJI_ERROR} No message has been deleted in the past 2 hours.`);
     }
 
@@ -154,6 +179,7 @@ async function handleSnipeCommands(client, message, command, args) {
     lastSnipeMessage.set(message.channel.id, sentMsg);
     // Save the embed data for deleted snipe fallback (only here!)
     lastSnipeEmbedData.set(message.channel.id, { ...embed.data, timestamp: Date.now() });
+    await saveSnipes();
     return;
   }
 }

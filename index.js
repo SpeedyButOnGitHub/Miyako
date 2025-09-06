@@ -6,6 +6,7 @@ const { handleModerationCommands, showWarnings, handleWarningButtons } = require
 const { handleSnipeCommands, handleMessageDelete } = require("./commands/snipes");
 const { handleHelpCommand } = require("./commands/help");
 const { updateStaffMessage } = require("./utils/helpers");
+const { OWNER_ID } = require("./commands/moderation/permissions");
 
 const client = new Client({
   intents: [
@@ -48,7 +49,7 @@ client.on("messageCreate", async (message) => {
     } 
     else if (command === "config") {
       // Only allow owner to use .config
-      if (message.author.id !== process.env.OWNER_ID) return;
+      if (message.author.id !== OWNER_ID) return;
       // If message is exactly ".config", show the interactive menu
       if (message.content.trim().toLowerCase() === ".config") {
         await handleMessageCreate(client, message);
