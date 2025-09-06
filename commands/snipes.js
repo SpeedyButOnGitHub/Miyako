@@ -44,7 +44,7 @@ async function saveSnipes() {
   try {
     await fs.writeFile(SNIPES_FILE, JSON.stringify(obj, null, 2));
   } catch (err) {
-    console.error("Failed to save snipes:", err);
+    console.error(`[Snipes Error] Failed to save snipes:`, err);
   }
 }
 
@@ -102,7 +102,7 @@ async function handleSnipeCommands(client, message, command, args) {
             });
           }
         } catch (err) {
-          console.error("Failed to edit snipe message:", err);
+          console.error(`[Snipes Error] Failed to edit snipe message:`, err);
         }
       }
     } else {

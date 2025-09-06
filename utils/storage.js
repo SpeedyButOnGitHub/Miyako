@@ -16,16 +16,30 @@ const defaultConfig = {
   testingMode: false
 };
 
+function validateConfig(cfg) {
+  if (!Array.isArray(cfg.snipingWhitelist)) cfg.snipingWhitelist = [];
+  if (!Array.isArray(cfg.moderatorRoles)) cfg.moderatorRoles = [];
+  if (typeof cfg.warnings !== "object" || cfg.warnings === null) cfg.warnings = {};
+  if (typeof cfg.escalation !== "object" || cfg.escalation === null) cfg.escalation = { ...defaultConfig.escalation };
+  if (typeof cfg.defaultMuteDuration !== "number") cfg.defaultMuteDuration = defaultConfig.defaultMuteDuration;
+  if (typeof cfg.modLogChannelId !== "string") cfg.modLogChannelId = defaultConfig.modLogChannelId;
+  if (typeof cfg.testingMode !== "boolean") cfg.testingMode = false;
+  // Validate escalation subkeys
+  if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
+  if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;
+  if (typeof cfg.escalation.kickThreshold !== "number") cfg.escalation.kickThreshold = defaultConfig.escalation.kickThreshold;
+  return cfg;
+}
+
 // Load config and merge with defaults
 let config = { ...defaultConfig };
 if (fs.existsSync(CONFIG_FILE)) {
   try {
     const loaded = JSON.parse(fs.readFileSync(CONFIG_FILE));
-    // Merge loaded config with defaults, filling in missing keys
-    config = { ...defaultConfig, ...loaded };
-    // Deep merge for nested objects like escalation
+    config = validateConfig({ ...defaultConfig, ...loaded });
     if (loaded.escalation) {
       config.escalation = { ...defaultConfig.escalation, ...loaded.escalation };
+      config.escalation = validateConfig(config.escalation);
     }
   } catch {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));

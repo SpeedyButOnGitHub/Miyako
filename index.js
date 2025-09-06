@@ -1,19 +1,19 @@
-import "dotenv/config";
-import { Client, GatewayIntentBits, Partials, InteractionType, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder } from "discord.js";
-import fs from "fs";
+require("dotenv/config");
+const { Client, GatewayIntentBits, Partials, InteractionType, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder } = require("discord.js");
+const fs = require("fs");
 
-import { handleMessageCreate, handleConfigCommand } from "./commands/configMenu.js";
-import { handleModerationCommands, showWarnings, handleWarningButtons } from "./commands/moderation/index.js";
-import { handleSnipeCommands, handleMessageDelete } from "./commands/snipes.js";
-import { handleHelpCommand } from "./commands/help.js";
-import { updateStaffMessage } from "./utils/staffTeam.js";
-import { addXP, getLevel, saveLevels } from "./utils/levels.js";
-import { handleLevelCommand } from "./commands/level.js";
-import { logMessageDelete, logMessageEdit } from "./utils/messageLogs.js";
-import { logRoleChange } from "./utils/roleLogs.js";
-import { handleTestCommand } from "./commands/test.js";
+const { handleMessageCreate, handleConfigCommand } = require("./commands/configMenu");
+const { handleModerationCommands, showWarnings, handleWarningButtons } = require("./commands/moderation/index");
+const { handleSnipeCommands, handleMessageDelete } = require("./commands/snipes");
+const { handleHelpCommand } = require("./commands/help");
+const { updateStaffMessage } = require("./utils/staffTeam");
+const { addXP, getLevel, saveLevels } = require("./utils/levels");
+const { handleLevelCommand } = require("./commands/level");
+const { logMessageDelete, logMessageEdit } = require("./utils/messageLogs");
+const { logRoleChange } = require("./utils/roleLogs");
+const { handleTestCommand } = require("./commands/test");
 
-import { OWNER_ID, ALLOWED_ROLES, CHATBOX_BUTTON_ID } from "./commands/moderation/permissions.js";
+const { OWNER_ID, ALLOWED_ROLES, CHATBOX_BUTTON_ID } = require("./commands/moderation/permissions");
 
 const BOT_STATUS_FILE = "./config/botStatus.json";
 const STATUS_CHANNEL_ID = "1413966369296220233";
@@ -140,8 +140,8 @@ client.on("messageCreate", async (message) => {
       await handleTestCommand(client, message);
     }
   } catch (err) {
-    console.error("Error handling command:", err);
-    message.reply("<:VRLSad:1413770577080094802> An error occurred while executing this command.");
+    console.error(`[Mod Log Error]:`, err);
+    message.reply(`<:VRLSad:1413770577080094802> An error occurred while executing \`${command}\`.\nDetails: \`${err.message || err}\``);
   }
 
   // Leveling system
@@ -260,7 +260,7 @@ client.on("interactionCreate", async (interaction) => {
   } catch (err) {
     console.error("Error handling interaction:", err);
     if (interaction.isRepliable()) {
-      await interaction.reply({ content: "<:VRLSad:1413770577080094802> An error occurred.", ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: `<:VRLSad:1413770577080094802> An error occurred.\nDetails: \`${err.message || err}\``, ephemeral: true }).catch(() => {});
     }
   }
 });

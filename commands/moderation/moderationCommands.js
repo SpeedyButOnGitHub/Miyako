@@ -1,11 +1,11 @@
-import { sendModLog } from "../../utils/modLogs";
-import { replySuccess, replyError } from "./replies";
-import { sendUserDM } from "./dm";
-import { isModerator } from "./permissions";
-import { config, saveConfig } from "../../utils/storage";
-import ms from "ms";
-import { parseDurationAndReason } from "../../utils/time";
-import { testLogMessageIds } from "../test.js";
+const { sendModLog } = require("../../utils/modLogs");
+const { replySuccess, replyError } = require("./replies");
+const { sendUserDM } = require("./dm");
+const { isModerator } = require("./permissions");
+const { config, saveConfig } = require("../../utils/storage");
+const ms = require("ms");
+const { parseDurationAndReason } = require("../../utils/time");
+const { testLogMessageIds } = require("../test");
 
 const OWNER_ID = process.env.OWNER_ID || "349282473085239298";
 const MUTE_ROLE_ID = "1391535514901020744";
@@ -228,8 +228,8 @@ async function handleModerationCommands(client, message, command, args) {
         return;
     }
   } catch (err) {
-    console.error("Error in moderation command:", err);
-    await replyError(message, "An error occurred while executing this command.");
+    console.error(`[Moderation Command Error] ${command}:`, err);
+    await replyError(message, `An error occurred while executing \`${command}\`.\nDetails: \`${err.message || err}\``);
   }
 }
 

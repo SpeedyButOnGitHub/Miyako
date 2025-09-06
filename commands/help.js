@@ -55,7 +55,7 @@ async function handleHelpCommand(client, message) {
 
   const user = message.author;
   let avatarURL = null;
-  let tag = null;w
+  let tag = null;
 
   // If it's a real User object, use its methods
   if (user && typeof user.displayAvatarURL === "function") {
