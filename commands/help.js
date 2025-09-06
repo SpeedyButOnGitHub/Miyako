@@ -98,11 +98,17 @@ async function handleHelpCommand(client, message) {
   // Button interaction for category details
   const collector = replyMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000 });
   collector.on("collect", async interaction => {
-    if (interaction.user.id !== message.author.id) {
-      await interaction.deferUpdate();
-      const tempMsg = await interaction.followUp({ content: "Only the Owner can use this", ephemeral: true });
-      setTimeout(() => tempMsg.delete().catch(() => {}), 3000);
-      return;
+    // Moderation category button
+    if (interaction.customId === "help_moderation") {
+      // Only allow moderators and owner
+      const isMod = interaction.member && isModerator(interaction.member);
+      const isOwner = interaction.user.id === OWNER_ID;
+      if (!isMod && !isOwner) {
+        await interaction.deferUpdate();
+        const tempMsg = await interaction.followUp({ content: "Only Moderators can use this", ephemeral: true });
+        setTimeout(() => tempMsg.delete().catch(() => {}), 3000);
+        return;
+      }
     }
 
     // Config button: only owner can use
@@ -115,8 +121,7 @@ async function handleHelpCommand(client, message) {
       }
       // Delete the help menu before opening config
       await replyMsg.delete().catch(() => {});
-      await interaction.message.delete().catch(() => {}); // <-- Delete the interaction message (help menu)
-      // Create a fake message object with the owner's ID and ".config" content
+      await interaction.message.delete().catch(() => {});
       const fakeMessage = {
         author: { id: interaction.user.id },
         content: ".config",
@@ -125,8 +130,6 @@ async function handleHelpCommand(client, message) {
         reply: (...args) => interaction.channel.send(...args)
       };
       await handleMessageCreate(client, fakeMessage);
-
-      // Optionally defer the interaction to avoid "interaction failed"
       await interaction.deferUpdate();
       return;
     }
@@ -134,6 +137,17 @@ async function handleHelpCommand(client, message) {
     // Category buttons
     const selectedCat = shownCategories.find(cat => `help_${cat.name.toLowerCase()}` === interaction.customId);
     if (selectedCat) {
+      // Moderation category: restrict to mods/owner
+      if (selectedCat.name === "Moderation") {
+        const isMod = interaction.member && isModerator(interaction.member);
+        const isOwner = interaction.user.id === OWNER_ID;
+        if (!isMod && !isOwner) {
+          await interaction.deferUpdate();
+          const tempMsg = await interaction.followUp({ content: "Only Moderators can use this", ephemeral: true });
+          setTimeout(() => tempMsg.delete().catch(() => {}), 3000);
+          return;
+        }
+      }
       const catEmbed = new EmbedBuilder()
         .setTitle(`${selectedCat.emoji} ${selectedCat.name} Commands`)
         .setColor(0x5865F2)
@@ -141,7 +155,6 @@ async function handleHelpCommand(client, message) {
         .setFooter({ text: `Requested by ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
         .setTimestamp();
 
-      // Add a back button
       const backRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("help_back")
