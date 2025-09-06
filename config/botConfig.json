@@ -13,6 +13,22 @@
     "1375957925356638228"
   ],
   "warnings": {
-    "432610292342587392": []
-  }
+    "432610292342587392": [
+      {
+        "moderator": "349282473085239298",
+        "reason": "No reason provided",
+        "date": 1757188345806
+      }
+    ],
+    "1413738051779428362": [],
+    "349282473085239298": []
+  },
+  "escalation": {
+    "muteThreshold": 2,
+    "muteDuration": 7200000,
+    "kickThreshold": 3
+  },
+  "defaultMuteDuration": 3600000,
+  "modLogChannelId": "1232701768383729791",
+  "testingMode": false
 }

@@ -55,7 +55,7 @@ async function handleHelpCommand(client, message) {
 
   const user = message.author;
   let avatarURL = null;
-  let tag = null;
+  let tag = null;w
 
   // If it's a real User object, use its methods
   if (user && typeof user.displayAvatarURL === "function") {
@@ -173,4 +173,4 @@ async function handleHelpCommand(client, message) {
   });
 }
 
-module.exports = { handleHelpCommand };
+export { handleHelpCommand };

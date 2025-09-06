@@ -1,9 +1,10 @@
 const { EmbedBuilder } = require("discord.js");
 
-const MOD_LOG_CHANNEL = "1232701768383729791"; // replace with your server's mod log channel ID
+// Only log moderation actions in the user action channel
+const USER_ACTION_LOG_CHANNEL = "1232701768383729791";
 
 /**
- * Logs moderation actions in the mod channel
+ * Logs moderation actions in the user action channel only
  * @param {Client} client - Discord client
  * @param {GuildMember} target - Member being moderated
  * @param {User} moderator - User who issued the action
@@ -15,7 +16,7 @@ const MOD_LOG_CHANNEL = "1232701768383729791"; // replace with your server's mod
  * @returns {Promise<Message|null>} - Sent message object
  */
 async function sendModLog(client, target, moderator, action, reason = null, isPunishment = true, duration = null, currentWarnings = null) {
-  const channel = await client.channels.fetch(MOD_LOG_CHANNEL).catch(() => null);
+  const channel = await client.channels.fetch(USER_ACTION_LOG_CHANNEL).catch(() => null);
   if (!channel) return null;
 
   const colors = {
@@ -80,8 +81,19 @@ async function sendModLog(client, target, moderator, action, reason = null, isPu
   if (fields.length) embed.addFields(fields);
   embed.setTimestamp();
 
-  const msg = await channel.send({ embeds: [embed] }).catch(() => null);
+  const msg = await channel.send({ embeds: [embed] }).catch(err => {
+    console.error("Failed to send mod log:", err);
+    return null;
+  });
+  if (msg) {
+    console.log("Mod log sent, message ID:", msg.id);
+  } else {
+    console.log("Mod log not sent!");
+  }
   return msg;
 }
 
-module.exports = { sendModLog };
+export { sendModLog };
+
+const logMsg = await sendModLog(client, member, message.author, "muted", finalReason, true, formatDuration(finalDuration));
+if (isTesting && logMsg && logMsg.id) testLogMessageIds.push(logMsg.id);

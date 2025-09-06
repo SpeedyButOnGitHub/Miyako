@@ -74,7 +74,7 @@ const updateStaffMessage = async (guild) => {
   } catch (err) { console.error("Failed to update staff message:", err); }
 };
 
-module.exports = {
+export {
   updateStaffMessage,
   ALLOWED_ROLES,
   CHATBOX_BUTTON_ID,

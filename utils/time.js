@@ -1,8 +1,18 @@
-const ms = require("ms");
+import ms from "ms";
 
-function parseTime(str) {
-  if (!str) return null;
-  try { return ms(str); } catch { return null; }
+function parseDurationAndReason(args) {
+  let duration = null;
+  let reasonParts = [];
+  for (const arg of args) {
+    const parsed = ms(arg);
+    if (parsed && !duration) {
+      duration = parsed;
+    } else {
+      reasonParts.push(arg);
+    }
+  }
+  const reason = reasonParts.join(" ").trim() || null;
+  return { duration, reason };
 }
 
-module.exports = { parseTime, ms };
+export { parseDurationAndReason, ms };

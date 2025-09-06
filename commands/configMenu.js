@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, InteractionResponseType, MessageFlags } = require("discord.js");
 const { config, saveConfig } = require("../utils/storage");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
 const { OWNER_ID } = require("./moderation/permissions");
@@ -373,4 +373,4 @@ async function handleConfigCommand(client, message) {
   );
 }
 
-module.exports = { handleMessageCreate, handleConfigCommand };
+export { handleMessageCreate, handleConfigCommand };

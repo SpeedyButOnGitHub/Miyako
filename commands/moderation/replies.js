@@ -1,4 +1,5 @@
 const { Message, BaseInteraction } = require("discord.js");
+const { config } = require("../../utils/storage");
 const EMOJI_SUCCESS = "<a:kyoukoThumbsUp:1413767126547828757>";
 const EMOJI_ERROR = "<:VRLSad:1413770577080094802>";
 
@@ -17,10 +18,13 @@ async function replySuccess(context, content) {
 async function replyError(context, content) {
   if (context && typeof context.reply === "function" && context.constructor.name === "Message") {
     const msg = await context.reply(`${EMOJI_ERROR} ${content}`);
-    setTimeout(() => {
-      context.delete().catch(() => {});
-      msg.delete().catch(() => {});
-    }, 5000);
+    // Only auto-delete if NOT in testing mode
+    if (!config.testingMode) {
+      setTimeout(() => {
+        context.delete().catch(() => {});
+        msg.delete().catch(() => {});
+      }, 5000);
+    }
   } else if (
     context &&
     typeof context.reply === "function" &&
@@ -36,4 +40,4 @@ async function replyError(context, content) {
   }
 }
 
-module.exports = { replySuccess, replyError, EMOJI_SUCCESS, EMOJI_ERROR };
+export { replySuccess, replyError, EMOJI_SUCCESS, EMOJI_ERROR };
