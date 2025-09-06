@@ -1,8 +1,8 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder } from "discord.js";
-import { OWNER_ID } from "./moderation/permissions.js";
-import { sendModLog } from "../utils/modLogs.js";
-import { config, saveConfig } from "../../utils/storage.js";
-import { handleModerationCommands } from "./moderation/moderationCommands.js";
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder } = require("discord.js");
+const { OWNER_ID } = require("./moderation/permissions");
+const { sendModLog } = require("../utils/modLogs");
+const { config, saveConfig } = require("../../utils/storage");
+const { handleModerationCommands } = require("./moderation/moderationCommands");
 
 const TEST_CHANNEL_ID = "1413966369296220233";
 const MOD_LOG_CHANNEL_ID = "1232701768383729791";
@@ -207,4 +207,8 @@ async function handleTestCommand(client, message) {
   });
 }
 
-export { handleTestCommand, testLogMessageIds, handleModerationCommands };
+module.exports = {
+  handleTestCommand,
+  testLogMessageIds,
+  handleModerationCommands
+};

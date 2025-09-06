@@ -1,5 +1,5 @@
-import { EmbedBuilder } from "discord.js";
-import { CONFIG_LOG_CHANNEL } from "./logChannels.js";
+const { EmbedBuilder } = require("discord.js");
+const { CONFIG_LOG_CHANNEL } = require("./logChannels");
 
 async function logConfigChange(client, config) {
   const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
