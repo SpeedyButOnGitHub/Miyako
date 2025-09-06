@@ -97,12 +97,15 @@ async function showWarnings(context, target) {
   const embed = new EmbedBuilder()
     .setAuthor({ name: target.user.tag, iconURL: target.displayAvatarURL({ dynamic: true }) })
     .setTitle("Warnings")
-    .setDescription(warnings.length > 0
-      ? warnings.map((w, i) => `**${i + 1}.** ${w.reason || "No reason"} (by <@${w.moderator}>)`).join("\n")
-      : "No warnings")
+    .setDescription(
+      warnings.length > 0
+        ? warnings.map((w, i) => `**${i + 1}.** ${w.reason || "No reason"} (by <@${w.moderator}>)`).join("\n")
+        : "No warnings"
+    )
     .setColor(0xffff00)
     .setFooter({ text: `${warnings.length} total warnings` });
 
+  // Add buttons for Add/Remove Warning
   const row = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
@@ -111,75 +114,73 @@ async function showWarnings(context, target) {
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId(`removewarn_${target.id}`)
-        .setLabel("Remove Latest Warning")
+        .setLabel("Remove Warning")
         .setStyle(ButtonStyle.Danger)
     );
 
   if (context instanceof Message) {
     await context.reply({ embeds: [embed], components: [row] });
-  } else if (context.isRepliable() && !context.replied && !context.deferred) {
-    await context.reply({ embeds: [embed], components: [row], ephemeral: true });
-  } else if (typeof context.editReply === "function") {
-    await context.editReply({ embeds: [embed], components: [row] });
-  } else if (typeof context.update === "function") {
-    await context.update({ embeds: [embed], components: [row] });
   }
 }
 
+// Update handleWarningButtons to only send a simple message for add/remove
 async function handleWarningButtons(client, interaction) {
-  if (!interaction.isButton() && interaction.type !== InteractionType.ModalSubmit) return;
-
-  const [action, targetId] = interaction.customId.split("_");
-  const member = await interaction.guild.members.fetch(targetId).catch(() => null);
-  if (!member) return replyError(interaction, "User not found.");
-  if (!isModerator(interaction.member)) return replyError(interaction, "You are not allowed.");
-
-  if (interaction.type === InteractionType.ModalSubmit) {
-    const reason = interaction.fields.getTextInputValue("warnReason") || "No reason";
-    let warnings = cleanWarnings(targetId);
-
+  if (interaction.isButton()) {
+    const [action, targetId] = interaction.customId.split("_");
     if (action === "addwarn") {
+      const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+      if (!member) return replyError(interaction, "User not found.");
+      if (!isModerator(interaction.member)) return replyError(interaction, "You are not allowed.");
+
+      const modal = new ModalBuilder()
+        .setCustomId(`addwarn_${targetId}`)
+        .setTitle(`Add Warning for ${member.user.tag}`)
+        .addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("warnReason")
+              .setLabel("Reason")
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(true)
+          )
+        );
+      return interaction.showModal(modal);
+    }
+    if (action === "removewarn") {
+      const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+      if (!member) return replyError(interaction, "User not found.");
+      if (!isModerator(interaction.member)) return replyError(interaction, "You are not allowed.");
+
+      let warnings = cleanWarnings(targetId);
+      if (warnings.length === 0) return replyError(interaction, "No warnings to remove.");
+      const removed = warnings.pop();
+      config.warnings[targetId] = warnings;
+      saveConfig();
+
+      await sendUserDM(member, "warning removed", null, removed.reason, `Current warnings: ${warnings.length}`);
+      await sendModLog(client, member, interaction.user, "warning removed", removed.reason, true, null, warnings.length);
+      await interaction.reply({ content: `${EMOJI_SUCCESS} Warning removed.`, ephemeral: true });
+      return;
+    }
+  } else if (interaction.type === InteractionType.ModalSubmit) {
+    const [action, targetId] = interaction.customId.split("_");
+    if (action === "addwarn") {
+      const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+      if (!member) return replyError(interaction, "User not found.");
+      if (!isModerator(interaction.member)) return replyError(interaction, "You are not allowed.");
+
+      const reason = interaction.fields.getTextInputValue("warnReason") || "No reason";
+      let warnings = cleanWarnings(targetId);
+
       warnings.push({ moderator: interaction.user.id, reason, date: Date.now() });
       config.warnings[targetId] = warnings;
       saveConfig();
 
       await sendUserDM(member, "warned", null, reason, `Current warnings: ${warnings.length}`);
       await sendModLog(client, member, interaction.user, "warned", reason, true, null, warnings.length);
+      await interaction.reply({ content: `${EMOJI_SUCCESS} Warning added.`, ephemeral: true });
+      return;
     }
-
-    await showWarnings(interaction, member);
-    return;
-  }
-
-  await interaction.deferUpdate();
-
-  if (action === "addwarn") {
-    const modal = new ModalBuilder()
-      .setCustomId(`addwarn_${targetId}`)
-      .setTitle(`Add Warning for ${member.user.tag}`)
-      .addComponents(
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("warnReason")
-            .setLabel("Reason")
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(true)
-        )
-      );
-    return interaction.showModal(modal);
-  }
-
-  if (action === "removewarn") {
-    let warnings = cleanWarnings(targetId);
-    if (warnings.length === 0) return replyError(interaction, "No warnings to remove.");
-    const removed = warnings.pop();
-    config.warnings[targetId] = warnings;
-    saveConfig();
-
-    await sendUserDM(member, "warning removed", null, removed.reason, `Current warnings: ${warnings.length}`);
-    await sendModLog(client, member, interaction.user, "warning removed", removed.reason, true, null, warnings.length);
-    await showWarnings(interaction, member);
-    return;
   }
 }
 
