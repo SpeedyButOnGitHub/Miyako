@@ -1,7 +1,7 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
-const { isModerator } = require("./moderation");
-const { handleMessageCreate } = require("./configMenu");
-const { OWNER_ID } = require("./moderation/permissions");
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } from "discord.js";
+import { isModerator } from "./moderation/index.js";
+import { handleMessageCreate } from "./configMenu.js";
+import { OWNER_ID } from "./moderation/permissions.js";
 
 const categories = [
   {

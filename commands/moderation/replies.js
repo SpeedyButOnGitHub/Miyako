@@ -1,5 +1,6 @@
-const { Message, BaseInteraction } = require("discord.js");
-const { config } = require("../../utils/storage");
+import { Message, BaseInteraction } from "discord.js";
+import { config } from "../../utils/storage.js";
+
 const EMOJI_SUCCESS = "<a:kyoukoThumbsUp:1413767126547828757>";
 const EMOJI_ERROR = "<:VRLSad:1413770577080094802>";
 

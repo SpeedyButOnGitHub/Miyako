@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require("discord.js");
+import { EmbedBuilder } from "discord.js";
 
 async function sendUserDM(target, action, duration = null, reason = null, extra = null) {
   let description;

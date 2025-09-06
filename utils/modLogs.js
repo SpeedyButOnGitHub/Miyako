@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require("discord.js");
+import { EmbedBuilder } from "discord.js";
 
 // Only log moderation actions in the user action channel
 const USER_ACTION_LOG_CHANNEL = "1232701768383729791";
