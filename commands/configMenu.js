@@ -73,23 +73,23 @@ function renderSettingEmbed(categoryName, settingKey) {
   setting.buttons.forEach(btn => {
     itemRow.addComponents(
       new ButtonBuilder()
-        .setCustomId(`settingButton_${categoryName}_${settingKey}_${btn.id}`)
+        .setCustomId(`settingButton_${categoryName}_${settingKey}_${btn.id}`) // This is unique per button
         .setLabel(btn.label)
         .setStyle(btn.style)
     );
   });
   itemRow.addComponents(
     new ButtonBuilder()
-      .setCustomId(`back_category_${categoryName}`)
+      .setCustomId(`back_category_${categoryName}`) // Unique per category
       .setLabel("Back")
       .setStyle(ButtonStyle.Secondary)
   );
 
-  // Remove Help Menu button from ModeratorRoles and RoleLogBlacklist
+  // Only add Help Menu button if NOT ModeratorRoles or RoleLogBlacklist
   if (!(categoryName === "Moderation" && (settingKey === "ModeratorRoles" || settingKey === "RoleLogBlacklist"))) {
     itemRow.addComponents(
       new ButtonBuilder()
-        .setCustomId("config_help")
+        .setCustomId("config_help") // Only one Help Menu button per row
         .setLabel("Help Menu")
         .setStyle(ButtonStyle.Secondary)
         .setEmoji("❓")

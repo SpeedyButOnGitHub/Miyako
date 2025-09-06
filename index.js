@@ -61,11 +61,11 @@ async function sendBotStatusMessage(client) {
   if (channel) {
     let title, color, desc;
     if (diff >= 5 * 60 * 1000) {
-      title = "🟢 Bot Started";
+      title = "🟢 Starting";
       color = 0x5865F2;
       desc = "Miyako has woken up.";
     } else {
-      title = "🔄 Bot Restarted";
+      title = "🔄 Restarting";
       color = 0xffd700;
       desc = "Miyako has restarted.";
     }
@@ -80,6 +80,42 @@ async function sendBotStatusMessage(client) {
   // Save current time as lastOnline
   fs.writeFileSync(BOT_STATUS_FILE, JSON.stringify({ lastOnline: now }, null, 2));
 }
+
+// Helper to send bot shutdown message
+async function sendBotShutdownMessage(client) {
+  const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
+  if (channel) {
+    const embed = new EmbedBuilder()
+      .setTitle("🔴 Shutting Down")
+      .setColor(0xff0000)
+      .setDescription("Miyako is shutting down <:dead:1414023466243330108>.")
+      .setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` })
+      .setTimestamp();
+    await channel.send({ embeds: [embed] });
+  }
+}
+
+// Listen for shutdown signals
+const shutdownSignals = ["SIGINT", "SIGTERM"];
+shutdownSignals.forEach(signal => {
+  process.on(signal, async () => {
+    if (client.isReady()) {
+      await sendBotShutdownMessage(client);
+    }
+    process.exit(0);
+  });
+});
+
+// Catch uncaught exceptions (best effort)
+process.on("uncaughtException", async (err) => {
+  console.error("Uncaught Exception:", err);
+  if (client.isReady()) {
+    await sendBotShutdownMessage(client);
+  }
+  process.exit(1);
+});
+
+client.login(process.env.DISCORD_TOKEN);
 
 // Ready event
 client.once("ready", async () => {
@@ -297,4 +333,3 @@ client.on("guildMemberRemove", (member) => {
   logMemberLeave(client, member);
 });
 
-client.login(process.env.DISCORD_TOKEN);
