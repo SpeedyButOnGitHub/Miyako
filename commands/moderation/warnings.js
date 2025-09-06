@@ -15,10 +15,13 @@ function cleanWarnings(targetId) {
   return config.warnings[targetId];
 }
 
-function buildWarningsEmbed(target) {
-  const warnings = cleanWarnings(target.id);
+function buildWarningsEmbed(userOrMember) {
+  const warnings = cleanWarnings(userOrMember.id);
   return new EmbedBuilder()
-    .setAuthor({ name: target.user.tag, iconURL: target.displayAvatarURL({ dynamic: true }) })
+    .setAuthor({
+      name: userOrMember.displayName || userOrMember.username,
+      iconURL: userOrMember.displayAvatarURL({ dynamic: true })
+    })
     .setTitle("Warnings")
     .setDescription(
       warnings.length > 0
@@ -29,23 +32,23 @@ function buildWarningsEmbed(target) {
     .setFooter({ text: `${warnings.length} total warnings` });
 }
 
-function buildWarningsRow(target) {
+function buildWarningsRow(userOrMember) {
   return new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
-        .setCustomId(`addwarn_${target.id}`)
+        .setCustomId(`addwarn_${userOrMember.id}`)
         .setLabel("Add Warning")
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
-        .setCustomId(`removewarn_${target.id}`)
+        .setCustomId(`removewarn_${userOrMember.id}`)
         .setLabel("Remove Warning")
         .setStyle(ButtonStyle.Danger)
     );
 }
 
-async function showWarnings(context, target) {
-  const embed = buildWarningsEmbed(target);
-  const row = buildWarningsRow(target);
+async function showWarnings(context, userOrMember) {
+  const embed = buildWarningsEmbed(userOrMember);
+  const row = buildWarningsRow(userOrMember);
 
   if (context instanceof Message) {
     await context.reply({ embeds: [embed], components: [row] });
@@ -56,16 +59,20 @@ async function handleWarningButtons(client, interaction) {
   const isButton = interaction.isButton();
   const isModal = interaction.type === InteractionType.ModalSubmit;
   const [action, targetId] = interaction.customId.split("_");
-  const member = await interaction.guild.members.fetch(targetId).catch(() => null);
 
-  if (!member) return replyError(interaction, "User not found.");
+  // Try to fetch member, fallback to user
+  let member = await interaction.guild.members.fetch(targetId).catch(() => null);
+  let user = member ? member.user : await interaction.client.users.fetch(targetId).catch(() => null);
+  if (!user) return replyError(interaction, "User not found.");
   if (!isModerator(interaction.member)) return replyError(interaction, "You are not allowed.");
+
+  const userOrMember = member || user;
 
   if (isButton) {
     if (action === "addwarn") {
       const modal = new ModalBuilder()
         .setCustomId(`addwarn_${targetId}`)
-        .setTitle(`Add Warning for ${member.user.tag}`)
+        .setTitle(`Add Warning for ${userOrMember.displayName || userOrMember.username}`)
         .addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
@@ -83,7 +90,7 @@ async function handleWarningButtons(client, interaction) {
 
       const modal = new ModalBuilder()
         .setCustomId(`removewarn_${targetId}`)
-        .setTitle(`Remove Warning for ${member.user.tag}`)
+        .setTitle(`Remove Warning for ${userOrMember.displayName || userOrMember.username}`)
         .addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
@@ -104,13 +111,13 @@ async function handleWarningButtons(client, interaction) {
       config.warnings[targetId] = warnings;
       saveConfig();
 
-      await sendUserDM(member, "warned", null, reason, `Current warnings: ${warnings.length}`);
-      await sendModLog(client, member, interaction.user, "warned", reason, true, null, warnings.length);
+      await sendUserDM(userOrMember, "warned", null, reason, `Current warnings: ${warnings.length}`);
+      await sendModLog(client, userOrMember, interaction.user, "warned", reason, true, null, warnings.length);
 
       // Update the original warnings message if possible
       if (interaction.message && interaction.message.edit) {
-        const embed = buildWarningsEmbed(member);
-        const row = buildWarningsRow(member);
+        const embed = buildWarningsEmbed(userOrMember);
+        const row = buildWarningsRow(userOrMember);
         await interaction.message.edit({ embeds: [embed], components: [row] });
       }
 
@@ -134,13 +141,13 @@ async function handleWarningButtons(client, interaction) {
       config.warnings[targetId] = warnings;
       saveConfig();
 
-      await sendUserDM(member, "warning removed", null, removed.reason, `Current warnings: ${warnings.length}`);
-      await sendModLog(client, member, interaction.user, "warning removed", removed.reason, true, null, warnings.length);
+      await sendUserDM(userOrMember, "warning removed", null, removed.reason, `Current warnings: ${warnings.length}`);
+      await sendModLog(client, userOrMember, interaction.user, "warning removed", removed.reason, true, null, warnings.length);
 
       // Update the original warnings message if possible
       if (interaction.message && interaction.message.edit) {
-        const embed = buildWarningsEmbed(member);
-        const row = buildWarningsRow(member);
+        const embed = buildWarningsEmbed(userOrMember);
+        const row = buildWarningsRow(userOrMember);
         await interaction.message.edit({ embeds: [embed], components: [row] });
       }
 

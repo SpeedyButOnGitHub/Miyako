@@ -83,6 +83,26 @@ async function handleMessageCreate(client, message) {
   collector.on("collect", async interaction => {
     if (interaction.user.id !== process.env.OWNER_ID) return interaction.reply({ content: "❌ You cannot use these buttons.", ephemeral: true });
 
+    // Fix: Extract category name for back button
+    if (interaction.customId.startsWith("back_category_")) {
+      const categoryName = interaction.customId.replace("back_category_", "");
+      const category = configCategories[categoryName];
+      if (!category) return interaction.reply({ content: "❌ Category not found.", ephemeral: true });
+
+      const categoryEmbed = new EmbedBuilder()
+        .setTitle(`⚙️ ${categoryName} Settings`)
+        .setColor(0x2c2f33)
+        .setDescription(category.description);
+
+      const settingsRow = new ActionRowBuilder();
+      for (const key in category.settings) {
+        settingsRow.addComponents(new ButtonBuilder().setCustomId(`setting_${categoryName}_${key}`).setLabel(key).setStyle(ButtonStyle.Primary));
+      }
+      settingsRow.addComponents(new ButtonBuilder().setCustomId("back_main").setLabel("⬅️ Back").setStyle(ButtonStyle.Secondary));
+
+      return await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
+    }
+
     const parts = interaction.customId.split("_");
     const [type, categoryName, settingKey, action] = parts;
 

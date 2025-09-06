@@ -69,13 +69,20 @@ client.on("messageDelete", (message) => handleMessageDelete(message));
 // Interaction Event (Buttons / Modals)
 client.on("interactionCreate", async (interaction) => {
   try {
-    if (interaction.isButton() || interaction.type === InteractionType.ModalSubmit) {
-      // Properly handle warnings buttons/modals
+    // Only handle warning buttons/modals here
+    if (
+      interaction.isButton() &&
+      (interaction.customId.startsWith("addwarn_") || interaction.customId.startsWith("removewarn_"))
+    ) {
+      await handleWarningButtons(client, interaction);
+    } else if (interaction.type === InteractionType.ModalSubmit &&
+      (interaction.customId.startsWith("addwarn_") || interaction.customId.startsWith("removewarn_"))
+    ) {
       await handleWarningButtons(client, interaction);
     }
+    // Other interaction types (config menu, etc.) should be handled in their own handler
   } catch (err) {
     console.error("Error handling interaction:", err);
-    // Only send an ephemeral error if interaction is still repliable
     if (interaction.isRepliable()) {
       await interaction.reply({ content: "<:VRLSad:1413770577080094802> An error occurred.", ephemeral: true }).catch(() => {});
     }
