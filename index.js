@@ -341,6 +341,77 @@ client.on("guildMemberRemove", (member) => {
   logMemberLeave(client, member);
 });
 
+// Ban event (user banned via Discord UI)
+client.on("guildBanAdd", async (ban) => {
+  const { sendModLog } = require("./utils/modLogs");
+  // Fetch audit log for ban
+  const auditLogs = await ban.guild.fetchAuditLogs({ type: "MEMBER_BAN_ADD", limit: 1 });
+  const entry = auditLogs.entries.find(e => e.target.id === ban.user.id);
+  const moderator = entry ? entry.executor : { id: "unknown", tag: "Unknown" };
+  const reason = entry && entry.reason ? entry.reason : "No reason provided";
+  await sendModLog(
+    client,
+    ban.user,
+    moderator,
+    "banned",
+    `[Manual ban via Discord UI]\nReason: ${reason}`,
+    true
+  );
+});
+
+client.on("guildBanRemove", async (ban) => {
+  const { sendModLog } = require("./utils/modLogs");
+  // Fetch audit log for unban
+  const auditLogs = await ban.guild.fetchAuditLogs({ type: "MEMBER_BAN_REMOVE", limit: 1 });
+  const entry = auditLogs.entries.find(e => e.target.id === ban.user.id);
+  const moderator = entry ? entry.executor : { id: "unknown", tag: "Unknown" };
+  const reason = entry && entry.reason ? entry.reason : "No reason provided";
+  await sendModLog(
+    client,
+    ban.user,
+    moderator,
+    "unbanned",
+    `[Manual unban via Discord UI]\nReason: ${reason}`,
+    false
+  );
+});
+
+// Member update (mute/timeout via Discord UI)
+client.on("guildMemberUpdate", async (oldMember, newMember) => {
+  const { sendModLog } = require("./utils/modLogs");
+  // Timeout applied
+  if (!oldMember.communicationDisabledUntil && newMember.communicationDisabledUntil) {
+    const auditLogs = await newMember.guild.fetchAuditLogs({ type: "MEMBER_UPDATE", limit: 1 });
+    const entry = auditLogs.entries.find(e => e.target.id === newMember.id);
+    const moderator = entry ? entry.executor : { id: "unknown", tag: "Unknown" };
+    const reason = entry && entry.reason ? entry.reason : "No reason provided";
+    await sendModLog(
+      client,
+      newMember,
+      moderator,
+      "muted",
+      `[Manual timeout/mute via Discord UI]\nReason: ${reason}`,
+      true,
+      newMember.communicationDisabledUntil ? `<t:${Math.floor(newMember.communicationDisabledUntil.getTime() / 1000)}:R>` : null
+    );
+  }
+  // Timeout removed
+  if (oldMember.communicationDisabledUntil && !newMember.communicationDisabledUntil) {
+    const auditLogs = await newMember.guild.fetchAuditLogs({ type: "MEMBER_UPDATE", limit: 1 });
+    const entry = auditLogs.entries.find(e => e.target.id === newMember.id);
+    const moderator = entry ? entry.executor : { id: "unknown", tag: "Unknown" };
+    const reason = entry && entry.reason ? entry.reason : "No reason provided";
+    await sendModLog(
+      client,
+      newMember,
+      moderator,
+      "unmuted",
+      `[Manual timeout/mute removed via Discord UI]\nReason: ${reason}`,
+      false
+    );
+  }
+});
+
 // Set status channel name based on online/offline
 async function setStatusChannelName(client, online) {
   const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
