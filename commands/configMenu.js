@@ -1,16 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
-const fs = require("fs");
-const CONFIG_FILE = "./botConfig.json";
-
-let config = { snipingWhitelist: [], moderatorRoles: [], warnings: {} };
-if (fs.existsSync(CONFIG_FILE)) {
-  try { config = JSON.parse(fs.readFileSync(CONFIG_FILE)); } 
-  catch { fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2)); }
-}
-if (!config.snipingWhitelist) config.snipingWhitelist = [];
-if (!config.moderatorRoles) config.moderatorRoles = [];
-
-const saveConfig = () => fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2, "\t"));
+const { config, saveConfig } = require("../utils/storage");
 
 const BOT_PREFIX = "**🌙 Late Night Hours Staff Team**\n\n";
 
@@ -67,8 +56,14 @@ function renderSettingEmbed(categoryName, settingKey) {
 
 // Main message handler
 async function handleMessageCreate(client, message) {
-  if (message.author.id !== process.env.OWNER_ID) return;
-  if (message.content.trim().toLowerCase() !== ".config") return;
+  if (message.author.id !== process.env.OWNER_ID) {
+    await message.reply("❌ You are not the owner.");
+    return;
+  }
+  if (message.content.trim().toLowerCase() !== ".config") {
+    await message.reply("❌ Invalid config command.");
+    return;
+  }
 
   // ===== Main Embed =====
   const mainEmbed = new EmbedBuilder()
@@ -88,7 +83,8 @@ async function handleMessageCreate(client, message) {
   collector.on("collect", async interaction => {
     if (interaction.user.id !== process.env.OWNER_ID) return interaction.reply({ content: "❌ You cannot use these buttons.", ephemeral: true });
 
-    const [type, categoryName, settingKey, action] = interaction.customId.split("_");
+    const parts = interaction.customId.split("_");
+    const [type, categoryName, settingKey, action] = parts;
 
     // ===== Back to main =====
     if (interaction.customId === "back_main") {
@@ -187,4 +183,51 @@ async function handleMessageCreate(client, message) {
   });
 }
 
-module.exports = { handleMessageCreate };
+async function handleConfigCommand(client, message) {
+  const args = message.content.trim().split(/\s+/);
+  if (args[0] !== ".config") return;
+
+  // Example: .config whitelist add <channelId>
+  if (args[1] === "whitelist" && args[2] === "add" && args[3]) {
+    if (!config.snipingWhitelist.includes(args[3])) {
+      config.snipingWhitelist.push(args[3]);
+      saveConfig();
+      return message.reply(`✅ Channel <#${args[3]}> added to sniping whitelist.`);
+    } else {
+      return message.reply(`⚠️ Channel <#${args[3]}> is already whitelisted.`);
+    }
+  }
+
+  // Example: .config whitelist remove <channelId>
+  if (args[1] === "whitelist" && args[2] === "remove" && args[3]) {
+    const index = config.snipingWhitelist.indexOf(args[3]);
+    if (index !== -1) {
+      config.snipingWhitelist.splice(index, 1);
+      saveConfig();
+      return message.reply(`✅ Channel <#${args[3]}> removed from sniping whitelist.`);
+    } else {
+      return message.reply(`⚠️ Channel <#${args[3]}> is not whitelisted.`);
+    }
+  }
+
+  // Show current whitelist
+  if (args[1] === "whitelist" && args[2] === "list") {
+    if (config.snipingWhitelist.length === 0) {
+      return message.reply("⚠️ No channels are whitelisted for sniping.");
+    }
+    return message.reply(
+      "Whitelisted channels:\n" +
+      config.snipingWhitelist.map(id => `<#${id}>`).join("\n")
+    );
+  }
+
+  // Default help
+  return message.reply(
+    "Usage:\n" +
+    "`.config whitelist add <channelId>`\n" +
+    "`.config whitelist remove <channelId>`\n" +
+    "`.config whitelist list`"
+  );
+}
+
+module.exports = { handleMessageCreate, handleConfigCommand };

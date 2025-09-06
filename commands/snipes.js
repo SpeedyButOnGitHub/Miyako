@@ -3,7 +3,7 @@ const { EmbedBuilder } = require("discord.js");
 
 const snipes = new Map();
 
-async function handleSnipeCommands(client, message) {
+async function handleSnipeCommands(client, message, command, args) {
   const content = message.content.toLowerCase();
 
   if (content === ".ds") {
@@ -17,11 +17,15 @@ async function handleSnipeCommands(client, message) {
   }
 
   if (content === ".snipe" || content === ".s") {
+    if (!config.snipingWhitelist.includes(message.channel.id)) {
+      await message.reply("❌ This channel is not whitelisted for sniping.");
+      return;
+    }
     const snipe = snipes.get(message.channel.id);
-    if (!snipe || Date.now() > snipe.expiresAt)
-      return message.reply("⚠️ No message has been deleted in the past 2 hours.");
-    if (!config.snipingWhitelist.includes(message.channel.id))
-      return message.reply("❌ Cannot snipe in this channel!");
+    if (!snipe || Date.now() > snipe.expiresAt) {
+      await message.reply("⚠️ No message has been deleted in the past 2 hours.");
+      return;
+    }
 
     let displayContent = snipe.deleted ? "⚠️ This snipe has been deleted" : snipe.content;
     if (displayContent.length > 1024) displayContent = displayContent.slice(0, 1021) + "...(truncated)";

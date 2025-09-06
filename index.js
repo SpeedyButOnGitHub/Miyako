@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { Client, GatewayIntentBits, Partials, InteractionType } = require("discord.js");
 
-const { handleMessageCreate } = require("./commands/configMenu");
+const { handleMessageCreate, handleConfigCommand } = require("./commands/configMenu");
 const { handleModerationCommands, showWarnings, handleWarningButtons } = require("./commands/moderation");
 const { handleSnipeCommands, handleMessageDelete } = require("./commands/snipes");
 const { handleHelpCommand } = require("./commands/help");
@@ -46,8 +46,16 @@ client.on("messageCreate", async (message) => {
     else if (["snipe", "snipes"].includes(command)) {
       await handleSnipeCommands(client, message, command, args);
     } 
-    else {
-      await handleMessageCreate(client, message, command, args);
+    else if (command === "config") {
+      // Only allow owner to use .config
+      if (message.author.id !== process.env.OWNER_ID) return;
+      // If message is exactly ".config", show the interactive menu
+      if (message.content.trim().toLowerCase() === ".config") {
+        await handleMessageCreate(client, message);
+      } else {
+        // Otherwise, run the text-based config command
+        await handleConfigCommand(client, message);
+      }
     }
   } catch (err) {
     console.error("Error handling command:", err);
