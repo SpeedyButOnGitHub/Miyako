@@ -6,6 +6,7 @@ const snipes = new Map();
 async function handleSnipeCommands(client, message, command, args) {
   const content = message.content.toLowerCase();
 
+  // accept both .ds and .delete-snipe aliases
   if (content === ".ds") {
     const snipe = snipes.get(message.channel.id);
     if (snipe) {
@@ -16,28 +17,29 @@ async function handleSnipeCommands(client, message, command, args) {
     return message.reply("⚠️ No snipe to delete.");
   }
 
+  // support .snipe and .s shortcuts
   if (content === ".snipe" || content === ".s") {
+    // whitelist check
     if (!config.snipingWhitelist.includes(message.channel.id)) {
-      await message.reply("❌ This channel is not whitelisted for sniping.");
-      return;
+      return message.reply("❌ Cannot snipe in this channel!");
     }
+
     const snipe = snipes.get(message.channel.id);
     if (!snipe || Date.now() > snipe.expiresAt) {
-      await message.reply("⚠️ No message has been deleted in the past 2 hours.");
-      return;
+      return message.reply("⚠️ No message has been deleted in the past 2 hours.");
     }
 
-    let displayContent = snipe.deleted ? "⚠️ This snipe has been deleted" : snipe.content;
-    if (displayContent.length > 1024) displayContent = displayContent.slice(0, 1021) + "...(truncated)";
-
     const embed = new EmbedBuilder()
-      .setAuthor({ name: snipe.nickname, iconURL: snipe.avatarURL })
-      .setDescription(displayContent)
-      .setColor(0x2c2f33);
+      .setAuthor({ name: snipe.authorTag, iconURL: snipe.authorAvatar })
+      .setDescription(snipe.content || "*No content (attachment or embed only)*")
+      .setColor(0x2f3136)
+      .setFooter({ text: `Deleted • ${new Date(snipe.deletedAt).toLocaleString()}` });
 
-    if (!snipe.deleted && snipe.attachments.length > 0) embed.setImage(snipe.attachments[0]);
+    if (snipe.attachments && snipe.attachments.length > 0) {
+      embed.setImage(snipe.attachments[0]);
+    }
 
-    await message.reply({ embeds: [embed] });
+    return message.reply({ embeds: [embed] });
   }
 }
 

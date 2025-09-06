@@ -145,6 +145,29 @@ async function handleModerationCommands(client, message, command, args) {
           `Warned <@${warnId}> for: **${reason}**${escalationMessage ? `\n${escalationMessage}` : ""}`
         );
         break;
+        
+      case "removewarn": {
+        // Always use user ID for warnings
+        const warnId = userObj.id;
+        if (!Array.isArray(config.warnings[warnId]) || config.warnings[warnId].length === 0) {
+          return replyError(message, "This user has no warnings to remove.");
+        }
+
+        // Parse index argument (1-based), default to last warning
+        let index = parseInt(reasonArgs[0], 10);
+        if (isNaN(index) || index < 1 || index > config.warnings[warnId].length) {
+          index = config.warnings[warnId].length; // Remove latest warning
+        }
+
+        const removed = config.warnings[warnId].splice(index - 1, 1)[0];
+        saveConfig();
+
+        await sendUserDM(member || userObj, "warning removed", null, removed.reason, `Current warnings: ${config.warnings[warnId].length}`);
+        await sendModLog(client, member || userObj, message.author, "warning removed", removed.reason, true, null, config.warnings[warnId].length);
+
+        await replySuccess(message, `Removed warning #${index} from <@${warnId}>${removed.reason ? `: **${removed.reason}**` : ""}`);
+        break;
+      }
     }
   } catch (err) {
     console.error("Error in moderation command:", err);

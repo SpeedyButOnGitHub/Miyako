@@ -35,7 +35,7 @@ client.on("messageCreate", async (message) => {
     if (command === "help") {
       await handleHelpCommand(client, message);
     } 
-    else if (["mute", "unmute", "timeout", "untimeout", "ban", "kick", "warn"].includes(command)) {
+    else if (["mute", "unmute", "timeout", "untimeout", "ban", "kick", "warn", "removewarn"].includes(command)) {
       await handleModerationCommands(client, message, command, args);
     } 
     else if (command === "warnings") {
