@@ -6,18 +6,16 @@ const snipes = new Map();
 async function handleSnipeCommands(client, message, command, args) {
   const content = message.content.toLowerCase();
 
-  // accept both .ds and .delete-snipe aliases
+  // .ds deletes the previous snipe in this channel
   if (content === ".ds") {
-    const snipe = snipes.get(message.channel.id);
-    if (snipe) {
-      snipe.deleted = true;
-      snipes.set(message.channel.id, snipe);
+    if (snipes.has(message.channel.id)) {
+      snipes.delete(message.channel.id);
       return message.reply("✅ Snipe deleted!");
     }
     return message.reply("⚠️ No snipe to delete.");
   }
 
-  // support .snipe and .s shortcuts
+  // .snipe and .s both show the last deleted message
   if (content === ".snipe" || content === ".s") {
     // whitelist check
     if (!config.snipingWhitelist.includes(message.channel.id)) {
@@ -30,10 +28,10 @@ async function handleSnipeCommands(client, message, command, args) {
     }
 
     const embed = new EmbedBuilder()
-      .setAuthor({ name: snipe.authorTag, iconURL: snipe.authorAvatar })
+      .setAuthor({ name: snipe.nickname, iconURL: snipe.avatarURL })
       .setDescription(snipe.content || "*No content (attachment or embed only)*")
       .setColor(0x2f3136)
-      .setFooter({ text: `Deleted • ${new Date(snipe.deletedAt).toLocaleString()}` });
+      .setFooter({ text: `Deleted • ${new Date(snipe.timestamp).toLocaleString()}` });
 
     if (snipe.attachments && snipe.attachments.length > 0) {
       embed.setImage(snipe.attachments[0]);
@@ -51,9 +49,8 @@ function handleMessageDelete(message) {
     nickname: member ? member.displayName : message.author.username,
     avatarURL: member ? member.displayAvatarURL({ dynamic: true }) : message.author.displayAvatarURL({ dynamic: true }),
     timestamp: Date.now(),
-    attachments: message.attachments.map(a => a.url),
-    deleted: false,
-    expiresAt: Date.now() + 2*60*60*1000
+    attachments: Array.from(message.attachments.values()).map(a => a.url),
+    expiresAt: Date.now() + 2 * 60 * 60 * 1000
   });
 }
 
