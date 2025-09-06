@@ -12,8 +12,6 @@ if (fs.existsSync(ACTIVE_MENUS_FILE)) {
   } catch { activeMenus = []; }
 }
 
-const BOT_PREFIX = "**🌙 Late Night Hours Staff Team**\n\n";
-
 const configCategories = {
   Sniping: {
     description: "Settings for sniping commands.",
@@ -25,8 +23,8 @@ const configCategories = {
             ? config.snipingWhitelist.map(id => `<#${id}>`).join("\n")
             : "*None*",
         buttons: [
-          { id: "addChannel", label: "➕ Add Channel", style: ButtonStyle.Success },
-          { id: "removeChannel", label: "➖ Remove Channel", style: ButtonStyle.Danger }
+          { id: "addChannel", label: "Add role", style: ButtonStyle.Success },
+          { id: "removeChannel", label: "Remove role", style: ButtonStyle.Danger }
         ]
       }
     }
@@ -41,8 +39,19 @@ const configCategories = {
             ? config.moderatorRoles.map(id => `<@&${id}>`).join("\n")
             : "*None*",
         buttons: [
-          { id: "addRole", label: "➕ Add Role", style: ButtonStyle.Success },
-          { id: "removeRole", label: "➖ Remove Role", style: ButtonStyle.Danger }
+          { id: "addRole", label: "Add role", style: ButtonStyle.Success },
+          { id: "removeRole", label: "Remove role", style: ButtonStyle.Danger }
+        ]
+      },
+      RoleLogBlacklist: {
+        description: "Roles that will NOT be logged in role logs.",
+        getDisplay: () =>
+          (config.roleLogBlacklist && config.roleLogBlacklist.length)
+            ? config.roleLogBlacklist.map(id => `<@&${id}>`).join("\n")
+            : "*None*",
+        buttons: [
+          { id: "addBlacklistRole", label: "Add role", style: ButtonStyle.Success },
+          { id: "removeBlacklistRole", label: "Remove role", style: ButtonStyle.Danger }
         ]
       }
     }
@@ -72,9 +81,20 @@ function renderSettingEmbed(categoryName, settingKey) {
   itemRow.addComponents(
     new ButtonBuilder()
       .setCustomId(`back_category_${categoryName}`)
-      .setLabel("⬅️ Back to Category")
+      .setLabel("Back")
       .setStyle(ButtonStyle.Secondary)
   );
+
+  // Remove Help Menu button from ModeratorRoles and RoleLogBlacklist
+  if (!(categoryName === "Moderation" && (settingKey === "ModeratorRoles" || settingKey === "RoleLogBlacklist"))) {
+    itemRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId("config_help")
+        .setLabel("Help Menu")
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji("❓")
+    );
+  }
 
   return { embed: itemEmbed, row: itemRow };
 }
@@ -198,7 +218,7 @@ async function handleMessageCreate(client, message) {
       settingsRow.addComponents(
         new ButtonBuilder()
           .setCustomId("back_main")
-          .setLabel("⬅️ Back to Main")
+          .setLabel("Back")
           .setStyle(ButtonStyle.Secondary)
       );
 
@@ -233,7 +253,7 @@ async function handleMessageCreate(client, message) {
       settingsRow.addComponents(
         new ButtonBuilder()
           .setCustomId("back_main")
-          .setLabel("⬅️ Back to Main")
+          .setLabel("Back")
           .setStyle(ButtonStyle.Secondary)
       );
 
@@ -243,14 +263,16 @@ async function handleMessageCreate(client, message) {
     // Open setting
     if (type === "setting") {
       const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-      // Add Help Menu button to setting view
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId("config_help")
-          .setLabel("Help Menu")
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji("❓")
-      );
+      // Only add Help Menu button if NOT RoleLogBlacklist
+      if (!(categoryName === "Moderation" && settingKey === "RoleLogBlacklist")) {
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId("config_help")
+            .setLabel("Help Menu")
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji("❓")
+        );
+      }
       return await interaction.update({ embeds: [embed], components: [row] });
     }
 
@@ -302,18 +324,40 @@ async function handleMessageCreate(client, message) {
           }
         }
 
+        if (categoryName === "Moderation" && settingKey === "RoleLogBlacklist") {
+          const matchedRoles = [];
+          inputs.forEach(input => {
+            const role = interaction.guild.roles.cache.find(
+              r => r.id === input || r.name.toLowerCase() === input.toLowerCase()
+            );
+            if (role) matchedRoles.push(role);
+          });
+
+          if (action === "addBlacklistRole")
+            matchedRoles.forEach(r => {
+              if (!config.roleLogBlacklist.includes(r.id)) config.roleLogBlacklist.push(r.id);
+            });
+          else if (action === "removeBlacklistRole") {
+            const idsToRemove = matchedRoles.map(r => r.id);
+            config.roleLogBlacklist = config.roleLogBlacklist.filter(id => !idsToRemove.includes(id));
+          }
+          saveConfig();
+        }
+
         saveConfig();
 
         // Edit original message with updated config
         const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-        // Add Help Menu button to setting view
-        row.addComponents(
-          new ButtonBuilder()
-            .setCustomId("config_help")
-            .setLabel("Help Menu")
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji("❓")
-        );
+        // Only add Help Menu button if NOT RoleLogBlacklist
+        if (!(categoryName === "Moderation" && settingKey === "RoleLogBlacklist")) {
+          row.addComponents(
+            new ButtonBuilder()
+              .setCustomId("config_help")
+              .setLabel("Help Menu")
+              .setStyle(ButtonStyle.Secondary)
+              .setEmoji("❓")
+          );
+        }
         await interaction.message.edit({ embeds: [embed], components: [row] });
 
         await interaction.followUp({

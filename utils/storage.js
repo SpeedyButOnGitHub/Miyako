@@ -13,7 +13,8 @@ const defaultConfig = {
   },
   defaultMuteDuration: 60 * 60 * 1000,
   modLogChannelId: "1232701768383729791",
-  testingMode: false
+  testingMode: false,
+  roleLogBlacklist: []
 };
 
 function validateConfig(cfg) {
@@ -28,6 +29,7 @@ function validateConfig(cfg) {
   if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
   if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;
   if (typeof cfg.escalation.kickThreshold !== "number") cfg.escalation.kickThreshold = defaultConfig.escalation.kickThreshold;
+  if (!Array.isArray(cfg.roleLogBlacklist)) cfg.roleLogBlacklist = [];
   return cfg;
 }
 

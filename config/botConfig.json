@@ -26,9 +26,28 @@
   "escalation": {
     "muteThreshold": 2,
     "muteDuration": 7200000,
-    "kickThreshold": 3
+    "kickThreshold": 3,
+    "snipingWhitelist": [],
+    "moderatorRoles": [],
+    "warnings": {},
+    "escalation": {
+      "muteThreshold": 2,
+      "muteDuration": 7200000,
+      "kickThreshold": 3
+    },
+    "defaultMuteDuration": 3600000,
+    "modLogChannelId": "1232701768383729791",
+    "testingMode": false,
+    "roleLogBlacklist": []
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
-  "testingMode": false
+  "testingMode": false,
+  "roleLogBlacklist": [
+    "1232701768329199666",
+    "1232701768341655617",
+    "1232701768354369554",
+    "1232701768362754145",
+    "1232701768375210151"
+  ]
 }
