@@ -117,9 +117,11 @@ async function showWarnings(context, target) {
 
   if (context instanceof Message) {
     await context.reply({ embeds: [embed], components: [row] });
-  } else if (context.isRepliable()) {
+  } else if (context.isRepliable() && !context.replied && !context.deferred) {
     await context.reply({ embeds: [embed], components: [row], ephemeral: true });
-  } else if (context.update) {
+  } else if (typeof context.editReply === "function") {
+    await context.editReply({ embeds: [embed], components: [row] });
+  } else if (typeof context.update === "function") {
     await context.update({ embeds: [embed], components: [row] });
   }
 }

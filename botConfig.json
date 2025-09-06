@@ -2,13 +2,7 @@
   "snipingWhitelist": [],
   "moderatorRoles": [],
   "warnings": {
-    "432610292342587392": [
-      {
-        "moderator": "349282473085239298",
-        "reason": null,
-        "date": 1757167025711
-      }
-    ]
+    "432610292342587392": []
   },
   "escalation": {
     "muteThreshold": 2,
