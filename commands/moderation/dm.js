@@ -47,7 +47,7 @@ async function sendUserDM(target, action, duration = null, reason = null, extra 
   try {
     await target.send({ embeds: [embed] });
   } catch (err) {
-    console.log(`Could not DM ${target.user.tag}: ${err.message}`);
+    console.error(`[DM Error] Could not DM ${target.user.tag}:`, err);
   }
 }
 

@@ -2,7 +2,10 @@ const { EmbedBuilder } = require("discord.js");
 const { CONFIG_LOG_CHANNEL } = require("./logChannels");
 
 async function logRoleChange(client, member, role, action) {
-  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
+  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(err => {
+    console.error("[Mod Log Error]:", err);
+    return null;
+  });
   if (!channel) return;
 
   const embed = new EmbedBuilder()

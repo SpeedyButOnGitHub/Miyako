@@ -82,7 +82,7 @@ async function sendModLog(client, target, moderator, action, reason = null, isPu
   embed.setTimestamp();
 
   const msg = await channel.send({ embeds: [embed] }).catch(err => {
-    console.error("Failed to send mod log:", err);
+    console.error("[Mod Log Error]:", err);
     return null;
   });
   if (msg) {
