@@ -160,10 +160,12 @@ async function handleSnipeCommands(client, message, command, args) {
 
 // Only snipe non-bot, non-self messages
 function handleMessageDelete(message) {
+  // Ignore partials, bot messages, self messages, and commands (messages starting with .)
   if (
     message.partial ||
     message.author.bot ||
-    (message.client && message.author.id === message.client.user.id)
+    (message.client && message.author.id === message.client.user.id) ||
+    (typeof message.content === "string" && message.content.trim().startsWith("."))
   ) return;
 
   const member = message.member || message.guild.members.cache.get(message.author.id);
