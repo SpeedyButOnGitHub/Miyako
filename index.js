@@ -197,6 +197,10 @@ client.on("messageCreate", async (message) => {
       await handleLevelCommand(client, message);
     } else if (command === "test") {
       await handleTestCommand(client, message);
+    } else if (command === "restart") {
+      if (message.author.id !== OWNER_ID) return;
+      await message.reply("🔄 Restarting bot...");
+      process.exit(0);
     }
   } catch (err) {
     console.error(`[Mod Log Error]:`, err);

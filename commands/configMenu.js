@@ -16,11 +16,22 @@ const configCategories = {
   Sniping: {
     description: "Settings for sniping commands.",
     settings: {
-      WhitelistedChannels: {
-        description: "Channels where snipes are allowed.",
+      SnipeMode: {
+        description: "Choose whether to use a whitelist or blacklist for sniping channels.",
+        getDisplay: () => config.snipeMode === "blacklist" ? "Blacklist" : "Whitelist",
+        buttons: [
+          { id: "setWhitelist", label: "Whitelist", style: ButtonStyle.Success },
+          { id: "setBlacklist", label: "Blacklist", style: ButtonStyle.Danger }
+        ]
+      },
+      ChannelList: {
+        description: () =>
+          config.snipeMode === "blacklist"
+            ? "Channels where snipes are **not** allowed."
+            : "Channels where snipes are allowed.",
         getDisplay: () =>
-          config.snipingWhitelist.length
-            ? config.snipingWhitelist.map(id => `<#${id}>`).join("\n")
+          config.snipingChannelList && config.snipingChannelList.length
+            ? config.snipingChannelList.map(id => `<#${id}>`).join("\n")
             : "*None*",
         buttons: [
           { id: "addChannel", label: "Add role", style: ButtonStyle.Success },
@@ -323,10 +334,10 @@ async function handleMessageCreate(client, message) {
 
             if (action === "addChannel")
               matchedChannels.forEach(id => {
-                if (!config.snipingWhitelist.includes(id)) config.snipingWhitelist.push(id);
+                if (!config.snipingChannelList.includes(id)) config.snipingChannelList.push(id);
               });
             else if (action === "removeChannel")
-              config.snipingWhitelist = config.snipingWhitelist.filter(id => !matchedChannels.includes(id));
+              config.snipingChannelList = config.snipingChannelList.filter(id => !matchedChannels.includes(id));
           }
 
           if (categoryName === "Moderation") {

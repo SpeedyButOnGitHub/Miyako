@@ -14,7 +14,9 @@ const defaultConfig = {
   defaultMuteDuration: 60 * 60 * 1000,
   modLogChannelId: "1232701768383729791",
   testingMode: false,
-  roleLogBlacklist: []
+  roleLogBlacklist: [],
+  snipeMode: "whitelist",
+  snipingChannelList: []
 };
 
 function validateConfig(cfg) {
@@ -30,6 +32,8 @@ function validateConfig(cfg) {
   if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;
   if (typeof cfg.escalation.kickThreshold !== "number") cfg.escalation.kickThreshold = defaultConfig.escalation.kickThreshold;
   if (!Array.isArray(cfg.roleLogBlacklist)) cfg.roleLogBlacklist = [];
+  if (!["whitelist", "blacklist"].includes(cfg.snipeMode)) cfg.snipeMode = "whitelist";
+  if (!Array.isArray(cfg.snipingChannelList)) cfg.snipingChannelList = [];
   return cfg;
 }
 
