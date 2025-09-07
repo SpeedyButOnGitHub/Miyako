@@ -34,8 +34,8 @@ const configCategories = {
             ? config.snipingChannelList.map(id => `<#${id}>`).join("\n")
             : "*None*",
         buttons: [
-          { id: "addChannel", label: "Add role", style: ButtonStyle.Success },
-          { id: "removeChannel", label: "Remove role", style: ButtonStyle.Danger }
+          { id: "addChannel", label: "Add channel", style: ButtonStyle.Success },
+          { id: "removeChannel", label: "Remove channel", style: ButtonStyle.Danger }
         ]
       }
     }
@@ -174,9 +174,8 @@ async function handleMessageCreate(client, message) {
 
     collector.on("collect", async interaction => {
       if (String(interaction.user.id) !== String(OWNER_ID)) {
-        await interaction.deferUpdate();
-        const errMsg = await interaction.reply({ content: "Your message", flags: 64 });
-        setTimeout(() => errMsg.delete().catch(() => {}), 3000);
+        // Reply ephemeral without deferring to avoid "already acknowledged" errors
+        await interaction.reply({ content: `${EMOJI_ERROR} Only the Owner can use this.`, ephemeral: true }).catch(() => {});
         return;
       }
 
