@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
-const { getXP, getLevel, levels } = require("../utils/levels");
+const { getXP, getLevel, levels } = require("../utils/leveling");
 
 function getLevelXP(level) {
   // This should match your level curve in utils/levels.js
