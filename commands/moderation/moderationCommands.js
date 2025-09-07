@@ -63,6 +63,8 @@ async function handleModerationCommands(client, message, command, args) {
   const userObj = member ? member.user : user;
 
   const isTesting = !!config.testingMode;
+  // Ensure escalation config exists early (used in checks below)
+  const escalation = config.escalation || {};
 
   // Restriction checks only if NOT in testing mode
   if (!isTesting) {
@@ -81,8 +83,7 @@ async function handleModerationCommands(client, message, command, args) {
     }
   }
 
-  // Ensure escalation config exists
-  const escalation = config.escalation || {};
+  // Escalation thresholds
   const kickThreshold = typeof escalation.kickThreshold === "number" ? escalation.kickThreshold : 3;
   const muteThreshold = typeof escalation.muteThreshold === "number" ? escalation.muteThreshold : 2;
   const muteDuration = typeof escalation.muteDuration === "number" ? escalation.muteDuration : 2 * 60 * 60 * 1000;

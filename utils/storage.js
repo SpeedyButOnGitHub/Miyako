@@ -1,7 +1,9 @@
 const fs = require("fs");
-const CONFIG_FILE = "./config/botConfig.json";
+const path = require("path");
 
-// Define all required default options here
+const CONFIG_FILE = path.resolve("./config/botConfig.json");
+
+// Default configuration
 const defaultConfig = {
   snipingWhitelist: [],
   moderatorRoles: [],
@@ -19,45 +21,63 @@ const defaultConfig = {
   snipingChannelList: []
 };
 
-function validateConfig(cfg) {
-  if (!Array.isArray(cfg.snipingWhitelist)) cfg.snipingWhitelist = [];
-  if (!Array.isArray(cfg.moderatorRoles)) cfg.moderatorRoles = [];
-  if (typeof cfg.warnings !== "object" || cfg.warnings === null) cfg.warnings = {};
-  if (typeof cfg.escalation !== "object" || cfg.escalation === null) cfg.escalation = { ...defaultConfig.escalation };
-  // Validate escalation subkeys
-  if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
-  if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;
-  if (typeof cfg.escalation.kickThreshold !== "number") cfg.escalation.kickThreshold = defaultConfig.escalation.kickThreshold;
-  if (typeof cfg.escalation.defaultMuteDuration !== "number") cfg.escalation.defaultMuteDuration = defaultConfig.defaultMuteDuration;
-  if (typeof cfg.escalation.modLogChannelId !== "string") cfg.escalation.modLogChannelId = defaultConfig.modLogChannelId;
-  if (typeof cfg.escalation.testingMode !== "boolean") cfg.escalation.testingMode = false;
-  if (!Array.isArray(cfg.escalation.roleLogBlacklist)) cfg.escalation.roleLogBlacklist = [];
-  if (!["whitelist", "blacklist"].includes(cfg.escalation.snipeMode)) cfg.escalation.snipeMode = "whitelist";
-  if (!Array.isArray(cfg.escalation.snipingChannelList)) cfg.escalation.snipingChannelList = [];
-  return cfg;
+function ensureDir() {
+  const dir = path.dirname(CONFIG_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-// Load config and merge with defaults
+function asArray(x) {
+  return Array.isArray(x) ? x : [];
+}
+
+function validateAndFix(cfg) {
+  const c = { ...defaultConfig, ...(cfg || {}) };
+
+  c.snipingWhitelist = asArray(c.snipingWhitelist).map(String);
+  c.moderatorRoles = asArray(c.moderatorRoles).map(String);
+  c.roleLogBlacklist = asArray(c.roleLogBlacklist).map(String);
+  c.snipingChannelList = asArray(c.snipingChannelList).map(String);
+  if (typeof c.warnings !== "object" || c.warnings === null) c.warnings = {};
+
+  if (typeof c.escalation !== "object" || c.escalation === null) c.escalation = { ...defaultConfig.escalation };
+  c.escalation.muteThreshold = Number.isFinite(c.escalation.muteThreshold) ? c.escalation.muteThreshold : defaultConfig.escalation.muteThreshold;
+  c.escalation.muteDuration = Number.isFinite(c.escalation.muteDuration) ? c.escalation.muteDuration : defaultConfig.escalation.muteDuration;
+  c.escalation.kickThreshold = Number.isFinite(c.escalation.kickThreshold) ? c.escalation.kickThreshold : defaultConfig.escalation.kickThreshold;
+
+  if (!Number.isFinite(c.defaultMuteDuration)) c.defaultMuteDuration = defaultConfig.defaultMuteDuration;
+  if (typeof c.modLogChannelId !== "string") c.modLogChannelId = defaultConfig.modLogChannelId;
+  if (typeof c.testingMode !== "boolean") c.testingMode = defaultConfig.testingMode;
+  if (!['whitelist','blacklist'].includes(c.snipeMode)) c.snipeMode = defaultConfig.snipeMode;
+
+  return c;
+}
+
 let config = { ...defaultConfig };
-if (fs.existsSync(CONFIG_FILE)) {
-  try {
-    const loaded = JSON.parse(fs.readFileSync(CONFIG_FILE));
-    config = validateConfig({ ...defaultConfig, ...loaded });
-    if (loaded.escalation) {
-      config.escalation = validateConfig({ ...defaultConfig.escalation, ...loaded.escalation });
-    }
-  } catch {
+try {
+  ensureDir();
+  if (fs.existsSync(CONFIG_FILE)) {
+    const raw = fs.readFileSync(CONFIG_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    config = validateAndFix(parsed);
+  } else {
+    config = validateAndFix(defaultConfig);
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   }
-} else {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+} catch (err) {
+  console.error("[Config] Failed to read config, using defaults:", err);
+  config = { ...defaultConfig };
 }
 
-// Save config function
-const saveConfig = () => fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+const saveConfig = () => {
+  try {
+    ensureDir();
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(validateAndFix(config), null, 2));
+  } catch (err) {
+    console.error("[Config] Failed to save config:", err);
+  }
+};
 
 module.exports = {
   config,
   saveConfig
-};
 };

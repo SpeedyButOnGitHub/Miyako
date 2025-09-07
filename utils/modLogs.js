@@ -1,7 +1,8 @@
 const { EmbedBuilder } = require("discord.js");
+const { config } = require("./storage");
 
-// Only log moderation actions in the user action channel
-const USER_ACTION_LOG_CHANNEL = "1232701768383729791";
+// Default mod log channel, overridden by config.modLogChannelId; tests route to TEST channel
+const TEST_LOG_CHANNEL = "1413966369296220233";
 
 /**
  * Logs moderation actions in the user action channel only
@@ -16,7 +17,8 @@ const USER_ACTION_LOG_CHANNEL = "1232701768383729791";
  * @returns {Promise<Message|null>} - Sent message object
  */
 async function sendModLog(client, target, moderator, action, reason = null, isPunishment = true, duration = null, currentWarnings = null) {
-  const channel = await client.channels.fetch(USER_ACTION_LOG_CHANNEL).catch(() => null);
+  const channelId = config.testingMode ? TEST_LOG_CHANNEL : (config.modLogChannelId || "1232701768383729791");
+  const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!channel) return null;
 
   const colors = {
@@ -65,9 +67,15 @@ async function sendModLog(client, target, moderator, action, reason = null, isPu
       break;
   }
 
+  const userObj = target?.user || target; // target can be GuildMember or User
+  const displayName = target?.displayName || userObj?.username || `User ${target?.id || "Unknown"}`;
+  const avatarURL = typeof userObj?.displayAvatarURL === "function"
+    ? userObj.displayAvatarURL({ dynamic: true })
+    : undefined;
+
   const embed = new EmbedBuilder()
-    .setAuthor({ name: target.displayName, iconURL: target.displayAvatarURL({ dynamic: true }) })
-    .setThumbnail(target.displayAvatarURL({ dynamic: true }))
+    .setAuthor({ name: displayName, iconURL: avatarURL })
+    .setThumbnail(avatarURL)
     .setColor(color)
     .setDescription(description);
 

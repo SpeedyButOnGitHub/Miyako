@@ -32,10 +32,11 @@ async function handleLevelCommand(client, message) {
     .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
     .addFields(
       { name: "Level", value: `${level}`, inline: true },
-      { name: "XP Progress", value: progressBar, inline: false },
-      { name: "XP to Next Level", value: `${xpForNextLevel - xp}`, inline: true }
+      { name: "XP", value: `${xp}`, inline: true },
+      { name: "XP to Next Level", value: `${xpForNextLevel - xp}`, inline: true },
     )
-    .setFooter({ text: `Max XP for current level: ${xpForCurrentLevel}` })
+    .addFields({ name: "Progress", value: progressBar })
+    .setFooter({ text: `XP this level: ${xpIntoLevel} / ${xpNeeded}` })
     .setTimestamp();
 
   await message.reply({ embeds: [embed] });

@@ -1,5 +1,6 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
 const { config, saveConfig } = require("../utils/storage");
+const { logConfigChange } = require("../utils/configLogs");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
 const { OWNER_ID } = require("./moderation/permissions");
 const fs = require("fs");
@@ -34,8 +35,8 @@ const configCategories = {
             ? config.snipingChannelList.map(id => `<#${id}>`).join("\n")
             : "*None*",
         buttons: [
-          { id: "addChannel", label: "Add role", style: ButtonStyle.Success },
-          { id: "removeChannel", label: "Remove role", style: ButtonStyle.Danger }
+          { id: "addChannel", label: "Add channel", style: ButtonStyle.Success },
+          { id: "removeChannel", label: "Remove channel", style: ButtonStyle.Danger }
         ]
       }
     }
@@ -84,14 +85,14 @@ function renderSettingEmbed(categoryName, settingKey) {
   setting.buttons.forEach(btn => {
     itemRow.addComponents(
       new ButtonBuilder()
-        .setCustomId(`settingButton_${categoryName}_${settingKey}_${btn.id}`) // This is unique per button
+        .setCustomId(`settingButton_${categoryName}_${settingKey}_${btn.id}`)
         .setLabel(btn.label)
         .setStyle(btn.style)
     );
   });
   itemRow.addComponents(
     new ButtonBuilder()
-      .setCustomId(`back_category_${categoryName}`) // Unique per category
+      .setCustomId(`back_category_${categoryName}`)
       .setLabel("Back")
       .setStyle(ButtonStyle.Secondary)
   );
@@ -100,7 +101,7 @@ function renderSettingEmbed(categoryName, settingKey) {
   if (!(categoryName === "Moderation" && (settingKey === "ModeratorRoles" || settingKey === "RoleLogBlacklist"))) {
     itemRow.addComponents(
       new ButtonBuilder()
-        .setCustomId("config_help") // Only one Help Menu button per row
+        .setCustomId("config_help")
         .setLabel("Help Menu")
         .setStyle(ButtonStyle.Secondary)
         .setEmoji("❓")
@@ -173,69 +174,62 @@ async function handleMessageCreate(client, message) {
     });
 
     collector.on("collect", async interaction => {
+      console.log("Config button pressed:", interaction.customId);
       if (String(interaction.user.id) !== String(OWNER_ID)) {
         await interaction.deferUpdate();
-        const errMsg = await interaction.reply({ content: "Your message", flags: 64 });
-        setTimeout(() => errMsg.delete().catch(() => {}), 3000);
+        const tempMsg = await interaction.followUp({ content: `${EMOJI_ERROR} Only the Owner can use this`, ephemeral: true });
+        setTimeout(() => tempMsg.delete().catch(() => {}), 3000);
         return;
       }
 
       // Help Menu button
       if (interaction.customId === "config_help") {
         await interaction.deferUpdate();
-        // Create a fake message object for help
-        const fakeHelpMsg = {
-          author: { id: interaction.user.id },
-          guild: interaction.guild,
-          channel: interaction.channel,
-          reply: (...args) => interaction.channel.send(...args)
-        };
-        const { handleHelpCommand } = require("./help");
-        await handleHelpCommand(client, fakeHelpMsg);
-        return startCollector();
+        const tempMsg = await interaction.followUp({ content: "Help: Use the buttons to navigate. Add/remove prompts will show modals.", ephemeral: true });
+        setTimeout(() => tempMsg.delete().catch(() => {}), 5000);
+        return;
       }
 
       // Back to main menu
       if (interaction.customId === "back_main") {
         await interaction.update({ embeds: [mainEmbed], components: [mainRow] });
-        return startCollector();
+        startCollector();
+        return;
       }
 
       // Back to category view
       if (interaction.customId.startsWith("back_category_")) {
         const categoryName = interaction.customId.replace("back_category_", "");
         const category = configCategories[categoryName];
-        if (!category)
-          return interaction.reply({ content: `${EMOJI_ERROR} Category not found.`, ephemeral: true });
+        if (!category) return;
 
         const categoryEmbed = new EmbedBuilder()
-          .setTitle(`⚙️ ${categoryName} Settings`)
+          .setTitle(`⚙️ ${categoryName}`)
           .setColor(0x5865F2)
           .setDescription(
-            `**${category.description}**\n\n__Current settings:__\n` +
-            Object.entries(category.settings)
-              .map(([key, setting]) => `**${key}:**\n${setting.getDisplay()}`)
-              .join("\n\n")
+            `${category.description}\n\n` +
+            Object.keys(category.settings).map(setting => `**${setting}** — ${category.settings[setting].description}`).join("\n")
           );
 
-        const settingsRow = new ActionRowBuilder();
-        for (const key in category.settings) {
-          settingsRow.addComponents(
+        const categoryRow = new ActionRowBuilder();
+        Object.keys(category.settings).forEach(setting => {
+          categoryRow.addComponents(
             new ButtonBuilder()
-              .setCustomId(`setting_${categoryName}_${key}`)
-              .setLabel(`⚙️ ${key}`)
+              .setCustomId(`setting_${categoryName}_${setting}`)
+              .setLabel(setting)
               .setStyle(ButtonStyle.Primary)
           );
-        }
-        settingsRow.addComponents(
+        });
+        categoryRow.addComponents(
           new ButtonBuilder()
             .setCustomId("back_main")
             .setLabel("Back")
             .setStyle(ButtonStyle.Secondary)
         );
 
-        await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
-        return startCollector();
+        await interaction.update({ embeds: [categoryEmbed], components: [categoryRow] });
+        startCollector();
+        return;
       }
 
       const parts = interaction.customId.split("_");
@@ -244,196 +238,89 @@ async function handleMessageCreate(client, message) {
       // Open category
       if (type === "category") {
         const category = configCategories[categoryName];
+        if (!category) return;
+
         const categoryEmbed = new EmbedBuilder()
-          .setTitle(`⚙️ ${categoryName} Settings`)
+          .setTitle(`⚙️ ${categoryName}`)
           .setColor(0x5865F2)
           .setDescription(
-            `**${category.description}**\n\n__Current settings:__\n` +
-            Object.entries(category.settings)
-              .map(([key, setting]) => `**${key}:**\n${setting.getDisplay()}`)
-              .join("\n\n")
+            `${category.description}\n\n` +
+            Object.keys(category.settings).map(setting => `**${setting}** — ${category.settings[setting].description}`).join("\n")
           );
 
-        const settingsRow = new ActionRowBuilder();
-        for (const key in category.settings) {
-          settingsRow.addComponents(
+        const categoryRow = new ActionRowBuilder();
+        Object.keys(category.settings).forEach(setting => {
+          categoryRow.addComponents(
             new ButtonBuilder()
-              .setCustomId(`setting_${categoryName}_${key}`)
-              .setLabel(`⚙️ ${key}`)
+              .setCustomId(`setting_${categoryName}_${setting}`)
+              .setLabel(setting)
               .setStyle(ButtonStyle.Primary)
           );
-        }
-        settingsRow.addComponents(
+        });
+        categoryRow.addComponents(
           new ButtonBuilder()
             .setCustomId("back_main")
             .setLabel("Back")
             .setStyle(ButtonStyle.Secondary)
         );
 
-        await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
-        return startCollector();
+        await interaction.update({ embeds: [categoryEmbed], components: [categoryRow] });
+        startCollector();
+        return;
       }
 
       // Open setting
       if (type === "setting") {
         const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-        // Only add Help Menu button if NOT RoleLogBlacklist
-        if (!(categoryName === "Moderation" && settingKey === "RoleLogBlacklist")) {
-          row.addComponents(
-            new ButtonBuilder()
-              .setCustomId("config_help")
-              .setLabel("Help Menu")
-              .setStyle(ButtonStyle.Secondary)
-              .setEmoji("❓")
-          );
-        }
         await interaction.update({ embeds: [embed], components: [row] });
-        return startCollector();
+        startCollector();
+        return;
       }
 
-      // Handle add/remove actions
+      // Handle add/remove actions and mode toggles
       if (type === "settingButton") {
-        const setting = configCategories[categoryName]?.settings[settingKey];
-        if (!setting)
-          return interaction.reply({ content: `${EMOJI_ERROR} Setting not found.`, ephemeral: true });
-
-        const promptMsg = await interaction.reply({
-          content: `Type ${action.includes("add") ? "IDs or mentions to add" : "IDs or mentions to remove"} (comma-separated).`,
-          ephemeral: true
-        });
-
-        const filter = m => m.author.id === interaction.user.id;
-        const msgCollector = interaction.channel.createMessageCollector({ filter, time: 30000, max: 1 });
-
-        msgCollector.on("collect", async m => {
-          const inputs = m.content
-            .split(",")
-            .map(s => s.trim().replace(/[<#&>]/g, ""))
-            .filter(Boolean);
-
-          if (categoryName === "Sniping") {
-            const matchedChannels = [];
-            const invalidChannels = [];
-            inputs.forEach(input => {
-              const channel = interaction.guild.channels.cache.get(input);
-              if (channel) {
-                matchedChannels.push(channel.id);
-              } else {
-                invalidChannels.push(input);
-              }
-            });
-
-            if (invalidChannels.length > 0) {
-              await interaction.followUp({
-                content: `${EMOJI_ERROR} Please type a valid channel ping or id. Invalid: ${invalidChannels.map(i => `\`${i}\``).join(", ")}`,
-                ephemeral: true
-              });
-              m.delete().catch(() => {});
-              return;
-            }
-
-            if (action === "addChannel")
-              matchedChannels.forEach(id => {
-                if (!config.snipingChannelList.includes(id)) config.snipingChannelList.push(id);
-              });
-            else if (action === "removeChannel")
-              config.snipingChannelList = config.snipingChannelList.filter(id => !matchedChannels.includes(id));
-            saveConfig();
-          }
-
-          if (categoryName === "Moderation") {
-            const matchedRoles = [];
-            const invalidInputs = [];
-            inputs.forEach(input => {
-              const role = interaction.guild.roles.cache.find(
-                r => r.id === input || r.name.toLowerCase() === input.toLowerCase()
-              );
-              if (role) {
-                matchedRoles.push(role);
-              } else {
-                invalidInputs.push(input);
-              }
-            });
-
-            if (invalidInputs.length > 0) {
-              await interaction.followUp({
-                content: `${EMOJI_ERROR} Please type a valid role ping or id. Invalid: ${invalidInputs.map(i => `\`${i}\``).join(", ")}`,
-                ephemeral: true
-              });
-              m.delete().catch(() => {});
-              return;
-            }
-
-            if (action === "addRole")
-              matchedRoles.forEach(r => {
-                if (!config.moderatorRoles.includes(r.id)) config.moderatorRoles.push(r.id);
-              });
-            else if (action === "removeRole") {
-              const idsToRemove = matchedRoles.map(r => r.id);
-              config.moderatorRoles = config.moderatorRoles.filter(id => !idsToRemove.includes(id));
-            }
-            saveConfig();
-          }
-
-          if (categoryName === "Moderation" && settingKey === "RoleLogBlacklist") {
-            const matchedRoles = [];
-            const invalidInputs = [];
-            inputs.forEach(input => {
-              const role = interaction.guild.roles.cache.find(
-                r => r.id === input || r.name.toLowerCase() === input.toLowerCase()
-              );
-              if (role) {
-                matchedRoles.push(role);
-              } else {
-                invalidInputs.push(input);
-              }
-            });
-
-            if (invalidInputs.length > 0) {
-              await interaction.followUp({
-                content: `${EMOJI_ERROR} Please type a valid role ping or id. Invalid: ${invalidInputs.map(i => `\`${i}\``).join(", ")}`,
-                ephemeral: true
-              });
-              m.delete().catch(() => {});
-              return;
-            }
-
-            if (action === "addBlacklistRole")
-              matchedRoles.forEach(r => {
-                if (!config.roleLogBlacklist.includes(r.id)) config.roleLogBlacklist.push(r.id);
-              });
-            else if (action === "removeBlacklistRole") {
-              const idsToRemove = matchedRoles.map(r => r.id);
-              config.roleLogBlacklist = config.roleLogBlacklist.filter(id => !idsToRemove.includes(id));
-            }
-            saveConfig();
-          }
-
+        if (action === "setWhitelist" || action === "setBlacklist") {
+          const oldMode = config.snipeMode;
+          config.snipeMode = action === "setWhitelist" ? "whitelist" : "blacklist";
           saveConfig();
-
-          // Edit original message with updated config
+          await logConfigChange(interaction.client, interaction.user, `Changed snipe mode from ${oldMode} to ${config.snipeMode}`);
           const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-          // Only add Help Menu button if NOT RoleLogBlacklist
-          if (!(categoryName === "Moderation" && settingKey === "RoleLogBlacklist")) {
-            row.addComponents(
-              new ButtonBuilder()
-                .setCustomId("config_help")
-                .setLabel("Help Menu")
-                .setStyle(ButtonStyle.Secondary)
-                .setEmoji("❓")
-            );
-          }
-          await interaction.message.edit({ embeds: [embed], components: [row] });
+          await interaction.update({ embeds: [embed], components: [row] });
+        } else if (action === "addChannel" || action === "removeChannel") {
+          const modal = new ModalBuilder()
+            .setCustomId(`modal_${categoryName}_${settingKey}_${action}`)
+            .setTitle(`${action === "addChannel" ? "Add" : "Remove"} Channel`);
 
-          await interaction.followUp({
-            content: `${EMOJI_SUCCESS} Settings updated successfully.`,
-            ephemeral: true
-          });
-          m.delete().catch(() => {});
-        });
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder()
+                .setCustomId("input")
+                .setLabel("Channel ID or #mention")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+            )
+          );
 
-        msgCollector.on("end", () => promptMsg.delete().catch(() => {}));
-        return startCollector();
+          await interaction.showModal(modal);
+        } else if (action === "addRole" || action === "removeRole" || action === "addBlacklistRole" || action === "removeBlacklistRole") {
+          const modal = new ModalBuilder()
+            .setCustomId(`modal_${categoryName}_${settingKey}_${action}`)
+            .setTitle(`${action.includes("add") ? "Add" : "Remove"} Role`);
+
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder()
+                .setCustomId("input")
+                .setLabel("Role ID or @mention")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true)
+            )
+          );
+
+          await interaction.showModal(modal);
+        }
+        startCollector();
+        return;
       }
 
       // Reset collector timer after any button interaction
@@ -442,13 +329,7 @@ async function handleMessageCreate(client, message) {
 
     collector.on("end", async (_, reason) => {
       if (reason !== "reset") {
-        await mainMsg.delete().catch(() => {});
-        await message.delete().catch(() => {});
-        // Remove from activeMenus.json
-        activeMenus = activeMenus.filter(
-          m => m.messageId !== mainMsg.id && m.commandId !== message.id
-        );
-        fs.writeFileSync(ACTIVE_MENUS_FILE, JSON.stringify(activeMenus, null, 2));
+        await mainMsg.edit({ components: [] }).catch(() => {});
       }
     });
   }
@@ -460,46 +341,115 @@ async function handleConfigCommand(client, message) {
   const args = message.content.trim().split(/\s+/);
   if (args[0] !== ".config") return;
 
-  // Example: .config whitelist add <channelId>
-  if (args[1] === "whitelist" && args[2] === "add" && args[3]) {
-    if (!config.snipingWhitelist.includes(args[3])) {
-      config.snipingWhitelist.push(args[3]);
-      saveConfig();
-      return message.reply(`${EMOJI_SUCCESS} Channel <#${args[3]}> added to sniping whitelist.`);
-    } else {
-      return message.reply(`${EMOJI_ERROR} Channel <#${args[3]}> is already whitelisted.`);
-    }
+  if (String(message.author.id) !== String(OWNER_ID)) {
+    return message.reply(`${EMOJI_ERROR} Only the Owner can use this.`);
   }
 
-  // Example: .config whitelist remove <channelId>
-  if (args[1] === "whitelist" && args[2] === "remove" && args[3]) {
-    const index = config.snipingWhitelist.indexOf(args[3]);
-    if (index !== -1) {
-      config.snipingWhitelist.splice(index, 1);
-      saveConfig();
-      return message.reply(`${EMOJI_SUCCESS} Channel <#${args[3]}> removed from sniping whitelist.`);
-    } else {
-      return message.reply(`${EMOJI_ERROR} Channel <#${args[3]}> is not whitelisted.`);
-    }
-  }
+  const sub = (args[1] || "").toLowerCase();
 
-  // Show current whitelist
-  if (args[1] === "whitelist" && args[2] === "list") {
-    if (config.snipingWhitelist.length === 0) {
-      return message.reply(`${EMOJI_ERROR} No channels are whitelisted for sniping.`);
+  // Helper to extract a channel ID from mention or raw ID
+  const toChannelId = (s) => (s || "").replace(/[^0-9]/g, "");
+  const channelsToMentions = (ids) => ids.map(id => `<#${id}>`).join("\n");
+
+  // New syntax: .config snipe ...
+  if (["snipe", "sniping"].includes(sub)) {
+    const action = (args[2] || "").toLowerCase();
+
+    // .config snipe mode whitelist|blacklist
+    if (action === "mode") {
+      const mode = (args[3] || "").toLowerCase();
+      if (!["whitelist", "blacklist"].includes(mode)) {
+        return message.reply(`${EMOJI_ERROR} Invalid mode. Use 'whitelist' or 'blacklist'.`);
+      }
+      const old = config.snipeMode;
+      config.snipeMode = mode;
+      saveConfig();
+      try {
+        await logConfigChange(client, message.author, `Changed snipe mode from ${old} to ${mode}`);
+      } catch {}
+      return message.reply(`${EMOJI_SUCCESS} Snipe mode set to: ${mode}.`);
     }
+
+    // .config snipe add/remove <channelId|mention>
+    if (["add", "remove"].includes(action)) {
+      const raw = args.slice(3);
+      if (!raw.length) return message.reply(`${EMOJI_ERROR} Provide channel(s) to ${action}.`);
+      const ids = raw.map(toChannelId).filter(Boolean);
+      const valid = ids.filter(id => message.guild.channels.cache.has(id));
+      const invalid = ids.filter(id => !valid.includes(id));
+      if (!valid.length) return message.reply(`${EMOJI_ERROR} No valid channels found.`);
+
+      if (action === "add") {
+        config.snipingChannelList = [...new Set([...config.snipingChannelList, ...valid])];
+      } else {
+        config.snipingChannelList = config.snipingChannelList.filter(id => !valid.includes(id));
+      }
+      saveConfig();
+      try {
+        await logConfigChange(client, message.author, `${action === "add" ? "Added" : "Removed"} channels: ${channelsToMentions(valid)}`);
+      } catch {}
+      const summary = channelsToMentions(valid);
+      const note = invalid.length ? `\nNote: ignored invalid IDs: ${invalid.map(i => `\`${i}\``).join(", ")}` : "";
+      return message.reply(`${EMOJI_SUCCESS} ${action === "add" ? "Added" : "Removed"}:\n${summary}${note}`);
+    }
+
+    // .config snipe list
+    if (action === "list") {
+      const list = config.snipingChannelList.length ? channelsToMentions(config.snipingChannelList) : "*None*";
+      return message.reply(`Snipe mode: ${config.snipeMode}\nChannels: ${list}`);
+    }
+
+    // Help for .config snipe
     return message.reply(
-      "Whitelisted channels:\n" +
-        config.snipingWhitelist.map(id => `<#${id}>`).join("\n")
+      "Usage:\n" +
+      "`.config snipe mode <whitelist|blacklist>`\n" +
+      "`.config snipe add <channel...>`\n" +
+      "`.config snipe remove <channel...>`\n" +
+      "`.config snipe list`"
     );
   }
 
-  // Default help
+  // Back-compat: old whitelist alias maps to sniping list (does not toggle mode automatically)
+  if (sub === "whitelist") {
+    const action = (args[2] || "").toLowerCase();
+    if (["add", "remove"].includes(action)) {
+      const raw = args.slice(3);
+      if (!raw.length) return message.reply(`${EMOJI_ERROR} Provide channel(s) to ${action}.`);
+      const ids = raw.map(toChannelId).filter(Boolean);
+      const valid = ids.filter(id => message.guild.channels.cache.has(id));
+      if (!valid.length) return message.reply(`${EMOJI_ERROR} No valid channels found.`);
+
+      if (action === "add") {
+        config.snipingChannelList = [...new Set([...config.snipingChannelList, ...valid])];
+      } else {
+        config.snipingChannelList = config.snipingChannelList.filter(id => !valid.includes(id));
+      }
+      saveConfig();
+      try {
+        await logConfigChange(client, message.author, `${action === "add" ? "Added" : "Removed"} channels: ${channelsToMentions(valid)}`);
+      } catch {}
+      const summary = channelsToMentions(valid);
+      return message.reply(`${EMOJI_SUCCESS} ${action === "add" ? "Added" : "Removed"}:\n${summary}`);
+    }
+    if (action === "list") {
+      const list = config.snipingChannelList.length ? channelsToMentions(config.snipingChannelList) : "*None*";
+      return message.reply(`Channels: ${list}`);
+    }
+    return message.reply(
+      "Usage (alias for snipe list):\n" +
+      "`.config whitelist add <channel>`\n" +
+      "`.config whitelist remove <channel>`\n" +
+      "`.config whitelist list`"
+    );
+  }
+
+  // Default help landing
   return message.reply(
     "Usage:\n" +
-      "`.config whitelist add <channelId>`\n" +
-      "`.config whitelist remove <channelId>`\n" +
-      "`.config whitelist list`"
+    "`.config snipe mode <whitelist|blacklist>`\n" +
+    "`.config snipe add <channel...>`\n" +
+    "`.config snipe remove <channel...>`\n" +
+    "`.config snipe list`"
   );
 }
 

@@ -167,8 +167,13 @@ async function handleScheduleModal(interaction) {
 
   if (type === "once") schedule.date = date;
   if (type === "weekly") {
-    const map = { sun:0, sun.:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
-    schedule.days = daysRaw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean).map(w => map[w] ?? null).filter(x => x !== null);
+    const map = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
+    schedule.days = daysRaw
+      .split(",")
+      .map(s => s.trim().toLowerCase().replace(/\.$/, ""))
+      .filter(Boolean)
+      .map(w => (w in map ? map[w] : null))
+      .filter(x => x !== null);
     if (schedule.days.length === 0) schedule.days = [1]; // default Monday
   }
   if (type === "interval") schedule.intervalDays = Number(intervalDays) || 1;
