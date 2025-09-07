@@ -7,7 +7,7 @@ const TEST_LOG_CHANNEL = "1413966369296220233";
 async function logMessageDelete(client, message) {
   const logChannelId = config.testingMode ? TEST_LOG_CHANNEL : MESSAGE_LOG_CHANNEL;
   const channel = await client.channels.fetch(logChannelId).catch(() => null);
-  if (!channel || !message.guild || !message.author || message.author.bot) return;
+  if (!channel || !message || !message.guild || !message.author || message.author.bot) return;
 
   const embed = new EmbedBuilder()
     .setTitle("Message Deleted")
@@ -17,30 +17,27 @@ async function logMessageDelete(client, message) {
     .addFields({ name: "Channel", value: `<#${message.channel.id}>`, inline: true })
     .setTimestamp();
 
-  await channel.send({ embeds: [embed] });
+  await channel.send({ embeds: [embed] }).catch(() => {});
 }
 
 async function logMessageEdit(client, oldMessage, newMessage) {
   const logChannelId = config.testingMode ? TEST_LOG_CHANNEL : MESSAGE_LOG_CHANNEL;
   const channel = await client.channels.fetch(logChannelId).catch(() => null);
-  if (!channel || !oldMessage.guild || !oldMessage.author || oldMessage.author.bot) return;
-  if (oldMessage.content === newMessage.content) return;
+  if (!channel || !oldMessage || !newMessage) return;
+  if (!newMessage.guild || (newMessage.author && newMessage.author.bot)) return;
 
   const embed = new EmbedBuilder()
     .setTitle("Message Edited")
-    .setColor(0xffcc00)
-    .setAuthor({ name: oldMessage.author.tag, iconURL: oldMessage.author.displayAvatarURL({ dynamic: true }) })
+    .setColor(0xffd700)
+    .setAuthor({ name: (newMessage.author && newMessage.author.tag) || "Unknown", iconURL: newMessage.author ? newMessage.author.displayAvatarURL({ dynamic: true }) : undefined })
     .addFields(
-      { name: "Before", value: oldMessage.content || "*No content*", inline: false },
-      { name: "After", value: newMessage.content || "*No content*", inline: false },
-      { name: "Channel", value: `<#${oldMessage.channel.id}>`, inline: true }
+      { name: "Channel", value: `<#${newMessage.channel.id}>`, inline: true },
+      { name: "Before", value: oldMessage.content || "*No content*" },
+      { name: "After", value: newMessage.content || "*No content*" }
     )
     .setTimestamp();
 
-  await channel.send({ embeds: [embed] });
+  await channel.send({ embeds: [embed] }).catch(() => {});
 }
 
-module.exports = {
-  logMessageDelete,
-  logMessageEdit
-};
+module.exports = { logMessageDelete, logMessageEdit };

@@ -27,20 +27,11 @@
     "muteThreshold": 2,
     "muteDuration": 7200000,
     "kickThreshold": 3,
-    "snipingWhitelist": [],
-    "moderatorRoles": [],
-    "warnings": {},
     "escalation": {
       "muteThreshold": 2,
       "muteDuration": 7200000,
       "kickThreshold": 3
-    },
-    "defaultMuteDuration": 3600000,
-    "modLogChannelId": "1232701768383729791",
-    "testingMode": false,
-    "roleLogBlacklist": [],
-    "snipeMode": "whitelist",
-    "snipingChannelList": []
+    }
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",

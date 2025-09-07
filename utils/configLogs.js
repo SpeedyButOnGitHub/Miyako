@@ -1,7 +1,11 @@
 const { EmbedBuilder } = require("discord.js");
 const { CONFIG_LOG_CHANNEL } = require("./logChannels");
 
-async function logConfigChange(client, config) {
+/**
+ * @param {import('discord.js').Client} client
+ * @param {{user:{id:string,tag?:string,displayAvatarURL?:Function}, change:string}} params
+ */
+async function logConfigChange(client, { user, change }) {
   const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
   if (!channel) return;
 
@@ -12,9 +16,7 @@ async function logConfigChange(client, config) {
     .setDescription(change)
     .setTimestamp();
 
-  await channel.send({ embeds: [embed] });
+  await channel.send({ embeds: [embed] }).catch(() => {});
 }
 
-module.exports = {
-  logConfigChange
-};
+module.exports = { logConfigChange };

@@ -27,13 +27,13 @@ function validateConfig(cfg) {
   if (typeof cfg.defaultMuteDuration !== "number") cfg.defaultMuteDuration = defaultConfig.defaultMuteDuration;
   if (typeof cfg.modLogChannelId !== "string") cfg.modLogChannelId = defaultConfig.modLogChannelId;
   if (typeof cfg.testingMode !== "boolean") cfg.testingMode = false;
-  // Validate escalation subkeys
-  if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
-  if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;
-  if (typeof cfg.escalation.kickThreshold !== "number") cfg.escalation.kickThreshold = defaultConfig.escalation.kickThreshold;
   if (!Array.isArray(cfg.roleLogBlacklist)) cfg.roleLogBlacklist = [];
   if (!["whitelist", "blacklist"].includes(cfg.snipeMode)) cfg.snipeMode = "whitelist";
   if (!Array.isArray(cfg.snipingChannelList)) cfg.snipingChannelList = [];
+  // escalation sub-keys
+  if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
+  if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;
+  if (typeof cfg.escalation.kickThreshold !== "number") cfg.escalation.kickThreshold = defaultConfig.escalation.kickThreshold;
   return cfg;
 }
 
@@ -41,13 +41,18 @@ function validateConfig(cfg) {
 let config = { ...defaultConfig };
 if (fs.existsSync(CONFIG_FILE)) {
   try {
-    const loaded = JSON.parse(fs.readFileSync(CONFIG_FILE));
-    config = validateConfig({ ...defaultConfig, ...loaded });
-    if (loaded.escalation) {
-      config.escalation = { ...defaultConfig.escalation, ...loaded.escalation };
-      config.escalation = validateConfig(config.escalation);
+    const loaded = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+    // Some past corruption placed defaults inside escalation; flatten if necessary
+    const cleaned = { ...loaded };
+    if (cleaned.escalation && typeof cleaned.escalation === "object") {
+      // Remove accidental nested defaults from escalation
+      for (const k of ["snipingWhitelist","moderatorRoles","warnings","defaultMuteDuration","modLogChannelId","testingMode","roleLogBlacklist","snipeMode","snipingChannelList"]) {
+        if (k in cleaned.escalation) delete cleaned.escalation[k];
+      }
     }
-  } catch {
+    config = validateConfig({ ...defaultConfig, ...cleaned, escalation: { ...defaultConfig.escalation, ...(cleaned.escalation || {}) } });
+  } catch (e) {
+    // rewrite with defaults if corrupted
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
   }
 } else {
@@ -57,7 +62,4 @@ if (fs.existsSync(CONFIG_FILE)) {
 // Save config function
 const saveConfig = () => fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 
-module.exports = {
-  config,
-  saveConfig
-};
+module.exports = { config, saveConfig };
