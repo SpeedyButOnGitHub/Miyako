@@ -38,7 +38,9 @@
     "defaultMuteDuration": 3600000,
     "modLogChannelId": "1232701768383729791",
     "testingMode": false,
-    "roleLogBlacklist": []
+    "roleLogBlacklist": [],
+    "snipeMode": "whitelist",
+    "snipingChannelList": []
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
@@ -49,5 +51,7 @@
     "1232701768354369554",
     "1232701768362754145",
     "1232701768375210151"
-  ]
+  ],
+  "snipeMode": "whitelist",
+  "snipingChannelList": []
 }

@@ -175,7 +175,7 @@ async function handleMessageCreate(client, message) {
     collector.on("collect", async interaction => {
       if (String(interaction.user.id) !== String(OWNER_ID)) {
         await interaction.deferUpdate();
-        const errMsg = await interaction.followUp({ content: "Only the Owner can use this", ephemeral: true });
+        const errMsg = await interaction.reply({ content: "Your message", flags: 64 });
         setTimeout(() => errMsg.delete().catch(() => {}), 3000);
         return;
       }

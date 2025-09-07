@@ -104,50 +104,21 @@ function getBotTestRow(testingMode) {
 /**
  * Get the native Discord tests button row.
  */
-function getNativeTestRow() {
-  return new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId("native_ban")
-        .setLabel("Ban")
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji("🔨"),
-      new ButtonBuilder()
-        .setCustomId("native_unban")
-        .setLabel("Unban")
-        .setStyle(ButtonStyle.Success)
-        .setEmoji("🔓"),
-      new ButtonBuilder()
-        .setCustomId("native_kick")
-        .setLabel("Kick")
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji("👢"),
-      new ButtonBuilder()
-        .setCustomId("native_mute")
-        .setLabel("Mute/Timeout")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji("🔇"),
-      new ButtonBuilder()
-        .setCustomId("native_unmute")
-        .setLabel("Unmute/Untimeout")
-        .setStyle(ButtonStyle.Success)
-        .setEmoji("🔊"),
-      new ButtonBuilder()
-        .setCustomId("native_warn")
-        .setLabel("Warn")
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji("⚠️"),
-      new ButtonBuilder()
-        .setCustomId("native_removewarn")
-        .setLabel("Remove Warn")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji("🗑️"),
-      new ButtonBuilder()
-        .setCustomId("native_back_main")
-        .setLabel("Back")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji("⬅️")
-    );
+function getNativeTestRows() {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("native_ban").setLabel("Ban").setStyle(ButtonStyle.Danger).setEmoji("🔨"),
+      new ButtonBuilder().setCustomId("native_unban").setLabel("Unban").setStyle(ButtonStyle.Success).setEmoji("🔓"),
+      new ButtonBuilder().setCustomId("native_kick").setLabel("Kick").setStyle(ButtonStyle.Danger).setEmoji("👢"),
+      new ButtonBuilder().setCustomId("native_mute").setLabel("Mute/Timeout").setStyle(ButtonStyle.Secondary).setEmoji("🔇"),
+      new ButtonBuilder().setCustomId("native_unmute").setLabel("Unmute/Untimeout").setStyle(ButtonStyle.Success).setEmoji("🔊")
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("native_warn").setLabel("Warn").setStyle(ButtonStyle.Primary).setEmoji("⚠️"),
+      new ButtonBuilder().setCustomId("native_removewarn").setLabel("Remove Warn").setStyle(ButtonStyle.Secondary).setEmoji("🗑️"),
+      new ButtonBuilder().setCustomId("native_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+    )
+  ];
 }
 
 /**
@@ -239,7 +210,7 @@ async function handleTestCommand(client, message) {
           .setTitle("🛡️ Native Discord Tests")
           .setColor(0x5865F2)
           .setDescription("Test Discord's built-in moderation actions below.");
-        await interaction.update({ embeds: [nativeEmbed], components: [getNativeTestRow()] });
+        await interaction.update({ embeds: [nativeEmbed], components: getNativeTestRows() });
         startCollector("native");
         return;
       }
@@ -362,7 +333,7 @@ async function handleTestCommand(client, message) {
             `[Native Discord Test]\nReason: ${reason}`,
             false
           );
-          await interaction.reply({ content: `Native Discord unban test sent for <@${subject.id}>!`, ephemeral: true });
+          await interaction.followUp({ content: `Native Discord unban test sent for <@${subject.id}>!`, ephemeral: true });
         } else if (interaction.customId === "native_kick") {
           await sendModLog(
             client,

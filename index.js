@@ -13,6 +13,7 @@ const { logMessageDelete, logMessageEdit } = require("./utils/messageLogs");
 const { logRoleChange } = require("./utils/roleLogs");
 const { handleTestCommand } = require("./commands/test");
 const { logMemberLeave } = require("./utils/memberLogs");
+const { config, saveConfig } = require("./utils/storage");
 
 const { OWNER_ID, ALLOWED_ROLES, CHATBOX_BUTTON_ID } = require("./commands/moderation/permissions");
 
@@ -60,22 +61,42 @@ async function sendBotStatusMessage(client) {
   const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
   if (channel) {
     let title, color, desc;
+    let embed;
+    let sentMsg;
     if (diff >= 5 * 60 * 1000) {
       title = "🟢 Starting";
       color = 0x5865F2;
       desc = "Miyako has woken up.";
+      embed = new EmbedBuilder()
+        .setTitle(title)
+        .setColor(color)
+        .setDescription(desc)
+        .setFooter({ text: `Timestamp: ${new Date(now).toLocaleString()}` })
+        .setTimestamp();
+      sentMsg = await channel.send({ embeds: [embed] });
     } else {
       title = "🔄 Restarting";
       color = 0xffd700;
-      desc = "Miyako has restarted.";
+      desc = "Miyako is restarting...";
+      embed = new EmbedBuilder()
+        .setTitle(title)
+        .setColor(color)
+        .setDescription(desc)
+        .setFooter({ text: `Timestamp: ${new Date(now).toLocaleString()}` })
+        .setTimestamp();
+      sentMsg = await channel.send({ embeds: [embed] });
+
+      // After 5 seconds, edit the embed to the awake version
+      setTimeout(async () => {
+        const awakeEmbed = new EmbedBuilder()
+          .setTitle("🟢 Starting")
+          .setColor(0x5865F2)
+          .setDescription("Miyako has woken up.")
+          .setFooter({ text: `Timestamp: ${new Date(Date.now()).toLocaleString()}` })
+          .setTimestamp();
+        await sentMsg.edit({ embeds: [awakeEmbed] }).catch(() => {});
+      }, 5000);
     }
-    const embed = new EmbedBuilder()
-      .setTitle(title)
-      .setColor(color)
-      .setDescription(desc)
-      .setFooter({ text: `Timestamp: ${new Date(now).toLocaleString()}` })
-      .setTimestamp();
-    await channel.send({ embeds: [embed] });
   }
   // Save current time as lastOnline
   fs.writeFileSync(BOT_STATUS_FILE, JSON.stringify({ lastOnline: now }, null, 2));
@@ -99,6 +120,8 @@ async function sendBotShutdownMessage(client) {
 const shutdownSignals = ["SIGINT", "SIGTERM"];
 shutdownSignals.forEach(signal => {
   process.on(signal, async () => {
+    config.testingMode = false;
+    saveConfig();
     if (client.isReady()) {
       await setStatusChannelName(client, false);
       await sendBotShutdownMessage(client);
@@ -109,6 +132,8 @@ shutdownSignals.forEach(signal => {
 
 // Catch uncaught exceptions (best effort)
 process.on("uncaughtException", async (err) => {
+  config.testingMode = false;
+  saveConfig();
   console.error("Uncaught Exception:", err);
   if (client.isReady()) {
     await setStatusChannelName(client, false);
@@ -121,6 +146,8 @@ client.login(process.env.DISCORD_TOKEN);
 
 // Ready event
 client.once("ready", async () => {
+  config.testingMode = false;
+  saveConfig();
   console.log(`✅ Logged in as ${client.user.tag}`);
   await sendBotStatusMessage(client);
   client.guilds.cache.forEach(guild => updateStaffMessage(guild));
@@ -200,6 +227,10 @@ client.on("messageCreate", async (message) => {
     } else if (command === "restart") {
       if (message.author.id !== OWNER_ID) return;
       await message.reply("🔄 Restarting bot...");
+      process.exit(0);
+    } else if (command === "stop") {
+      if (message.author.id !== OWNER_ID) return;
+      await message.reply("🛑 Stopping bot...");
       process.exit(0);
     }
   } catch (err) {
