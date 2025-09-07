@@ -43,6 +43,6 @@
     "1232701768362754145",
     "1232701768375210151"
   ],
-  "snipeMode": "whitelist",
+  "snipeMode": "blacklist",
   "snipingChannelList": []
 }
