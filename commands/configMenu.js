@@ -338,6 +338,7 @@ async function handleMessageCreate(client, message) {
               });
             else if (action === "removeChannel")
               config.snipingChannelList = config.snipingChannelList.filter(id => !matchedChannels.includes(id));
+            saveConfig();
           }
 
           if (categoryName === "Moderation") {
@@ -371,6 +372,7 @@ async function handleMessageCreate(client, message) {
               const idsToRemove = matchedRoles.map(r => r.id);
               config.moderatorRoles = config.moderatorRoles.filter(id => !idsToRemove.includes(id));
             }
+            saveConfig();
           }
 
           if (categoryName === "Moderation" && settingKey === "RoleLogBlacklist") {

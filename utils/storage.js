@@ -24,16 +24,16 @@ function validateConfig(cfg) {
   if (!Array.isArray(cfg.moderatorRoles)) cfg.moderatorRoles = [];
   if (typeof cfg.warnings !== "object" || cfg.warnings === null) cfg.warnings = {};
   if (typeof cfg.escalation !== "object" || cfg.escalation === null) cfg.escalation = { ...defaultConfig.escalation };
-  if (typeof cfg.defaultMuteDuration !== "number") cfg.defaultMuteDuration = defaultConfig.defaultMuteDuration;
-  if (typeof cfg.modLogChannelId !== "string") cfg.modLogChannelId = defaultConfig.modLogChannelId;
-  if (typeof cfg.testingMode !== "boolean") cfg.testingMode = false;
   // Validate escalation subkeys
   if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
   if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;
   if (typeof cfg.escalation.kickThreshold !== "number") cfg.escalation.kickThreshold = defaultConfig.escalation.kickThreshold;
-  if (!Array.isArray(cfg.roleLogBlacklist)) cfg.roleLogBlacklist = [];
-  if (!["whitelist", "blacklist"].includes(cfg.snipeMode)) cfg.snipeMode = "whitelist";
-  if (!Array.isArray(cfg.snipingChannelList)) cfg.snipingChannelList = [];
+  if (typeof cfg.escalation.defaultMuteDuration !== "number") cfg.escalation.defaultMuteDuration = defaultConfig.defaultMuteDuration;
+  if (typeof cfg.escalation.modLogChannelId !== "string") cfg.escalation.modLogChannelId = defaultConfig.modLogChannelId;
+  if (typeof cfg.escalation.testingMode !== "boolean") cfg.escalation.testingMode = false;
+  if (!Array.isArray(cfg.escalation.roleLogBlacklist)) cfg.escalation.roleLogBlacklist = [];
+  if (!["whitelist", "blacklist"].includes(cfg.escalation.snipeMode)) cfg.escalation.snipeMode = "whitelist";
+  if (!Array.isArray(cfg.escalation.snipingChannelList)) cfg.escalation.snipingChannelList = [];
   return cfg;
 }
 
@@ -44,8 +44,7 @@ if (fs.existsSync(CONFIG_FILE)) {
     const loaded = JSON.parse(fs.readFileSync(CONFIG_FILE));
     config = validateConfig({ ...defaultConfig, ...loaded });
     if (loaded.escalation) {
-      config.escalation = { ...defaultConfig.escalation, ...loaded.escalation };
-      config.escalation = validateConfig(config.escalation);
+      config.escalation = validateConfig({ ...defaultConfig.escalation, ...loaded.escalation });
     }
   } catch {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
@@ -60,4 +59,5 @@ const saveConfig = () => fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, nu
 module.exports = {
   config,
   saveConfig
+};
 };

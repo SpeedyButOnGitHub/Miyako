@@ -71,8 +71,10 @@ async function handleModerationCommands(client, message, command, args) {
       if (member.id === OWNER_ID) return replyError(message, "You cannot moderate the owner.");
       if (member.roles.highest.comparePositionTo(message.member.roles.highest) >= 0 && message.author.id !== OWNER_ID)
         return replyError(message, "You cannot moderate this user due to role hierarchy.");
-      if (config.moderatorRoles.some(roleId => member.roles.cache.has(roleId)))
+      if (config.moderatorRoles.some(roleId => member.roles.cache.has(roleId)) ||
+          (escalation.moderatorRoles || []).some(roleId => member.roles.cache.has(roleId))) {
         return replyError(message, "Cannot moderate this user (they are a configured moderator).");
+      }
     } else {
       if (userObj.id === message.author.id) return replyError(message, "You cannot moderate yourself.");
       if (userObj.id === OWNER_ID) return replyError(message, "You cannot moderate the owner.");

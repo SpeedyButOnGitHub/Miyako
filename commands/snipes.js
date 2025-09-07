@@ -116,14 +116,15 @@ async function handleSnipeCommands(client, message, command, args) {
   }
 
   if (content === ".snipe" || content === ".s") {
+    // Use config.snipeMode and config.snipingChannelList for channel access
+    let allowed = false;
     if (config.snipeMode === "blacklist") {
-      if (config.snipingChannelList.includes(message.channel.id)) {
-        return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
-      }
+      allowed = !config.snipingChannelList.includes(message.channel.id);
     } else {
-      if (!config.snipingChannelList.includes(message.channel.id)) {
-        return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
-      }
+      allowed = config.snipingChannelList.includes(message.channel.id);
+    }
+    if (!allowed) {
+      return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
     }
 
     if (deletedSnipes.has(message.channel.id)) {
