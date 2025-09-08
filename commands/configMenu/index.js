@@ -83,7 +83,12 @@ async function handleConfigMenuCommand(message) {
   });
 
   collector.on('end', async () => {
-    try { await sent.edit({ components: [] }); } catch {}
+    try {
+      const { timeoutRow } = require('../../utils/activeMenus');
+      await sent.edit({ components: timeoutRow() });
+    } catch {
+      try { await sent.edit({ components: [] }); } catch {}
+    }
   });
 }
 

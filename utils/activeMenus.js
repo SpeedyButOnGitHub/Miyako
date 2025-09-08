@@ -159,5 +159,7 @@ module.exports = {
   init,
   registerHandler,
   registerMessage,
-  processInteraction
+  processInteraction,
+  // expose standardized timeout row for other ephemeral collectors
+  timeoutRow
 };

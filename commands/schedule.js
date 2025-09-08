@@ -120,8 +120,13 @@ async function handleScheduleCommand(client, message) {
     }
   });
 
-  collector.on("end", () => {
-    replyMsg.edit({ components: [] }).catch(() => {});
+  collector.on("end", async () => {
+    try {
+      const { timeoutRow } = require("../utils/activeMenus");
+      await replyMsg.edit({ components: timeoutRow() });
+    } catch {
+      try { await replyMsg.edit({ components: [] }); } catch {}
+    }
   });
 }
 

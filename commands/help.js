@@ -208,6 +208,15 @@ async function handleHelpCommand(client, message) {
       try { await interaction.reply({ content: "❌ Something went wrong.", ephemeral: true }); } catch {}
     }
   });
+  collector.on("end", async (_collected, reason) => {
+    if (reason === "switch") return; // already handled when opening config
+    try {
+      const { timeoutRow } = require("../utils/activeMenus");
+      await replyMsg.edit({ components: timeoutRow() });
+    } catch {
+      try { await replyMsg.edit({ components: [] }); } catch {}
+    }
+  });
 }
 
 module.exports = {

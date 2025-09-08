@@ -86,7 +86,14 @@ async function handleScriptsCommand(client, message) {
     await interaction.update({ embeds: [newEmbed], components: [newRow] });
   });
 
-  collector.on("end", () => reply.edit({ components: [] }).catch(() => {}));
+  collector.on("end", async () => {
+    try {
+      const { timeoutRow } = require("../utils/activeMenus");
+      await reply.edit({ components: timeoutRow() });
+    } catch {
+      try { await reply.edit({ components: [] }); } catch {}
+    }
+  });
 }
 
 module.exports = { handleScriptsCommand };
