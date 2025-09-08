@@ -36,8 +36,8 @@ function setUserWarnings(userId, arr) {
 
 function getThresholds() {
   const esc = config.escalation || {};
-  const muteT = Math.max(1, Number(esc.muteThreshold || 3));
-  const kickT = Math.max(muteT + 1, Number(esc.kickThreshold || 5));
+  const muteT = Math.max(3, Number(esc.muteThreshold || 3));
+  const kickT = Math.max(5, Number(esc.kickThreshold || 5));
   return { muteT, kickT };
 }
 
