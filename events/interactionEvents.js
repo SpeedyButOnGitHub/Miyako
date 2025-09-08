@@ -67,6 +67,44 @@ function attachInteractionEvents(client) {
 
         const isTesting = !!config.testingMode;
 
+        // Permission/hierarchy helpers for kick/ban
+        const canActKickBan = (action) => {
+          const g = interaction.guild;
+          if (!g) return { ok: false, msg: `${EMOJI_ERROR} Not in a guild.` };
+          const me = g.members?.me;
+          const targetInGuild = !!targetMember;
+          // Target membership constraints
+          if (action === "kick" && !targetInGuild) {
+            return { ok: false, msg: `${EMOJI_ERROR} That user is not in the server.` };
+          }
+          // Self-protection
+          if (interaction.user.id === uid) {
+            return { ok: false, msg: `${EMOJI_ERROR} You cannot ${action} yourself.` };
+          }
+          // Bot permission checks
+          const needPerm = action === "kick" ? "KickMembers" : "BanMembers";
+          if (!me || !me.permissions?.has?.(needPerm)) {
+            return { ok: false, msg: `${EMOJI_ERROR} I lack permission to ${action} members.` };
+          }
+          // Role hierarchy checks when target is in guild
+          if (targetInGuild) {
+            const actorOwner = g.ownerId === interaction.user.id;
+            if (!actorOwner) {
+              const actorHighest = interaction.member?.roles?.highest?.position ?? 0;
+              const targetHighest = targetMember.roles?.highest?.position ?? 0;
+              if (actorHighest <= targetHighest) {
+                return { ok: false, msg: `${EMOJI_ERROR} You cannot act on a member with an equal or higher role.` };
+              }
+            }
+            const botHighest = me.roles?.highest?.position ?? 0;
+            const targetHighest = targetMember.roles?.highest?.position ?? 0;
+            if (botHighest <= targetHighest) {
+              return { ok: false, msg: `${EMOJI_ERROR} I cannot act on a member with an equal or higher role than mine.` };
+            }
+          }
+          return { ok: true };
+        };
+
         // Helpers to access warnings store
         const ensureStores = () => {
           if (typeof config.warnings !== "object" || !config.warnings) config.warnings = {};
@@ -129,6 +167,11 @@ function attachInteractionEvents(client) {
 
         // Kick/Ban flow: init -> optional reason -> ephemeral confirmation (confirm/cancel/changeReason)
         if (kind === "init" && (flowAction === "kick" || flowAction === "ban")) {
+          const guard = canActKickBan(flowAction);
+          if (!guard.ok) {
+            await interaction.reply({ content: guard.msg, ephemeral: true }).catch(() => {});
+            return;
+          }
           // Prompt optional reason
           const modalId = `modact_reason_${flowAction}_${uid}_${Date.now()}`;
           const modal = new ModalBuilder()
@@ -204,6 +247,28 @@ function attachInteractionEvents(client) {
             return;
           }
           if (kind === "confirm") {
+            const guard = canActKickBan(flowAction);
+            if (!guard.ok) {
+              await interaction.reply({ content: guard.msg, ephemeral: true }).catch(() => {});
+              pendingPunishments.delete(key);
+              // restore original message buttons to top row
+              try {
+                if (state.originChannelId && state.originMessageId) {
+                  const channel = await client.channels.fetch(state.originChannelId).catch(() => null);
+                  const msg = await channel?.messages?.fetch?.(state.originMessageId).catch(() => null);
+                  if (msg) {
+                    const buildTopRow = () => new ActionRowBuilder().addComponents(
+                      new ButtonBuilder().setCustomId(`modact:menu:warnings:${uid}`).setLabel("Warnings").setStyle(ButtonStyle.Secondary).setEmoji("⚠️"),
+                      new ButtonBuilder().setCustomId(`modact:menu:mute:${uid}`).setLabel("Mute").setStyle(ButtonStyle.Secondary).setEmoji("⏰"),
+                      new ButtonBuilder().setCustomId(`modact:init:kick:${uid}`).setLabel("Kick").setStyle(ButtonStyle.Secondary).setEmoji("👢"),
+                      new ButtonBuilder().setCustomId(`modact:init:ban:${uid}`).setLabel("Ban").setStyle(ButtonStyle.Danger).setEmoji("🔨")
+                    );
+                    await msg.edit({ components: [buildTopRow()] }).catch(() => {});
+                  }
+                }
+              } catch {}
+              return;
+            }
             // Execute kick/ban with reason (default: no reason)
             const reason = state.reason || "No reason provided";
             if (!isTesting && targetMember) {
@@ -211,6 +276,8 @@ function attachInteractionEvents(client) {
                 if (flowAction === "kick") await targetMember.kick(reason);
                 else await targetMember.ban({ reason });
               } catch {}
+            } else if (!isTesting && !targetMember && flowAction === "ban" && interaction.guild) {
+              try { await interaction.guild.members.ban(uid, { reason }); } catch {}
             }
             await sendUserDM(targetMember || targetUser, flowAction === "kick" ? "kicked" : "banned", null, reason);
             await sendModLog(client, targetMember || targetUser, interaction.user, flowAction === "kick" ? "kicked" : "banned", reason, true, null, null);
