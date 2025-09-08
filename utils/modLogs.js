@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const ms = require("ms");
 const { config } = require("./storage");
+const theme = require("./theme");
 
 // Only log moderation actions in the user action channel; testing mode uses test channel
 const USER_ACTION_LOG_CHANNEL = "1232701768383729791";
@@ -42,11 +43,11 @@ async function sendModLog(
   const modTag = modUser?.tag || modUser?.username || modId;
 
   // Colors
-  let color = 0x5865f2;
+  let color = theme.colors.primary;
   const a = String(action || "").toLowerCase();
-  if (a.includes("warn")) color = 0xffd700;
-  if (a.includes("removed")) color = 0x00c853;
-  if (a.includes("mute") || a.includes("ban") || a.includes("kick")) color = 0xff5555;
+  if (a.includes("warn")) color = theme.colors.warning;
+  if (a.includes("removed")) color = theme.colors.success;
+  if (a.includes("mute") || a.includes("ban") || a.includes("kick")) color = theme.colors.danger;
 
   // Build a modern, stacked description similar to DM style
   // Extract any "warnings remaining until <punishment>" line from reason to place in footer (not for warn logs)
@@ -99,23 +100,23 @@ async function sendModLog(
     .setTitle(targetTag)
     .setDescription([descParts.join("\n\n"), bottomParts.length ? bottomParts.join("\n\n") : null].filter(Boolean).join("\n\n"))
     .addFields(
-      { name: "🧰 Action", value: `**${actionTitle}**`, inline: true },
-      { name: "🎯 Target", value: `<@${targetId}>`, inline: true },
-      { name: "🛡️ Moderator", value: `<@${modId}>`, inline: true }
+      { name: `${theme.emojis.action} Action`, value: `**${actionTitle}**`, inline: true },
+      { name: `${theme.emojis.target} Target`, value: `<@${targetId}>`, inline: true },
+      { name: `${theme.emojis.moderator} Moderator`, value: `<@${modId}>`, inline: true }
     );
 
   // Always prefer a footer over timestamp; include emojis
   if (footerRemaining) {
-    embed.setFooter({ text: `🧮 ${footerRemaining} • 🆔 ${targetId}` });
+  embed.setFooter({ text: `${theme.emojis.counter} ${footerRemaining} • ${theme.emojis.id} ${targetId}` });
   } else {
-    embed.setFooter({ text: `🆔 ${targetId}` });
+  embed.setFooter({ text: `${theme.emojis.id} ${targetId}` });
   }
 
   const avatarUrl = targetUser?.displayAvatarURL ? targetUser.displayAvatarURL({ dynamic: true, size: 256 }) : null;
   if (avatarUrl) embed.setThumbnail(avatarUrl);
 
   try {
-    return await channel.send({ embeds: [embed] });
+  return await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
   } catch {
     return null;
   }

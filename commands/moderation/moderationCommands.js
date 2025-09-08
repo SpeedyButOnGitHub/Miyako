@@ -243,7 +243,7 @@ async function handleModerationCommands(client, message, command, args) {
     else if (count < kickT) remainingLine2 = `${kickT - count} warning${kickT - count === 1 ? "" : "s"} remaining until kick`;
 
     const nxtRemain2 = remainingLine2 ? parseInt((remainingLine2.match(/^(\d+)/) || [0,0])[1], 10) || 0 : 0;
-  await sendUserDM(member || userObj, "warning removed", null, removed?.reason || "No reason", null);
+  await sendUserDM(member || userObj, "warning removed", null, null, null);
   // Include remaining line in reason so the logger can move it to the footer
   const reasonForLog = remainingLine2 ? `${removed?.reason || "No reason"}\n\n${remainingLine2}` : `${removed?.reason || "No reason"}`;
   await sendModLog(client, member || userObj, message.author, "warning removed", reasonForLog, true, null, nxtRemain2);

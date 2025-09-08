@@ -1,36 +1,40 @@
 const { EmbedBuilder } = require("discord.js");
+const theme = require("../../utils/theme");
 
 async function sendUserDM(target, action, duration = null, reason = null, extra = null) {
   let description;
   let color;
-  switch (action) {
+  const a = String(action || "");
+  const al = a.toLowerCase();
+  switch (al) {
     case "warned":
-      description = "⚠️ You have been warned in **Late Night Hours**.";
-      color = 0xffff00;
-      break;
-    case "warning removed":
-      description = "✅ A warning has been removed from your account.";
-      color = 0x00ff00;
-      break;
-    case "kicked":
-      description = "👢 You have been **kicked** from **Late Night Hours**.";
-      color = 0xff0000;
-      break;
-    case "banned":
-      description = "🔨 You have been **banned** from **Late Night Hours**.";
-      color = 0xff0000;
-      break;
-    case "muted":
-      description = "🔇 You have been **muted** in **Late Night Hours**.";
-      color = 0xff0000;
-      break;
-    case "unmuted":
-      description = "🔊 You have been **unmuted** in **Late Night Hours**.";
-      color = 0x00ff00;
+  description = `${theme.emojis.warn} You have been warned in **Late Night Hours**.`;
+  color = theme.colors.warning;
       break;
     default:
-      description = `ℹ️ You have been **${action}** in **Late Night Hours**.`;
-      color = 0x5865F2;
+      if (al.startsWith("warning removed")) {
+        // Parse optional count from patterns like "warning removed x3"
+        const m = al.match(/x(\d+)/);
+        const count = Math.max(1, m ? parseInt(m[1], 10) || 1 : 1);
+        const plural = count === 1 ? "warning has" : "warnings have";
+  description = `${theme.emojis.success} ${count} ${plural} been removed from your account in **Late Night Hours**.`;
+  color = theme.colors.success;
+      } else if (al === "kicked") {
+  description = "👢 You have been **kicked** from **Late Night Hours**.";
+  color = theme.colors.danger;
+      } else if (al === "banned") {
+  description = "🔨 You have been **banned** from **Late Night Hours**.";
+  color = theme.colors.danger;
+      } else if (al === "muted") {
+  description = "🔇 You have been **muted** in **Late Night Hours**.";
+  color = theme.colors.danger;
+      } else if (al === "unmuted") {
+  description = "🔊 You have been **unmuted** in **Late Night Hours**.";
+  color = theme.colors.success;
+      } else {
+  description = `${theme.emojis.info} You have been **${a}** in **Late Night Hours**.`;
+  color = theme.colors.primary;
+      }
       break;
   }
 
@@ -41,8 +45,9 @@ async function sendUserDM(target, action, duration = null, reason = null, extra 
     .setColor(color)
     .setDescription(description);
 
-  if (reason) embed.addFields({ name: "📝 Reason", value: reason, inline: true });
-  if (duration) embed.addFields({ name: "⏰ Duration", value: duration, inline: true });
+  // For removal DMs, omit the Reason field entirely to reduce noise
+  if (!al.startsWith("warning removed") && reason) embed.addFields({ name: "📝 Reason", value: reason, inline: true });
+  if (duration) embed.addFields({ name: `${theme.emojis.duration} Duration`, value: duration, inline: true });
   if (extra) embed.addFields({ name: "ℹ️ Info", value: extra, inline: false });
   embed.setTimestamp();
 

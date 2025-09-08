@@ -352,7 +352,7 @@ async function handleWarningButtons(client, interaction) {
   // Resolve target for DM/log
   let target = interaction.guild.members.cache.get(userId) || interaction.client.users.cache.get(userId);
   if (!target) target = await interaction.client.users.fetch(userId).catch(() => null);
-  try { if (target) await sendUserDM(target, actionText, null, lastReason, null); } catch {}
+  try { if (target) await sendUserDM(target, actionText, null, null, null); } catch {}
   try { if (target) await sendModLog(interaction.client, target, interaction.user, actionText, remLine ? `${lastReason}\n\n${remLine}` : `${lastReason}`, true, null, remainingNum); } catch {}
         const view = buildUserView(interaction.guild, userId, 1);
         // Update the message and send a hidden confirmation
