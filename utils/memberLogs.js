@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const { config } = require("./storage");
+const theme = require("./theme");
 
 const MEMBER_LEAVE_LOG_CHANNEL = "1232701769859993628";
 const TEST_LOG_CHANNEL = "1413966369296220233";
@@ -25,7 +26,7 @@ async function logMemberLeave(client, member, isTest = false) {
 
   const embed = new EmbedBuilder()
     .setTitle("Member Left")
-    .setColor(0xff5555)
+    .setColor(theme.colors.warning)
     .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .addFields(
       { name: "Member", value: `<@${member.id}>`, inline: true },
@@ -34,7 +35,7 @@ async function logMemberLeave(client, member, isTest = false) {
     )
     .setTimestamp();
 
-  await channel.send({ embeds: [embed] }).catch(() => {});
+  await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
 }
 
 module.exports = {

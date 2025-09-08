@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const { config } = require("./storage");
+const theme = require("./theme");
 
 const MESSAGE_LOG_CHANNEL = "1232701769859993622";
 const TEST_LOG_CHANNEL = "1413966369296220233";
@@ -11,13 +12,13 @@ async function logMessageDelete(client, message) {
 
   const embed = new EmbedBuilder()
     .setTitle("Message Deleted")
-    .setColor(0xff5555)
+    .setColor(theme.colors.danger)
     .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
     .setDescription(message.content || "*No content*")
     .addFields({ name: "Channel", value: `<#${message.channel.id}>`, inline: true })
     .setTimestamp();
 
-  await channel.send({ embeds: [embed] }).catch(() => {});
+  await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
 }
 
 async function logMessageEdit(client, oldMessage, newMessage) {

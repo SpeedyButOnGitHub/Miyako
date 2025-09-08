@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const { CONFIG_LOG_CHANNEL } = require("./logChannels");
+const theme = require("./theme");
 
 /**
  * @param {import('discord.js').Client} client
@@ -11,12 +12,12 @@ async function logConfigChange(client, { user, change }) {
 
   const embed = new EmbedBuilder()
     .setTitle("Config Changed")
-    .setColor(0x5865F2)
+    .setColor(theme.colors.primary)
     .setAuthor({ name: user.tag || user.id, iconURL: user.displayAvatarURL ? user.displayAvatarURL({ dynamic: true }) : undefined })
     .setDescription(change)
     .setTimestamp();
 
-  await channel.send({ embeds: [embed] }).catch(() => {});
+  await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
 }
 
 module.exports = { logConfigChange };

@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const { config } = require("./storage");
+const theme = require("./theme");
 
 const ROLE_LOG_CHANNEL = "1232739307736010854";
 const TEST_LOG_CHANNEL = "1413966369296220233";
@@ -16,7 +17,7 @@ async function logRoleChange(client, member, role, action) {
 
   const embed = new EmbedBuilder()
     .setTitle(`Role ${action === "add" ? "Added" : "Removed"}`)
-    .setColor(action === "add" ? 0x55ff55 : 0xff5555)
+    .setColor(action === "add" ? theme.colors.success : theme.colors.danger)
     .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .addFields(
       { name: "Role", value: `<@&${role.id}>`, inline: true },
@@ -24,7 +25,7 @@ async function logRoleChange(client, member, role, action) {
     )
     .setTimestamp();
 
-  await channel.send({ embeds: [embed] });
+  await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
 }
 
 module.exports = {

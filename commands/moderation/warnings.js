@@ -144,11 +144,12 @@ function buildDashboardEmbed(guild, page) {
       }).join("\n")
     : "No users currently have warnings.";
 
+  const { muteT, kickT } = getThresholds();
   const embed = new EmbedBuilder()
     .setTitle("⚠️Warning Dashboard")
     .setColor(theme.colors.primary)
     .setDescription(lines)
-    .setFooter({ text: `Page ${curPage}/${totalPages}` });
+    .setFooter({ text: `Mute at ${muteT} • Kick at ${kickT} • Page ${curPage}/${totalPages}` });
 
   // Per-user select for simpler navigation
   const userOptions = slice.map(x => ({
@@ -194,11 +195,12 @@ function buildUserView(guild, userId, page = 1, opts = {}) {
   const baseDesc = total ? chunk.map((e, i) => formatWarnLine(guild, e, start + i + 1)).join("\n\n") : "This user has no warnings.";
   const nxt = getNextPunishmentInfo(total);
   const disclaimer = nxt ? `${nxt.remaining} warning${nxt.remaining === 1 ? "" : "s"} remaining until ${nxt.label}` : null;
+  const { muteT, kickT } = getThresholds();
   const embed = new EmbedBuilder()
     .setTitle(`⚠️Warnings — ${memberName}`)
     .setColor(theme.colors.primary)
     .setDescription([baseDesc, disclaimer].filter(Boolean).join("\n\n"))
-    .setFooter({ text: `Total: ${total} • Page ${Math.min(page, totalPages)}/${totalPages}` });
+    .setFooter({ text: `Total: ${total} • Mute at ${muteT} • Kick at ${kickT} • Page ${Math.min(page, totalPages)}/${totalPages}` });
 
   const rows = [];
   const row = new ActionRowBuilder();
