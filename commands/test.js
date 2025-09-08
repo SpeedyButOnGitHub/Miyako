@@ -1,418 +1,175 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
 const { OWNER_ID } = require("./moderation/permissions");
 const { sendModLog } = require("../utils/modLogs");
 const { config, saveConfig } = require("../utils/storage");
 const { logMemberLeave } = require("../utils/memberLogs");
-const { TEST_LOG_CHANNEL, MOD_ACTION_LOG_CHANNEL, MEMBER_LEAVE_LOG_CHANNEL: MEMBER_LEAVE_LOG_CHANNEL_CONST } = require("../utils/logChannels");
+const { TEST_LOG_CHANNEL } = require("../utils/logChannels");
+const { spawnTestDrop, activeDrops } = require("../utils/cashDrops");
+const { clearTestingCash, getTestingCash, formatCash } = require("../utils/cash");
+const theme = require("../utils/theme");
 
-// Preserve legacy variable names for downstream references
-const TEST_CHANNEL_ID = TEST_LOG_CHANNEL;
-const MOD_LOG_CHANNEL_ID = MOD_ACTION_LOG_CHANNEL;
-const MEMBER_LEAVE_LOG_CHANNEL = MEMBER_LEAVE_LOG_CHANNEL_CONST;
+const CATEGORY_ROOT = "root";
 
-// Track test log message IDs in memory and export for use in moderationCommands.js
-let testLogMessageIds = [];
-
-/**
- * Format a duration in ms to a readable string.
- */
-function formatDuration(ms) {
-  if (ms >= 24 * 60 * 60 * 1000) return `${Math.floor(ms / (24 * 60 * 60 * 1000))} day(s)`;
-  if (ms >= 60 * 60 * 1000) return `${Math.floor(ms / (60 * 60 * 1000))} hour(s)`;
-  if (ms >= 60 * 1000) return `${Math.floor(ms / (60 * 1000))} minute(s)`;
-  return `${ms / 1000} seconds`;
-}
-
-/**
- * Pick a random element from an array.
- */
-function pickRandom(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-/**
- * Get the test menu embed.
- */
-function getTestEmbed(testingMode) {
+function buildRootEmbed() {
   return new EmbedBuilder()
-    .setTitle("🧪 Test Menu")
-    .setColor(testingMode ? 0xffd700 : 0x5865F2)
-    .setDescription(
-      "Choose a test category below:\n\n" +
-      "🔧 **Bot Tests**: Test bot moderation features.\n" +
-      "🛡️ **Native Discord Tests**: Test Discord's built-in moderation actions.\n\n" +
-      `Testing mode is currently **${testingMode ? "ENABLED" : "DISABLED"}**.`
-    );
-}
-
-/**
- * Get the main test menu button row.
- */
-function getMainTestRow(testingMode) {
-  return new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId("test_bot_category")
-        .setLabel("Bot Tests")
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji("🔧"),
-      new ButtonBuilder()
-        .setCustomId("test_native_category")
-        .setLabel("Native Discord Tests")
-        .setStyle(ButtonStyle.Success)
-        .setEmoji("🛡️"),
-      new ButtonBuilder()
-        .setCustomId("toggle_testing")
-        .setLabel(testingMode ? "Disable Testing Mode" : "Enable Testing Mode")
-        .setStyle(testingMode ? ButtonStyle.Danger : ButtonStyle.Success)
-        .setEmoji(testingMode ? "🛑" : "🧪")
-    );
-}
-
-/**
- * Get the bot tests button row.
- */
-function getBotTestRow(testingMode) {
-  return new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId("test_warn")
-        .setLabel("Test Warning")
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji("⚠️"),
-      new ButtonBuilder()
-        .setCustomId("test_mute")
-        .setLabel("Test Mute")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji("🔇"),
-      new ButtonBuilder()
-        .setCustomId("test_kick")
-        .setLabel("Test Kick")
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji("👢"),
-      new ButtonBuilder()
-        .setCustomId("test_member_leave")
-        .setLabel("Test Member Leave")
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji("👋"),
-      new ButtonBuilder()
-        .setCustomId("test_back_main")
-        .setLabel("Back")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji("⬅️")
-    );
-}
-
-/**
- * Get the native Discord tests button row.
- */
-function getNativeTestRows() {
-  return [
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("native_ban").setLabel("Ban").setStyle(ButtonStyle.Danger).setEmoji("🔨"),
-      new ButtonBuilder().setCustomId("native_unban").setLabel("Unban").setStyle(ButtonStyle.Success).setEmoji("🔓"),
-      new ButtonBuilder().setCustomId("native_kick").setLabel("Kick").setStyle(ButtonStyle.Danger).setEmoji("👢"),
-      new ButtonBuilder().setCustomId("native_mute").setLabel("Mute/Timeout").setStyle(ButtonStyle.Secondary).setEmoji("🔇"),
-      new ButtonBuilder().setCustomId("native_unmute").setLabel("Unmute/Untimeout").setStyle(ButtonStyle.Success).setEmoji("🔊")
-    ),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("native_warn").setLabel("Warn").setStyle(ButtonStyle.Primary).setEmoji("⚠️"),
-      new ButtonBuilder().setCustomId("native_removewarn").setLabel("Remove Warn").setStyle(ButtonStyle.Secondary).setEmoji("🗑️"),
-      new ButtonBuilder().setCustomId("native_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+    .setTitle("🧪 Test Console")
+    .setColor(theme.colors.primary)
+    .setDescription("Pick a category to test features in a safe sandbox that does not affect production data.")
+    .addFields(
+      { name: "General", value: "Warnings, Logs, Member events", inline: false },
+      { name: "Events", value: "Economy, Cash Drops", inline: false },
     )
-  ];
+    .setFooter({ text: `Testing Mode: ${config.testingMode ? "ON" : "OFF"}` });
 }
 
-/**
- * Handle the test command and menu.
- */
+function buildRootRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("test:cat:general").setLabel("General").setEmoji("🧰").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("test:cat:events").setLabel("Events").setEmoji("🎟️").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("test:toggle").setLabel(config.testingMode ? "Disable" : "Enable").setEmoji("🧪").setStyle(config.testingMode ? ButtonStyle.Danger : ButtonStyle.Success),
+  );
+}
+
+function buildEventsEmbed() {
+  return new EmbedBuilder()
+    .setTitle("🎟️ Test: Events")
+    .setColor(theme.colors.neutral)
+    .setDescription("Choose an event category to test.")
+    .addFields({ name: "Economy", value: "Cash Drops" });
+}
+
+function buildEventsRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("test:events:economy").setLabel("Economy").setEmoji("💰").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("test:back:root").setLabel("Back").setEmoji("⬅️").setStyle(ButtonStyle.Secondary),
+  );
+}
+
+function buildEconomyEmbed() {
+  const bal = getTestingCash(OWNER_ID);
+  return new EmbedBuilder()
+    .setTitle("💰 Test: Economy — Cash Drops")
+    .setColor(theme.colors.primary)
+    .setDescription(
+      "Spawn a test cash drop in the testing channel and try claiming it.\n" +
+      "Test-mode drops and balances are sandboxed and do not affect real cash."
+    )
+    .addFields({ name: "Your test balance", value: formatCash(bal), inline: true });
+}
+
+function buildEconomyRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("test:econ:spawn").setLabel("Spawn Test Drop").setEmoji("🪙").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("test:econ:clear").setLabel("Clear Test Balances").setEmoji("🧹").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("test:back:events").setLabel("Back").setEmoji("⬅️").setStyle(ButtonStyle.Secondary),
+  );
+}
+
 async function handleTestCommand(client, message) {
-  if (message.author.id !== OWNER_ID) {
-    return message.reply({ content: "Only the Owner can use this command." });
-  }
+  if (String(message.author.id) !== String(OWNER_ID)) return;
 
-  // Quick prefix: .test testing on/off
-  const args = message.content.trim().split(/\s+/).slice(1);
-  if (args[0] === "testing" && (args[1] === "on" || args[1] === "off")) {
-    const enable = args[1] === "on";
-    if (enable && config.testingMode) {
-      return message.reply("🧪 Testing mode is already enabled.");
-    }
-    if (!enable && !config.testingMode) {
-      return message.reply("🧪 Testing mode is already disabled.");
-    }
-    config.testingMode = enable;
-    saveConfig();
-    if (!enable) {
-      await message.reply("🧪 Testing mode is now **DISABLED**.");
-    } else {
-      await message.reply("🧪 Testing mode is now **ENABLED**.");
-    }
-    return;
-  }
+  const sent = await message.channel.send({ embeds: [buildRootEmbed()], components: [buildRootRow()] });
+  const collector = sent.createMessageComponentCollector({ componentType: ComponentType.Button, time: 5 * 60 * 1000 });
 
-  // Pick random test subject (from guild members, including bots and yourself)
-  const members = await message.guild.members.fetch();
-  const testSubjects = members;
-
-  // Initial embed and row
-  let testingMode = !!config.testingMode;
-  let embed = getTestEmbed(testingMode);
-  let row = getMainTestRow(testingMode);
-
-  let replyMsg = await message.reply({ embeds: [embed], components: [row] });
-
-  // Collector management
-  let collector;
-  let collectorTimeout = 5 * 60 * 1000; // 5 minutes
-
-  function startCollector(currentCategory = "main") {
-    if (collector) collector.stop("reset");
-    collector = replyMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: collectorTimeout });
-
-    collector.on("collect", async interaction => {
-      if (interaction.user.id !== OWNER_ID) {
-        await interaction.reply({ content: "Only the Owner can use this.", ephemeral: true });
-        return;
+  collector.on("collect", async (interaction) => {
+    try {
+      if (interaction.user.id !== message.author.id) {
+        return interaction.reply({ content: "This menu is not for you.", ephemeral: true });
       }
+      const id = interaction.customId;
 
-      // Refresh testing mode in case it changed
-      testingMode = !!config.testingMode;
-
-      // Toggle testing mode button (always available)
-      if (interaction.customId === "toggle_testing") {
-        if (testingMode) {
-          config.testingMode = false;
-          saveConfig();
-          testingMode = false;
-        } else {
-          config.testingMode = true;
-          saveConfig();
-          testingMode = true;
+      if (id === "test:toggle") {
+        config.testingMode = !config.testingMode;
+        if (!config.testingMode) {
+          // Leaving testing: clear test economy overlay
+          clearTestingCash();
         }
-        embed = getTestEmbed(testingMode);
-        row = getMainTestRow(testingMode);
-        await interaction.update({ embeds: [embed], components: [row] });
-        startCollector("main");
-        return;
+        saveConfig();
+        return interaction.update({ embeds: [buildRootEmbed()], components: [buildRootRow()] });
       }
 
-      // Category navigation
-      if (interaction.customId === "test_bot_category") {
-        const botEmbed = new EmbedBuilder()
-          .setTitle("🔧 Bot Tests")
-          .setColor(0x5865F2)
-          .setDescription("Test bot moderation features below.");
-        await interaction.update({ embeds: [botEmbed], components: [getBotTestRow(testingMode)] });
-        startCollector("bot");
-        return;
-      }
-      if (interaction.customId === "test_native_category") {
-        const nativeEmbed = new EmbedBuilder()
-          .setTitle("🛡️ Native Discord Tests")
-          .setColor(0x5865F2)
-          .setDescription("Test Discord's built-in moderation actions below.");
-        await interaction.update({ embeds: [nativeEmbed], components: getNativeTestRows() });
-        startCollector("native");
-        return;
-      }
-      if (interaction.customId === "test_back_main" || interaction.customId === "native_back_main") {
-        embed = getTestEmbed(testingMode);
-        row = getMainTestRow(testingMode);
-        await interaction.update({ embeds: [embed], components: [row] });
-        startCollector("main");
-        return;
-      }
-
-      // Bot test buttons
-      if (currentCategory === "bot") {
-        const subject = pickRandom([...testSubjects.values()]);
-        const reason = `[TEST EVENT] ${pickRandom([
-          "Because the cake is a lie.",
-          "For science!",
-          "Just testing the waters.",
-          "To boldly go where no bot has gone before.",
-          "Because Miyako said so.",
-          "It's just a prank, bro.",
-          "Testing, testing, 1, 2, 3.",
-          "No actual users were harmed in this test.",
-          "This is only a drill.",
-          "For the memes."
-        ])}`;
-        const duration = formatDuration(pickRandom([
-          60 * 60 * 1000,
-          5 * 60 * 1000,
-          24 * 60 * 60 * 1000,
-          10 * 60 * 1000,
-          30 * 60 * 1000
-        ]));
-        let action;
-        let currentWarnings = Math.floor(Math.random() * 5) + 1;
-
-        if (interaction.customId === "test_warn") {
-          action = "warned";
-        } else if (interaction.customId === "test_mute") {
-          action = "muted";
-        } else if (interaction.customId === "test_kick") {
-          action = "kicked";
-        } else if (interaction.customId === "test_member_leave") {
-          const members = [...message.guild.members.cache.values()].filter(m => !m.user.bot);
-          const subject = pickRandom(members);
-          const originalTestingMode = config.testingMode;
-          if (testingMode) {
-            config.testingMode = true;
-            await logMemberLeave(client, subject, true);
-            config.testingMode = originalTestingMode;
-            await interaction.reply({ content: `Test member leave log sent for <@${subject.id}> in <#${TEST_CHANNEL_ID}>!`, ephemeral: true });
-          } else {
-            config.testingMode = false;
-            await logMemberLeave(client, subject, true);
-            config.testingMode = originalTestingMode;
-            await interaction.reply({ content: `Test member leave log sent for <@${subject.id}> in <#${MEMBER_LEAVE_LOG_CHANNEL}>!`, ephemeral: true });
-          }
-          startCollector("bot");
-          return;
-        }
-
-        if (action) {
-          // Send mod log ONLY to the correct channel based on testing mode
-          const originalTestingMode = config.testingMode;
-          config.testingMode = testingMode;
-          await sendModLog(
-            client,
-            subject,
-            message.author,
-            action,
-            reason,
-            true,
-            action === "muted" ? duration : null,
-            action === "warned" ? currentWarnings : null
-          );
-          config.testingMode = originalTestingMode;
-
-          await interaction.reply({ content: `Test event sent to <#${testingMode ? TEST_CHANNEL_ID : MOD_LOG_CHANNEL_ID}>!`, ephemeral: true });
-          startCollector("bot");
-          return;
-        }
-      }
-
-      // Native Discord test buttons
-      if (currentCategory === "native") {
-        const subject = pickRandom([...testSubjects.values()].filter(m => !m.user.bot));
-        const reason = `[NATIVE TEST] ${pickRandom([
-          "Manual moderation via Discord UI.",
-          "Native Discord action.",
-          "Testing audit log integration.",
-          "Simulated Discord moderation.",
-          "Native moderation test."
-        ])}`;
-        const duration = formatDuration(pickRandom([
-          60 * 60 * 1000,
-          5 * 60 * 1000,
-          24 * 60 * 60 * 1000,
-          10 * 60 * 1000,
-          30 * 60 * 1000
-        ]));
-        let moderator = message.author;
-        let currentWarnings = Math.floor(Math.random() * 5) + 1;
-
-        if (interaction.customId === "native_ban") {
-          await sendModLog(
-            client,
-            subject,
-            moderator,
-            "banned",
-            `[Native Discord Test]\nReason: ${reason}`,
-            true
-          );
-          await interaction.reply({ content: `Native Discord ban test sent for <@${subject.id}>!`, ephemeral: true });
-        } else if (interaction.customId === "native_unban") {
-          await sendModLog(
-            client,
-            subject,
-            moderator,
-            "unbanned",
-            `[Native Discord Test]\nReason: ${reason}`,
-            false
-          );
-          // interaction.update/reply used earlier for category selection; use reply here to acknowledge
-          await interaction.reply({ content: `Native Discord unban test sent for <@${subject.id}>!`, ephemeral: true });
-        } else if (interaction.customId === "native_kick") {
-          await sendModLog(
-            client,
-            subject,
-            moderator,
-            "kicked",
-            `[Native Discord Test]\nReason: ${reason}`,
-            true
-          );
-          await interaction.reply({ content: `Native Discord kick test sent for <@${subject.id}>!`, ephemeral: true });
-        } else if (interaction.customId === "native_mute") {
-          await sendModLog(
-            client,
-            subject,
-            moderator,
-            "muted",
-            `[Native Discord Test]\nReason: ${reason}`,
-            true,
-            duration
-          );
-          await interaction.reply({ content: `Native Discord mute/timeout test sent for <@${subject.id}>!`, ephemeral: true });
-        } else if (interaction.customId === "native_unmute") {
-          await sendModLog(
-            client,
-            subject,
-            moderator,
-            "unmuted",
-            `[Native Discord Test]\nReason: ${reason}`,
-            false
-          );
-          await interaction.reply({ content: `Native Discord unmute/untimeout test sent for <@${subject.id}>!`, ephemeral: true });
-        } else if (interaction.customId === "native_warn") {
-          await sendModLog(
-            client,
-            subject,
-            moderator,
-            "warned",
-            `[Native Discord Test]\nReason: ${reason}`,
-            true,
-            null,
-            currentWarnings
-          );
-          await interaction.reply({ content: `Native Discord warn test sent for <@${subject.id}>!`, ephemeral: true });
-        } else if (interaction.customId === "native_removewarn") {
-          await sendModLog(
-            client,
-            subject,
-            moderator,
-            "warning removed",
-            `[Native Discord Test]\nReason: ${reason}`,
-            true,
-            null,
-            currentWarnings
-          );
-          await interaction.reply({ content: `Native Discord remove warn test sent for <@${subject.id}>!`, ephemeral: true });
-        }
-        startCollector("native");
-        return;
-      }
-    });
-
-    collector.on("end", async (_, reason) => {
-      if (reason === "reset") return;
-      try {
+      if (id === "test:cat:general") {
+        const embed = new EmbedBuilder()
+          .setTitle("🧰 Test: General")
+          .setColor(theme.colors.neutral)
+          .setDescription("This section will hold general testing utilities (warnings, logs, member leave/join). Coming soon.");
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("expired").setLabel("Timed out — use the command again").setStyle(ButtonStyle.Secondary).setDisabled(true)
+          new ButtonBuilder().setCustomId("test:back:root").setLabel("Back").setEmoji("⬅️").setStyle(ButtonStyle.Secondary)
         );
-        await replyMsg.edit({ components: [row] }).catch(() => {});
-      } catch {}
-    });
-  }
+        return interaction.update({ embeds: [embed], components: [row] });
+      }
 
-  startCollector("main");
+      if (id === "test:cat:events") {
+        return interaction.update({ embeds: [buildEventsEmbed()], components: [buildEventsRow()] });
+      }
+
+      if (id === "test:back:root") {
+        return interaction.update({ embeds: [buildRootEmbed()], components: [buildRootRow()] });
+      }
+
+      if (id === "test:back:events") {
+        return interaction.update({ embeds: [buildEventsEmbed()], components: [buildEventsRow()] });
+      }
+
+      if (id === "test:events:economy") {
+        return interaction.update({ embeds: [buildEconomyEmbed()], components: [buildEconomyRow()] });
+      }
+
+      if (id === "test:econ:spawn") {
+        if (!config.testingMode) {
+          return interaction.reply({ content: "Enable Testing Mode first.", ephemeral: true });
+        }
+        const modalId = `test:econ:spawn:${Date.now()}`;
+        const modal = new ModalBuilder().setCustomId(modalId).setTitle("Spawn Test Cash Drop");
+        modal.addComponents(new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId("amount").setLabel("Amount (optional)").setStyle(TextInputStyle.Short).setRequired(false)
+        ));
+        await interaction.showModal(modal);
+        const submitted = await interaction.awaitModalSubmit({ time: 30000, filter: i => i.customId === modalId && i.user.id === interaction.user.id }).catch(() => null);
+        if (!submitted) return;
+        const raw = submitted.fields.getTextInputValue("amount").trim();
+        const num = raw ? Math.max(1, Math.floor(Number(raw) || 0)) : undefined;
+        const drop = spawnTestDrop(num);
+        const channel = await client.channels.fetch(TEST_LOG_CHANNEL).catch(() => null);
+        if (channel) {
+          const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+          const embed = new EmbedBuilder()
+            .setTitle("🧪 � Test Cash Drop")
+            .setColor(theme.colors.warning)
+            .setDescription(`Type this word to claim it first:\n\n→ \`${drop.word}\``)
+            .addFields({ name: "Reward", value: `**${drop.amount}** coins`, inline: true })
+            .setFooter({ text: "First correct message wins (testing)." });
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("cash:check:test").setLabel("Check Balance").setEmoji("💳").setStyle(ButtonStyle.Secondary)
+          );
+          await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
+        }
+        await submitted.reply({ content: `Spawned a test drop of ${drop.amount} in <#${TEST_LOG_CHANNEL}>.`, ephemeral: true });
+        // Stay on economy view and refresh balance row
+        try { await interaction.message.edit({ embeds: [buildEconomyEmbed()], components: [buildEconomyRow()] }); } catch {}
+        return;
+      }
+
+      if (id === "test:econ:clear") {
+        clearTestingCash();
+        return interaction.update({ embeds: [buildEconomyEmbed()], components: [buildEconomyRow()] });
+      }
+
+    } catch (err) {
+      console.error("[test] error:", err);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: "Error handling interaction.", ephemeral: true });
+      }
+    }
+  });
+
+  collector.on("end", async () => {
+    try {
+      const ActiveMenus = require("../utils/activeMenus");
+      const { timeoutRow } = ActiveMenus;
+      await sent.edit({ components: [timeoutRow()] });
+    } catch { try { await sent.edit({ components: [] }); } catch {} }
+  });
 }
 
-module.exports = {
-  handleTestCommand,
-  testLogMessageIds
-};
+module.exports = { handleTestCommand };

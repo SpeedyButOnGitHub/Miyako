@@ -1,4 +1,5 @@
 const { addVCXP, saveVCLevels } = require("./vcLevels");
+const { addCash } = require("./cash");
 
 // Track join times and periodic ticks
 const voiceStates = new Map(); // userId -> { joinedAt: number, channelId: string }
@@ -34,7 +35,12 @@ function startVoiceLeveling(client) {
       const mins = Math.floor((now - st.joinedAt) / TICK_MS);
       if (mins <= 0) continue;
       const gained = mins * XP_PER_MIN;
-      addVCXP(userId, gained);
+      const newLevel = addVCXP(userId, gained);
+      if (newLevel > 0) {
+        // Award Cash on VC level up (separate rule allows easy tuning later)
+        const cashReward = Math.max(0, Math.floor(40 + newLevel * 8));
+        addCash(userId, cashReward);
+      }
       st.joinedAt = st.joinedAt + mins * TICK_MS; // advance checkpoint
     }
     // persist occasionally

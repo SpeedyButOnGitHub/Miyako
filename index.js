@@ -10,6 +10,7 @@ const { attachInteractionEvents } = require("./events/interactionEvents");
 const { startScheduler } = require("./utils/scheduler");
 const ActiveMenus = require("./utils/activeMenus");
 const { startVoiceLeveling } = require("./utils/voiceLeveling");
+const { startCashDrops } = require("./utils/cashDrops");
 // debug: ensure functions are imported correctly
 // console.log('attachMessageEvents typeof =', typeof attachMessageEvents);
 // console.log('attachGuildEvents typeof =', typeof attachGuildEvents);
@@ -129,6 +130,9 @@ client.once("ready", async () => {
 
   // Start voice leveling loop
   try { startVoiceLeveling(client); } catch (e) { console.error("[VoiceLeveling] start error:", e); }
+
+  // Start cash drops cleanup loop
+  try { startCashDrops(); } catch (e) { console.error("[CashDrops] start error:", e); }
 
   // Cleanup lingering menus on restart
   if (fs.existsSync(ACTIVE_MENUS_FILE)) {

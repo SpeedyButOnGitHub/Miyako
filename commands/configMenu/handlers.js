@@ -27,6 +27,100 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
   const ensureArray = (arr) => (Array.isArray(arr) ? arr : []);
   const parseId = (raw) => (raw || '').replace(/[^0-9]/g, '');
 
+  // Economy > CashDrops
+  if (categoryName === 'Economy' && settingName === 'CashDrops') {
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({ content: 'Admin only.', ephemeral: true });
+    }
+    const e = (config.cashDrops = typeof config.cashDrops === 'object' && config.cashDrops ? config.cashDrops : { dropChance: 0.02, minAmount: 25, maxAmount: 125, lifetimeMs: 60000 });
+
+    if (action === 'setChance') {
+      const modalId = `config:modal:cashdrops:chance:${Date.now()}`;
+      const modal = new ModalBuilder().setCustomId(modalId).setTitle('Set Drop Chance');
+      const input = new TextInputBuilder()
+        .setCustomId('chance')
+        .setLabel('Chance per message (percent 0-100)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(6)
+        .setRequired(true);
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+      await interaction.showModal(modal);
+      const submitted = await interaction.awaitModalSubmit({ time: 30000, filter: i => i.customId === modalId && i.user.id === interaction.user.id }).catch(() => null);
+      if (!submitted) return;
+      const raw = submitted.fields.getTextInputValue('chance');
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return submitted.reply({ content: 'Enter a valid percent between 0 and 100.', ephemeral: true });
+      }
+      e.dropChance = Math.max(0, Math.min(1, n / 100));
+      await saveConfig();
+      await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop chance to ${(e.dropChance * 100).toFixed(2)}%/msg.` });
+      await submitted.reply({ content: `Drop chance set to ${(e.dropChance * 100).toFixed(2)}% per message.`, ephemeral: true });
+      await refreshSettingMessage(interaction.message, categoryName, settingName);
+      return;
+    }
+
+    if (action === 'setAmount') {
+      const modalId = `config:modal:cashdrops:amount:${Date.now()}`;
+      const modal = new ModalBuilder().setCustomId(modalId).setTitle('Set Drop Amount Range');
+      const minInput = new TextInputBuilder()
+        .setCustomId('min')
+        .setLabel('Minimum amount')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(8)
+        .setRequired(true);
+      const maxInput = new TextInputBuilder()
+        .setCustomId('max')
+        .setLabel('Maximum amount')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(8)
+        .setRequired(true);
+      modal.addComponents(new ActionRowBuilder().addComponents(minInput));
+      modal.addComponents(new ActionRowBuilder().addComponents(maxInput));
+      await interaction.showModal(modal);
+      const submitted = await interaction.awaitModalSubmit({ time: 30000, filter: i => i.customId === modalId && i.user.id === interaction.user.id }).catch(() => null);
+      if (!submitted) return;
+      const min = Math.floor(Number(submitted.fields.getTextInputValue('min')));
+      const max = Math.floor(Number(submitted.fields.getTextInputValue('max')));
+      if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < 0 || max < min) {
+        return submitted.reply({ content: 'Enter valid non-negative integers (max >= min).', ephemeral: true });
+      }
+      e.minAmount = min; e.maxAmount = max;
+      await saveConfig();
+      await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop amount range to ${min}-${max}.` });
+      await submitted.reply({ content: `Drop amount range set to ${min}-${max}.`, ephemeral: true });
+      await refreshSettingMessage(interaction.message, categoryName, settingName);
+      return;
+    }
+
+    if (action === 'setLifetime') {
+      const modalId = `config:modal:cashdrops:lifetime:${Date.now()}`;
+      const modal = new ModalBuilder().setCustomId(modalId).setTitle('Set Drop Lifetime');
+      const input = new TextInputBuilder()
+        .setCustomId('secs')
+        .setLabel('Lifetime in seconds (>= 5)')
+        .setStyle(TextInputStyle.Short)
+        .setMaxLength(8)
+        .setRequired(true);
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+      await interaction.showModal(modal);
+      const submitted = await interaction.awaitModalSubmit({ time: 30000, filter: i => i.customId === modalId && i.user.id === interaction.user.id }).catch(() => null);
+      if (!submitted) return;
+      const s = Math.floor(Number(submitted.fields.getTextInputValue('secs')));
+      if (!Number.isFinite(s) || s < 5 || s > 86400) {
+        return submitted.reply({ content: 'Enter a valid seconds value between 5 and 86400.', ephemeral: true });
+      }
+      e.lifetimeMs = s * 1000;
+      await saveConfig();
+      await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop lifetime to ${s}s.` });
+      await submitted.reply({ content: `Drop lifetime set to ${s}s.`, ephemeral: true });
+      await refreshSettingMessage(interaction.message, categoryName, settingName);
+      return;
+    }
+
+    return openSetting(interaction, categoryName, settingName);
+  }
+
   // Simple numeric setter for GlobalXPMultiplier
   if (categoryName === 'Leveling' && settingName === 'GlobalXPMultiplier') {
     if (action === 'set') {
@@ -47,16 +141,16 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       if (!Number.isFinite(num) || num <= 0 || num > 100) {
         return submitted.reply({ content: 'Enter a valid number >0 and <=100.', ephemeral: true });
       }
-  config.globalXPMultiplier = num;
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Set Global XP multiplier to x${num.toFixed(2)}` });
-  await submitted.reply({ content: `XP multiplier set to x${num.toFixed(2)}.`, ephemeral: true });
+      config.globalXPMultiplier = num;
+      await saveConfig();
+      await logConfigChange(interaction.client, { user: interaction.user, change: `Set Global XP multiplier to x${num.toFixed(2)}` });
+      await submitted.reply({ content: `XP multiplier set to x${num.toFixed(2)}.`, ephemeral: true });
       return;
     }
     if (action === 'reset') {
       config.globalXPMultiplier = 1;
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Reset Global XP multiplier to x1.00` });
+      await saveConfig();
+      await logConfigChange(interaction.client, { user: interaction.user, change: `Reset Global XP multiplier to x1.00` });
       return openSetting(interaction, categoryName, settingName);
     }
   }
@@ -86,17 +180,17 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     }
     if (action === 'reseed') {
       const seed = config.testingSeed || {};
-  config.testingWarnings = JSON.parse(JSON.stringify(seed));
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Reseeded testing warnings from seed (${Object.keys(seed).length} users).` });
+      config.testingWarnings = JSON.parse(JSON.stringify(seed));
+      await saveConfig();
+      await logConfigChange(interaction.client, { user: interaction.user, change: `Reseeded testing warnings from seed (${Object.keys(seed).length} users).` });
       await interaction.reply({ content: 'Reseeded testing warnings from seed.', ephemeral: true });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
     }
     if (action === 'clear') {
-  config.testingWarnings = {};
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Cleared testing warnings.` });
+      config.testingWarnings = {};
+      await saveConfig();
+      await logConfigChange(interaction.client, { user: interaction.user, change: `Cleared testing warnings.` });
       await interaction.reply({ content: 'Cleared testing warnings.', ephemeral: true });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
@@ -126,27 +220,27 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     if (mode === 'whitelist') {
       config.snipingWhitelist = ensureArray(config.snipingWhitelist);
       if (action === 'addChannel') {
-  if (!config.snipingWhitelist.includes(id)) config.snipingWhitelist.push(id);
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to sniping whitelist.` });
+        if (!config.snipingWhitelist.includes(id)) config.snipingWhitelist.push(id);
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to sniping whitelist.` });
         await submitted.reply({ content: `Added <#${id}> to whitelist.`, ephemeral: true });
       } else {
-  config.snipingWhitelist = config.snipingWhitelist.filter(x => x !== id);
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from sniping whitelist.` });
+        config.snipingWhitelist = config.snipingWhitelist.filter(x => x !== id);
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from sniping whitelist.` });
         await submitted.reply({ content: `Removed <#${id}> from whitelist.`, ephemeral: true });
       }
     } else {
       config.snipingChannelList = ensureArray(config.snipingChannelList);
       if (action === 'addChannel') {
-  if (!config.snipingChannelList.includes(id)) config.snipingChannelList.push(id);
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to sniping blacklist.` });
+        if (!config.snipingChannelList.includes(id)) config.snipingChannelList.push(id);
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to sniping blacklist.` });
         await submitted.reply({ content: `Added <#${id}> to blacklist.`, ephemeral: true });
       } else {
-  config.snipingChannelList = config.snipingChannelList.filter(x => x !== id);
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from sniping blacklist.` });
+        config.snipingChannelList = config.snipingChannelList.filter(x => x !== id);
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from sniping blacklist.` });
         await submitted.reply({ content: `Removed <#${id}> from blacklist.`, ephemeral: true });
       }
     }
@@ -175,14 +269,14 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     if (!channel) return submitted.reply({ content: 'Invalid or unknown channel.', ephemeral: true });
     config.levelingChannelList = ensureArray(config.levelingChannelList);
     if (action === 'addChannel') {
-  if (!config.levelingChannelList.includes(id)) config.levelingChannelList.push(id);
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to leveling channel list.` });
+      if (!config.levelingChannelList.includes(id)) config.levelingChannelList.push(id);
+      await saveConfig();
+      await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to leveling channel list.` });
       await submitted.reply({ content: `Added <#${id}>.`, ephemeral: true });
     } else {
-  config.levelingChannelList = config.levelingChannelList.filter(x => x !== id);
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from leveling channel list.` });
+      config.levelingChannelList = config.levelingChannelList.filter(x => x !== id);
+      await saveConfig();
+      await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from leveling channel list.` });
       await submitted.reply({ content: `Removed <#${id}>.`, ephemeral: true });
     }
     await refreshSettingMessage(interaction.message, categoryName, settingName);
@@ -329,14 +423,14 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
         return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', ephemeral: true });
       }
       if (action === 'addLevel') {
-  ensureLevelArr(String(lvlNum));
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Created Level ${lvlNum} in levelRewards.` });
+        ensureLevelArr(String(lvlNum));
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Created Level ${lvlNum} in levelRewards.` });
         await submitted.reply({ content: `Created level ${lvlNum}.`, ephemeral: true });
       } else {
-  if (config.levelRewards && config.levelRewards[String(lvlNum)]) delete config.levelRewards[String(lvlNum)];
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Removed Level ${lvlNum} from levelRewards.` });
+        if (config.levelRewards && config.levelRewards[String(lvlNum)]) delete config.levelRewards[String(lvlNum)];
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Removed Level ${lvlNum} from levelRewards.` });
         await submitted.reply({ content: `Removed level ${lvlNum}.`, ephemeral: true });
       }
       await refreshSettingMessage(interaction.message, categoryName, settingName);
@@ -377,17 +471,17 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       const key = String(lvlNum);
       const arr = ensureLevelArr(key);
       if (action === 'addReward') {
-  for (const id of validIds) if (!arr.includes(id)) arr.push(id);
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to Level ${lvlNum}.` });
+        for (const id of validIds) if (!arr.includes(id)) arr.push(id);
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to Level ${lvlNum}.` });
         await submitted.reply({ content: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to level ${lvlNum}.`, ephemeral: true });
       } else {
         const before = arr.length;
         const set = new Set(validIds);
         config.levelRewards[key] = arr.filter(id => !set.has(id));
         const after = config.levelRewards[key].length;
-  await saveConfig();
-  await logConfigChange(interaction.client, { user: interaction.user, change: `Removed ${before - after} role(s) from Level ${lvlNum}.` });
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Removed ${before - after} role(s) from Level ${lvlNum}.` });
         await submitted.reply({ content: `Removed ${before - after} role(s) from level ${lvlNum}.`, ephemeral: true });
       }
       await refreshSettingMessage(interaction.message, categoryName, settingName);

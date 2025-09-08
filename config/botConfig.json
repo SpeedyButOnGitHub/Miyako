@@ -27,7 +27,7 @@
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
-  "testingMode": false,
+  "testingMode": true,
   "roleLogBlacklist": [
     "1232701768329199666",
     "1232701768341655617",
@@ -78,6 +78,12 @@
     "1232701768341655619"
   ],
   "globalXPMultiplier": 1,
+  "cashDrops": {
+    "dropChance": 0.02,
+    "minAmount": 25,
+    "maxAmount": 125,
+    "lifetimeMs": 60000
+  },
   "testingWarnings": {
     "432610292342587392": [
       {

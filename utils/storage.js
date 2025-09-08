@@ -28,7 +28,14 @@ const defaultConfig = {
   levelingChannelList: [],
   // Leveling role blacklist and multiplier
   roleXPBlacklist: [],
-  globalXPMultiplier: 1.0
+  globalXPMultiplier: 1.0,
+  // Economy: cash drops
+  cashDrops: {
+    dropChance: 0.02, // 2% per message
+    minAmount: 25,
+    maxAmount: 125,
+    lifetimeMs: 60 * 1000,
+  }
 };
 
 function ensureDir() {
@@ -45,11 +52,11 @@ function validateConfig(cfg) {
   if (typeof cfg.modLogChannelId !== "string") cfg.modLogChannelId = defaultConfig.modLogChannelId;
   if (typeof cfg.testingMode !== "boolean") cfg.testingMode = false;
   if (!Array.isArray(cfg.roleLogBlacklist)) cfg.roleLogBlacklist = [];
-  if (!["whitelist", "blacklist"].includes(cfg.snipeMode)) cfg.snipeMode = "whitelist";
+  if (["whitelist", "blacklist"].includes(cfg.snipeMode) === false) cfg.snipeMode = "whitelist";
   if (!Array.isArray(cfg.snipingChannelList)) cfg.snipingChannelList = [];
   if (typeof cfg.levelRewards !== "object" || cfg.levelRewards === null) cfg.levelRewards = {};
   if (typeof cfg.vcLevelRewards !== "object" || cfg.vcLevelRewards === null) cfg.vcLevelRewards = {};
-  if (!["whitelist", "blacklist"].includes(cfg.levelingMode)) cfg.levelingMode = "blacklist";
+  if (["whitelist", "blacklist"].includes(cfg.levelingMode) === false) cfg.levelingMode = "blacklist";
   if (!Array.isArray(cfg.levelingChannelList)) cfg.levelingChannelList = [];
   if (!Array.isArray(cfg.roleXPBlacklist)) cfg.roleXPBlacklist = [];
   if (typeof cfg.globalXPMultiplier !== "number" || !Number.isFinite(cfg.globalXPMultiplier)) cfg.globalXPMultiplier = 1.0;
@@ -86,6 +93,17 @@ function validateConfig(cfg) {
   if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
   if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;
   if (typeof cfg.escalation.kickThreshold !== "number") cfg.escalation.kickThreshold = defaultConfig.escalation.kickThreshold;
+
+  // Validate economy.cashDrops
+  if (typeof cfg.cashDrops !== 'object' || cfg.cashDrops === null) cfg.cashDrops = { ...defaultConfig.cashDrops };
+  const e = cfg.cashDrops;
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  e.dropChance = Number.isFinite(e.dropChance) ? clamp(e.dropChance, 0, 1) : defaultConfig.cashDrops.dropChance;
+  e.minAmount = Number.isFinite(e.minAmount) ? Math.max(0, Math.floor(e.minAmount)) : defaultConfig.cashDrops.minAmount;
+  e.maxAmount = Number.isFinite(e.maxAmount) ? Math.max(e.minAmount, Math.floor(e.maxAmount)) : Math.max(e.minAmount, defaultConfig.cashDrops.maxAmount);
+  e.lifetimeMs = Number.isFinite(e.lifetimeMs) ? Math.max(5 * 1000, Math.floor(e.lifetimeMs)) : defaultConfig.cashDrops.lifetimeMs;
+
+  cfg.cashDrops = e;
 
   return cfg;
 }

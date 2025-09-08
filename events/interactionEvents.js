@@ -9,6 +9,7 @@ const ActiveMenus = require("../utils/activeMenus");
 const { sendModLog } = require("../utils/modLogs");
 const { sendUserDM } = require("../commands/moderation/dm");
 const { parseDurationAndReason } = require("../utils/time");
+const { handleBalanceCommand } = require("../commands/balance");
 
 // Pending Kick/Ban confirmations: key = `${userId}:${action}:${moderatorId}` -> { reason: string|null, originChannelId?:string, originMessageId?:string }
 const pendingPunishments = new Map();
@@ -20,6 +21,24 @@ function attachInteractionEvents(client) {
       if (interaction.isButton()) {
         const res = await ActiveMenus.processInteraction(interaction);
         if (res && res.handled) return;
+      }
+
+      // Cash balance quick button
+      if (interaction.isButton() && interaction.customId && interaction.customId.startsWith("cash:check")) {
+        // Reuse the balance command handler by fabricating a message-like
+        const channel = interaction.channel;
+        if (channel) {
+          await interaction.deferUpdate().catch(() => {});
+          try {
+            // Create a lightweight shim to route to same embed output
+            const fakeMsg = {
+              author: interaction.user,
+              reply: (payload) => channel.send(payload)
+            };
+            await handleBalanceCommand(interaction.client, fakeMsg);
+          } catch {}
+        }
+        return;
       }
 
       // Warnings dashboard/buttons/selects/modals (only routes warns:*)

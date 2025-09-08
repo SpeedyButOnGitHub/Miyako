@@ -5,6 +5,7 @@ const { getUserModifier } = require("../utils/leveling");
 const { config } = require("../utils/storage");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
+const { getCash, formatCash, getTopCash } = require("../utils/cash");
 
 // Map configured level reward roles to human-friendly labels
 const PERMISSION_ROLE_LABELS = {
@@ -78,21 +79,23 @@ function buildRows(view = "main", page = 1, totalPages = 1, mode = "text") {
   const isProfile = view === "main" || view === "profile";
   const isRank = view === "rank";
   const isLB = view === "leaderboard";
-  const top = new ActionRowBuilder().addComponents(
+  const navRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("prof_home").setLabel("👤 Profile").setStyle(isProfile ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("prof_rank").setLabel("📊 Rank").setStyle(isRank ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("prof_lb").setLabel("🏆 Leaderboard").setStyle(isLB ? ButtonStyle.Primary : ButtonStyle.Secondary),
+  );
+  const toggleRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("prof_toggle_mode")
       .setLabel(mode === "text" ? "🎙️ VC Mode" : "💬 Text Mode")
       .setStyle(mode === "text" ? ButtonStyle.Secondary : ButtonStyle.Success)
   );
-  if (!isLB) return [top];
+  if (!isLB) return [toggleRow, navRow];
   const prev = new ButtonBuilder().setCustomId("lb_prev").setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(page <= 1);
   const pageBtn = new ButtonBuilder().setCustomId("lb_page").setLabel(`Page ${page}/${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true);
   const next = new ButtonBuilder().setCustomId("lb_next").setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages);
-  const bottom = new ActionRowBuilder().addComponents(prev, pageBtn, next);
-  return [top, bottom];
+  const pageRow = new ActionRowBuilder().addComponents(prev, pageBtn, next);
+  return [toggleRow, navRow, pageRow];
 }
 
 function buildRankEmbed(member, rank, level, progressBar, mode = "text") {
@@ -132,10 +135,19 @@ function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 
   const extra = !viewerOnPage && rank
     ? `\n— —\nYou: **#${rank}** <@${viewerId}>`
     : "";
+
+  // Build Cash leaderboard section (top 10) appended below
+  const topCash = getTopCash(10) || [];
+  const cashLines = topCash.map((e, i) => {
+    const rankNum = i + 1;
+    const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : `#${rankNum}`;
+    return `${medal} <@${e.userId}> — ${formatCash(e.amount)}`;
+  });
+  const cashSection = `\n\n💰 Cash Leaderboard\n${cashLines.length ? cashLines.join("\n") : "No balances yet."}`;
   return new EmbedBuilder()
     .setTitle(mode === "text" ? "🏆 Leaderboard" : "🎙️ VC Leaderboard")
   .setColor(mode === "text" ? theme.colors.warning : theme.colors.danger)
-    .setDescription(lines.length ? lines.join("\n") + extra : "No data yet.")
+    .setDescription((lines.length ? lines.join("\n") + extra : "No data yet.") + cashSection)
     .setFooter({ text: rank ? `Your rank: #${rank} • Page ${safePage}/${totalPages}` : `Page ${safePage}/${totalPages}` })
     .setTimestamp();
 }
@@ -173,7 +185,8 @@ async function handleProfileCommand(client, message) {
     .addFields(
       { name: "Level", value: `\`Lv. ${level}\``, inline: true },
       { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
-      { name: "XP Modifier", value: `x${effective.toFixed(2)}`, inline: true },
+  { name: "XP Modifier", value: `x${effective.toFixed(2)}`, inline: true },
+  { name: "Cash", value: `${formatCash(getCash(userId))}`, inline: true },
     )
     .addFields(
       { name: "Progress", value: `${progressBar}`, inline: false },
@@ -261,6 +274,7 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
           { name: "Level", value: `\`Lv. ${userLvl}\``, inline: true },
           { name: "Rank", value: r ? `#${r}` : "—", inline: true },
           { name: m === "text" ? "XP Modifier" : "VC XP Modifier", value: `x${eff.toFixed(2)}`, inline: true },
+          { name: "Cash", value: `${formatCash(getCash(uid))}`, inline: true },
         )
         .addFields(
           { name: "Progress", value: `${bar}`, inline: false },
@@ -329,7 +343,8 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
     .addFields(
       { name: "Level", value: `\`Lv. ${lvl}\``, inline: true },
       { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
-      { name: "XP Modifier", value: `x${eff.toFixed(2)}`, inline: true },
+  { name: "XP Modifier", value: `x${eff.toFixed(2)}`, inline: true },
+  { name: "Cash", value: `${formatCash(getCash(uid))}`, inline: true },
     )
     .addFields(
       { name: "Progress", value: `${bar}`, inline: false },

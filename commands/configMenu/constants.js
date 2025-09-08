@@ -172,6 +172,40 @@ const configCategories = {
       }
     }
   },
+  Economy: {
+    description: "Economy and cash drops settings.",
+    settings: {
+      CashDrops: {
+        description: () => {
+          const e = config.cashDrops || {};
+          const chance = (e.dropChance ?? 0.02) * 100;
+          const min = e.minAmount ?? 25;
+          const max = e.maxAmount ?? 125;
+          const life = Math.floor((e.lifetimeMs ?? 60000) / 1000);
+          return `Random cash drops during active chat. Chance: ${chance.toFixed(1)}% per message, Amount: ${min}-${max}, Lifetime: ${life}s.`;
+        },
+        getDisplay: () => {
+          const e = config.cashDrops || {};
+          return [
+            `Chance per message: ${(Math.max(0, Math.min(1, e.dropChance ?? 0.02)) * 100).toFixed(2)}%`,
+            `Amount range: ${e.minAmount ?? 25} - ${e.maxAmount ?? 125}`,
+            `Lifetime: ${Math.floor((e.lifetimeMs ?? 60000) / 1000)}s`,
+          ].join("\n");
+        },
+        getLabel: () => "Cash Drops",
+        getSummary: () => {
+          const e = config.cashDrops || {};
+          const chance = (e.dropChance ?? 0.02) * 100;
+          return `${chance.toFixed(1)}%`;
+        },
+        buttons: [
+          { id: "setChance", label: "Set Chance", style: ButtonStyle.Primary, emoji: "🎲" },
+          { id: "setAmount", label: "Set Amounts", style: ButtonStyle.Primary, emoji: "💰" },
+          { id: "setLifetime", label: "Set Lifetime", style: ButtonStyle.Secondary, emoji: "⏱️" },
+        ]
+      }
+    }
+  },
   Testing: {
     description: "Owner-only testing utilities.",
     settings: {

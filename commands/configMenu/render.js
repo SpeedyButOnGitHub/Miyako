@@ -29,6 +29,7 @@ function buildCategorySelect() {
     Sniping: "🔭",
     Moderation: "🛡️",
     Leveling: "📈",
+    Economy: "💰",
     Testing: "🧪",
   };
   for (const name of Object.keys(configCategories)) {
@@ -214,6 +215,8 @@ function renderSettingEmbed(categoryName, settingKey) {
       ? settingKey.toLowerCase().includes("channel")
         ? "🔭"
         : "🔧"
+      : categoryName === "Economy"
+      ? "💰"
       : "🛡️";
   const prettyTitle = `${titleEmoji} ${categoryName} — ${keyLabel}`;
   const color =

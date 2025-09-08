@@ -1,4 +1,5 @@
 const { addXP, saveLevels } = require("./levels");
+const { addCash } = require("./cash");
 const { config } = require("./storage");
 
 const userCooldowns = new Map();
@@ -65,7 +66,7 @@ async function handleLeveling(message, LEVEL_ROLES = {}) {
 
     userCooldowns.set(userId, now);
 
-    if (leveledUp) {
+  if (leveledUp) {
       const key = String(leveledUp);
       const configured = config.levelRewards ? config.levelRewards[key] : null;
       const rewards = Array.isArray(configured)
@@ -78,7 +79,10 @@ async function handleLeveling(message, LEVEL_ROLES = {}) {
           }
         }
       }
-      await message.reply(`🎉 Congrats <@${userId}>, you reached level ${leveledUp}!`).catch(() => {});
+  // Cash reward: base grows per level (expandable rule)
+  const cashReward = Math.max(0, Math.floor(50 + leveledUp * 10));
+  addCash(userId, cashReward);
+  await message.reply(`🎉 Congrats <@${userId}>, you reached level ${leveledUp}! You earned ${cashReward} Cash.`).catch(() => {});
     }
   } catch (e) {
     // ignore leveling errors

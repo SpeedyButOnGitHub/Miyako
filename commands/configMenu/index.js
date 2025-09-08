@@ -1,5 +1,5 @@
 const { ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { buildRootEmbed, buildCategorySelect, buildCategoryEmbed, buildSettingEmbed, buildSettingSelect, buildSettingRow } = require('./render');
+const { buildRootEmbed, buildCategorySelect, buildCategoryEmbed, buildSettingEmbed, buildSettingSelect, buildSettingRow, renderSettingEmbed } = require('./render');
 const { openCategory, openSetting, handleButton, handleModal } = require('./handlers');
 const { OWNER_ID } = require('../moderation/permissions');
 const { config, saveConfig } = require('../../utils/storage');
@@ -92,4 +92,7 @@ async function handleConfigMenuCommand(message) {
   });
 }
 
-module.exports = { handleConfigMenuCommand };
+// Legacy exports
+const handleMessageCreate = handleConfigMenuCommand;
+
+module.exports = { handleConfigMenuCommand, handleMessageCreate, renderSettingEmbed };
