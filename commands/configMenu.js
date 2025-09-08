@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, StringSelectMenuBuilder } = require("discord.js");
-=======
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
 const { config, saveConfig } = require("../utils/storage");
 const { logConfigChange } = require("../utils/configLogs");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
@@ -45,13 +41,8 @@ const configCategories = {
           return `${count}`;
         },
         buttons: [
-<<<<<<< HEAD
           { id: "addChannel", label: "Add Channel", style: ButtonStyle.Success },
           { id: "removeChannel", label: "Remove Channel", style: ButtonStyle.Danger }
-=======
-          { id: "addChannel", label: "Add channel", style: ButtonStyle.Success },
-          { id: "removeChannel", label: "Remove channel", style: ButtonStyle.Danger }
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
         ]
       }
     }
@@ -240,20 +231,7 @@ function renderSettingEmbed(categoryName, settingKey) {
       .setEmoji('↩️')
   );
 
-<<<<<<< HEAD
   rows.push(itemRow);
-=======
-  // Only add Help Menu button if NOT ModeratorRoles or RoleLogBlacklist
-  if (!(categoryName === "Moderation" && (settingKey === "ModeratorRoles" || settingKey === "RoleLogBlacklist"))) {
-    itemRow.addComponents(
-      new ButtonBuilder()
-        .setCustomId("config_help")
-        .setLabel("Help Menu")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji("❓")
-    );
-  }
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
 
   return { embed: itemEmbed, row: rows.length === 1 ? itemRow : rows };
 }
@@ -320,13 +298,7 @@ async function handleMessageCreate(client, message) {
     collector.on("collect", async interaction => {
       console.log("Config button pressed:", interaction.customId);
       if (String(interaction.user.id) !== String(OWNER_ID)) {
-<<<<<<< HEAD
         await interaction.reply({ content: `${EMOJI_ERROR} Only the Owner can use this.`, ephemeral: true }).catch(() => {});
-=======
-        await interaction.deferUpdate();
-        const tempMsg = await interaction.followUp({ content: `${EMOJI_ERROR} Only the Owner can use this`, ephemeral: true });
-        setTimeout(() => tempMsg.delete().catch(() => {}), 3000);
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
         return;
       }
 
@@ -486,7 +458,6 @@ async function handleMessageCreate(client, message) {
 
       // Help Menu button
       if (interaction.customId === "config_help") {
-<<<<<<< HEAD
         // Stop this collector with a custom reason so the 'end' handler won't delete anything
         try { collector.stop("switch"); } catch {}
 
@@ -512,12 +483,6 @@ async function handleMessageCreate(client, message) {
         };
         await handleHelpCommand(client, fakeHelpMsg);
         return; // do not restart this collector
-=======
-        await interaction.deferUpdate();
-        const tempMsg = await interaction.followUp({ content: "Help: Use the buttons to navigate. Add/remove prompts will show modals.", ephemeral: true });
-        setTimeout(() => tempMsg.delete().catch(() => {}), 5000);
-        return;
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
       }
 
       // Back to main menu
@@ -643,7 +608,6 @@ async function handleMessageCreate(client, message) {
         const categoryEmbed = new EmbedBuilder()
           .setTitle(`⚙️ ${categoryName}`)
           .setColor(0x5865F2)
-<<<<<<< HEAD
           .setDescription(description);
 
         // Build setting buttons in rows of max 5, and put Back in its own row
@@ -685,32 +649,6 @@ async function handleMessageCreate(client, message) {
 
   await interaction.update({ embeds: [categoryEmbed], components: rows });
         return startCollector();
-=======
-          .setDescription(
-            `${category.description}\n\n` +
-            Object.keys(category.settings).map(setting => `**${setting}** — ${category.settings[setting].description}`).join("\n")
-          );
-
-        const categoryRow = new ActionRowBuilder();
-        Object.keys(category.settings).forEach(setting => {
-          categoryRow.addComponents(
-            new ButtonBuilder()
-              .setCustomId(`setting_${categoryName}_${setting}`)
-              .setLabel(setting)
-              .setStyle(ButtonStyle.Primary)
-          );
-        });
-        categoryRow.addComponents(
-          new ButtonBuilder()
-            .setCustomId("back_main")
-            .setLabel("Back")
-            .setStyle(ButtonStyle.Secondary)
-        );
-
-        await interaction.update({ embeds: [categoryEmbed], components: [categoryRow] });
-        startCollector();
-        return;
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
       }
 
       const parts = interaction.customId.split("_");
@@ -719,7 +657,6 @@ async function handleMessageCreate(client, message) {
       // Open category
       if (type === "category") {
         const category = configCategories[categoryName];
-<<<<<<< HEAD
         // Build description with concise header summary and per-setting summaries
         let description = `**${category.description}**`;
         if (categoryName === "Leveling") {
@@ -744,14 +681,10 @@ async function handleMessageCreate(client, message) {
               return `• **${label}** — ${setting.getSummary ? setting.getSummary() : setting.getDisplay()}`;
             })
             .join("\n");
-=======
-        if (!category) return;
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
 
         const categoryEmbed = new EmbedBuilder()
           .setTitle(`⚙️ ${categoryName}`)
           .setColor(0x5865F2)
-<<<<<<< HEAD
           .setDescription(description);
 
         // Build setting buttons in rows of max 5, and put Back in its own row
@@ -793,51 +726,17 @@ async function handleMessageCreate(client, message) {
 
   await interaction.update({ embeds: [categoryEmbed], components: rows });
         return startCollector();
-=======
-          .setDescription(
-            `${category.description}\n\n` +
-            Object.keys(category.settings).map(setting => `**${setting}** — ${category.settings[setting].description}`).join("\n")
-          );
-
-        const categoryRow = new ActionRowBuilder();
-        Object.keys(category.settings).forEach(setting => {
-          categoryRow.addComponents(
-            new ButtonBuilder()
-              .setCustomId(`setting_${categoryName}_${setting}`)
-              .setLabel(setting)
-              .setStyle(ButtonStyle.Primary)
-          );
-        });
-        categoryRow.addComponents(
-          new ButtonBuilder()
-            .setCustomId("back_main")
-            .setLabel("Back")
-            .setStyle(ButtonStyle.Secondary)
-        );
-
-        await interaction.update({ embeds: [categoryEmbed], components: [categoryRow] });
-        startCollector();
-        return;
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
       }
 
       // Open setting
       if (type === "setting") {
-<<<<<<< HEAD
   const { embed, row } = renderSettingEmbed(categoryName, settingKey);
   await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] });
         return startCollector();
-=======
-        const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-        await interaction.update({ embeds: [embed], components: [row] });
-        startCollector();
-        return;
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
       }
 
       // Handle add/remove actions and mode toggles
       if (type === "settingButton") {
-<<<<<<< HEAD
         const setting = configCategories[categoryName]?.settings[settingKey];
         if (!setting) {
           await interaction.reply({ content: `${EMOJI_ERROR} Setting not found.`, ephemeral: true }).catch(() => {});
@@ -1180,50 +1079,6 @@ async function handleMessageCreate(client, message) {
           await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
           return startCollector();
         }
-=======
-        if (action === "setWhitelist" || action === "setBlacklist") {
-          const oldMode = config.snipeMode;
-          config.snipeMode = action === "setWhitelist" ? "whitelist" : "blacklist";
-          saveConfig();
-          await logConfigChange(interaction.client, interaction.user, `Changed snipe mode from ${oldMode} to ${config.snipeMode}`);
-          const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-          await interaction.update({ embeds: [embed], components: [row] });
-        } else if (action === "addChannel" || action === "removeChannel") {
-          const modal = new ModalBuilder()
-            .setCustomId(`modal_${categoryName}_${settingKey}_${action}`)
-            .setTitle(`${action === "addChannel" ? "Add" : "Remove"} Channel`);
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId("input")
-                .setLabel("Channel ID or #mention")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-            )
-          );
-
-          await interaction.showModal(modal);
-        } else if (action === "addRole" || action === "removeRole" || action === "addBlacklistRole" || action === "removeBlacklistRole") {
-          const modal = new ModalBuilder()
-            .setCustomId(`modal_${categoryName}_${settingKey}_${action}`)
-            .setTitle(`${action.includes("add") ? "Add" : "Remove"} Role`);
-
-          modal.addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId("input")
-                .setLabel("Role ID or @mention")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-            )
-          );
-
-          await interaction.showModal(modal);
-        }
-        startCollector();
-        return;
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
       }
 
       // Reset collector timer after any button interaction
@@ -1231,7 +1086,6 @@ async function handleMessageCreate(client, message) {
     });
 
     collector.on("end", async (_, reason) => {
-<<<<<<< HEAD
       // If we intentionally switched/reset, don't touch UI
       if (reason === "switch" || reason === "reset") return;
       // Replace all rows with a single disabled timeout button
@@ -1250,10 +1104,6 @@ async function handleMessageCreate(client, message) {
           m => m.messageId !== mainMsg.id && m.commandId !== message.id
         );
         fs.writeFileSync(ACTIVE_MENUS_FILE, JSON.stringify(activeMenus, null, 2));
-=======
-      if (reason !== "reset") {
-        await mainMsg.edit({ components: [] }).catch(() => {});
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
       }
     });
   }

@@ -83,16 +83,10 @@ async function handleModerationCommands(client, message, command, args) {
     }
   }
 
-<<<<<<< HEAD
   // Ensure escalation config exists
   const escalation = config.escalation || {};
   const kickThreshold = 5;
   const muteThreshold = 3;
-=======
-  // Escalation thresholds
-  const kickThreshold = typeof escalation.kickThreshold === "number" ? escalation.kickThreshold : 3;
-  const muteThreshold = typeof escalation.muteThreshold === "number" ? escalation.muteThreshold : 2;
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
   const muteDuration = typeof escalation.muteDuration === "number" ? escalation.muteDuration : 2 * 60 * 60 * 1000;
 
   // Parse duration and reason from args (after user mention/user id)
