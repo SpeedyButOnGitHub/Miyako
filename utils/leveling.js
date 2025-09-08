@@ -4,6 +4,11 @@ const { config } = require("./storage");
 const userCooldowns = new Map();
 const userModifiers = new Map();
 
+function getUserModifier(userId) {
+  const data = userModifiers.get(userId);
+  return data && typeof data.modifier === 'number' ? data.modifier : 1.0;
+}
+
 const XP_MIN = 15;
 const XP_MAX = 30;
 const MODIFIER_CAP = 2.0;
@@ -79,4 +84,4 @@ async function handleLeveling(message, LEVEL_ROLES = {}) {
   }
 }
 
-module.exports = { handleLeveling };
+module.exports = { handleLeveling, getUserModifier };

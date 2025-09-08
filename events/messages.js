@@ -5,6 +5,7 @@ const { handleMessageCreate } = require("../commands/configMenu");
 const { handleLevelCommand } = require("../commands/level");
 const { handleTestCommand } = require("../commands/test");
 const { handleLeaderboardCommand } = require("../commands/leaderboard");
+const { handleProfileCommand } = require("../commands/profile");
 const { handleLeveling } = require("../utils/leveling");
 const { handleScheduleCommand } = require("../commands/schedule");
 
@@ -38,8 +39,10 @@ function attachMessageEvents(client) {
         await handleSnipeCommands(client, message, command, args);
       } else if (command === "config") {
         await handleMessageCreate(client, message);
-      } else if (command === "level" || command === "profile") {
+      } else if (command === "level") {
         await handleLevelCommand(client, message);
+      } else if (command === "profile" || command === "p") {
+        await handleProfileCommand(client, message);
       } else if (command === "test") {
         await handleTestCommand(client, message);
       } else if (command === "leaderboard" || command === "lb") {

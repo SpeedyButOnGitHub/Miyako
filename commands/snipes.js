@@ -71,7 +71,11 @@ function cleanupSnipes() {
     }
   }
 }
-setInterval(cleanupSnipes, 60 * 1000);
+// Run periodic cleanup, but don't keep the process alive solely for this timer
+const _snipeCleanupInterval = setInterval(cleanupSnipes, 60 * 1000);
+if (typeof _snipeCleanupInterval.unref === "function") {
+  _snipeCleanupInterval.unref();
+}
 
 async function handleSnipeCommands(client, message, command, args) {
   const content = message.content.toLowerCase();
