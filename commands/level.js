@@ -2,10 +2,11 @@ const { EmbedBuilder } = require("discord.js");
 const { getXP, getLevel } = require("../utils/levels");
 
 function getLevelXP(level) {
-  return Math.floor(50 * Math.pow(level, 1 / 0.7));
+  const BASE_XP = 150; // keep in sync with utils/levels addXP
+  return Math.floor(BASE_XP * Math.pow(level, 1 / 0.7));
 }
 
-function createProgressBar(current, max, size = 24) {
+function createProgressBar(current, max, size = 20) {
   const safeMax = Math.max(1, max);
   const filled = Math.min(size, Math.max(0, Math.round((current / safeMax) * size)));
   const empty = size - filled;

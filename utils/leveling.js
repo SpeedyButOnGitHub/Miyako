@@ -9,8 +9,9 @@ function getUserModifier(userId) {
   return data && typeof data.modifier === 'number' ? data.modifier : 1.0;
 }
 
-const XP_MIN = 15;
-const XP_MAX = 30;
+// Slightly lower per-message XP to slow overall progression
+const XP_MIN = 8;
+const XP_MAX = 16;
 const MODIFIER_CAP = 2.0;
 const MODIFIER_STEP = 0.1;
 

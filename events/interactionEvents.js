@@ -4,10 +4,16 @@ const { handleWarningButtons } = require("../commands/moderation/index");
 const { config, saveConfig } = require("../utils/storage");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("../commands/moderation/replies");
 const { renderSettingEmbed } = require("../commands/configMenu");
+const ActiveMenus = require("../utils/activeMenus");
 
 function attachInteractionEvents(client) {
   client.on("interactionCreate", async (interaction) => {
     try {
+      // Global session router for buttons (persistent, renewable 5-minute windows)
+      if (interaction.isButton()) {
+        const res = await ActiveMenus.processInteraction(interaction);
+        if (res && res.handled) return;
+      }
       // StaffTeam Chatbox Button
       if (interaction.isButton() && interaction.customId === CHATBOX_BUTTON_ID) {
         const member = interaction.member;

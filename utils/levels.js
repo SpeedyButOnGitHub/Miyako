@@ -18,7 +18,9 @@ function getLevel(userId) {
 function addXP(userId, amount) {
   if (!levels[userId]) levels[userId] = { xp: 0, level: 0 };
   levels[userId].xp += amount;
-  const newLevel = Math.floor(Math.pow(levels[userId].xp / 50, 0.7));
+  // Tougher curve: raise base XP to make early levels less trivial
+  const BASE_XP = 150; // was 50
+  const newLevel = Math.floor(Math.pow(levels[userId].xp / BASE_XP, 0.7));
   if (newLevel > levels[userId].level) {
     levels[userId].level = newLevel;
     return newLevel;

@@ -2,6 +2,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("
 const { getXP, getLevel } = require("../utils/levels");
 const { getUserModifier } = require("../utils/leveling");
 const { config } = require("../utils/storage");
+const ActiveMenus = require("../utils/activeMenus");
 
 // Map configured level reward roles to human-friendly labels
 const PERMISSION_ROLE_LABELS = {
@@ -17,7 +18,8 @@ const PERMISSION_ROLE_PHRASES = {
 };
 
 function getLevelXP(level) {
-  return Math.floor(50 * Math.pow(level, 1 / 0.7));
+  const BASE_XP = 150; // keep in sync with utils/levels
+  return Math.floor(BASE_XP * Math.pow(level, 1 / 0.7));
 }
 
 function createProgressBar(current, max, size = 18) {
@@ -75,25 +77,25 @@ function buildRows(view = "main") {
   if (view === "main") {
     return [
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("prof_rank").setLabel("View Rank").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId("prof_lb").setLabel("Leaderboard").setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder().setCustomId("prof_rank").setLabel("📊 View Rank").setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId("prof_lb").setLabel("🏆 Leaderboard").setStyle(ButtonStyle.Secondary)
       )
     ];
   }
-  // Rank view: Back + Leaderboard
+  // Rank view: Profile + Leaderboard
   if (view === "rank") {
     return [
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("prof_back").setLabel("Back").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("prof_lb").setLabel("Leaderboard").setStyle(ButtonStyle.Primary)
+        new ButtonBuilder().setCustomId("prof_home").setLabel("👤 Profile").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId("prof_lb").setLabel("🏆 Leaderboard").setStyle(ButtonStyle.Primary)
       )
     ];
   }
-  // Leaderboard view: Back + View Rank
+  // Leaderboard view: Profile + View Rank
   return [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("prof_back").setLabel("Back").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("prof_rank").setLabel("View Rank").setStyle(ButtonStyle.Primary)
+      new ButtonBuilder().setCustomId("prof_home").setLabel("👤 Profile").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("prof_rank").setLabel("📊 View Rank").setStyle(ButtonStyle.Primary)
     )
   ];
 }
@@ -187,87 +189,75 @@ async function handleProfileCommand(client, message) {
     }
   }
 
-  // Send with buttons and add a collector to switch views
+  // Send and register a persistent session. Handling is done in ActiveMenus.registerHandler below.
   const sent = await message.reply({ embeds: [embed], components: buildRows("main") });
-
-  const filter = (i) => i.user.id === message.author.id && ["prof_rank", "prof_lb", "prof_back"].includes(i.customId);
-  const collector = sent.createMessageComponentCollector({ filter, time: 60_000 });
-
-  collector.on("collect", async (interaction) => {
-    try {
-      if (interaction.customId === "prof_lb") {
-        const levelsObj = require("../utils/levels").levels;
-        const lbEmbed = buildLeaderboardEmbed(message.guild, levelsObj, message.author.id);
-        return interaction.update({ embeds: [lbEmbed], components: buildRows("leaderboard") });
-      }
-      if (interaction.customId === "prof_rank") {
-        const uid = member.id;
-        const xp2 = getXP(uid);
-        const lvl2 = getLevel(uid);
-        const next2 = lvl2 + 1;
-        const xpNext2 = getLevelXP(next2);
-        const xpCurr2 = getLevelXP(lvl2);
-        const into2 = Math.max(0, xp2 - xpCurr2);
-        const need2 = Math.max(1, xpNext2 - xpCurr2);
-        const bar2 = createProgressBar(into2, need2, 20);
-        const rank2 = getRankFromLeaderboard(require("../utils/levels").levels, uid);
-        const rankEmbed = buildRankEmbed(member, rank2, lvl2, bar2);
-        return interaction.update({ embeds: [rankEmbed], components: buildRows("rank") });
-      }
-      // Back -> show profile again (recompute in case it changed)
-      const uid = member.id;
-      const xp2 = getXP(uid);
-      const lvl2 = getLevel(uid);
-      const next2 = lvl2 + 1;
-      const xpNext2 = getLevelXP(next2);
-      const xpCurr2 = getLevelXP(lvl2);
-      const into2 = Math.max(0, xp2 - xpCurr2);
-      const need2 = Math.max(1, xpNext2 - xpCurr2);
-      const bar2 = createProgressBar(into2, need2, 20);
-      const rank2 = getRankFromLeaderboard(require("../utils/levels").levels, uid);
-      const modUser2 = getUserModifier(uid) || 1.0;
-      const global2 = typeof config.globalXPMultiplier === "number" ? config.globalXPMultiplier : 1.0;
-      const eff2 = Math.max(0, +(modUser2 * global2).toFixed(2));
-      const upcoming2 = Object.keys(config.levelRewards || {})
-        .map(n => Number(n)).filter(n => Number.isFinite(n) && n > lvl2)
-        .sort((a,b) => a-b)[0];
-      const profEmbed = new EmbedBuilder()
-        .setColor(0x00B2FF)
-        .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
-        .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-        .setTitle("Your profile")
-        .addFields(
-          { name: "Level", value: `\`Lv. ${lvl2}\``, inline: true },
-          { name: "Rank", value: rank2 ? `#${rank2}` : "—", inline: true },
-          { name: "XP Modifier", value: `x${eff2.toFixed(2)}`, inline: true },
-        )
-        .addFields(
-          { name: "Progress", value: `${bar2}`, inline: false },
-          { name: "Unlocked Perks", value: formatPermissionPhrases(collectUserPermissions(member)), inline: false },
-        )
-        .setFooter({ text: member.guild.name })
-        .setTimestamp();
-      if (upcoming2) {
-        const roles2 = config.levelRewards[String(upcoming2)];
-        const roleIds2 = Array.isArray(roles2) ? roles2 : (roles2 ? [roles2] : []);
-        if (roleIds2.length) {
-          const mentions2 = roleIds2.map(id => `<@&${id}>`).join(", ");
-          profEmbed.addFields({ name: "Next Unlock", value: `Level ${upcoming2}: ${mentions2}`, inline: false });
-        }
-      }
-      return interaction.update({ embeds: [profEmbed], components: buildRows("main") });
-    } catch (err) {
-      console.error("[profile collector]", err);
-    }
-  });
-
-  collector.on("end", async () => {
-    try {
-      const disabled = buildRows("main");
-      disabled.forEach(row => row.components.forEach(btn => btn.setDisabled(true)));
-      await sent.edit({ components: disabled });
-    } catch {}
-  });
+  ActiveMenus.registerMessage(sent, { type: "profile", userId: message.author.id, data: { view: "main" } });
 }
+
+// Global handler for profile sessions
+const { levels: levelsObj } = require("../utils/levels");
+ActiveMenus.registerHandler("profile", async (interaction, session) => {
+  const member = interaction.member;
+  if (!member || (session.userId && member.id !== session.userId)) {
+    try { await interaction.reply({ content: "Only the original user can use this menu.", ephemeral: true }); } catch {}
+    return;
+  }
+  const uid = member.id;
+  const xp = getXP(uid);
+  const lvl = getLevel(uid);
+  const next = lvl + 1;
+  const xpNext = getLevelXP(next);
+  const xpCurr = getLevelXP(lvl);
+  const into = Math.max(0, xp - xpCurr);
+  const need = Math.max(1, xpNext - xpCurr);
+  const bar = createProgressBar(into, need, 20);
+  const rank = getRankFromLeaderboard(levelsObj, uid);
+
+  if (interaction.customId === "prof_lb") {
+    const lbEmbed = buildLeaderboardEmbed(interaction.guild, levelsObj, uid);
+    session.data.view = "leaderboard";
+    await interaction.update({ embeds: [lbEmbed], components: buildRows("leaderboard") });
+    return;
+  }
+  if (interaction.customId === "prof_rank") {
+    const rEmbed = buildRankEmbed(member, rank, lvl, bar);
+    session.data.view = "rank";
+    await interaction.update({ embeds: [rEmbed], components: buildRows("rank") });
+    return;
+  }
+  // prof_home
+  const userMod = getUserModifier(uid) || 1.0;
+  const globalMod = typeof config.globalXPMultiplier === "number" ? config.globalXPMultiplier : 1.0;
+  const eff = Math.max(0, +(userMod * globalMod).toFixed(2));
+  const upcoming = Object.keys(config.levelRewards || {})
+    .map(n => Number(n)).filter(n => Number.isFinite(n) && n > lvl)
+    .sort((a,b) => a-b)[0];
+  const pEmbed = new EmbedBuilder()
+    .setColor(0x00B2FF)
+    .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
+    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
+    .setTitle("Your profile")
+    .addFields(
+      { name: "Level", value: `\`Lv. ${lvl}\``, inline: true },
+      { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
+      { name: "XP Modifier", value: `x${eff.toFixed(2)}`, inline: true },
+    )
+    .addFields(
+      { name: "Progress", value: `${bar}`, inline: false },
+      { name: "Unlocked Perks", value: formatPermissionPhrases(collectUserPermissions(member)), inline: false },
+    )
+    .setFooter({ text: member.guild.name })
+    .setTimestamp();
+  if (upcoming) {
+    const roles = config.levelRewards[String(upcoming)];
+    const roleIds = Array.isArray(roles) ? roles : (roles ? [roles] : []);
+    if (roleIds.length) {
+      const mentions = roleIds.map(id => `<@&${id}>`).join(", ");
+      pEmbed.addFields({ name: "Next Unlock", value: `Level ${upcoming}: ${mentions}`, inline: false });
+    }
+  }
+  session.data.view = "main";
+  await interaction.update({ embeds: [pEmbed], components: buildRows("main") });
+});
 
 module.exports = { handleProfileCommand };

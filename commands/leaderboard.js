@@ -2,7 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const { config } = require("../utils/storage");
 const { levels } = require("../utils/levels");
 
-function createProgressBar(current, max, size = 12) {
+function createProgressBar(current, max, size = 14) {
   const safeMax = Math.max(1, max);
   const filled = Math.min(size, Math.max(0, Math.round((current / safeMax) * size)));
   const empty = size - filled;
@@ -10,7 +10,8 @@ function createProgressBar(current, max, size = 12) {
 }
 
 function getLevelXP(level) {
-  return Math.floor(50 * Math.pow(level, 1 / 0.7));
+  const BASE_XP = 150;
+  return Math.floor(BASE_XP * Math.pow(level, 1 / 0.7));
 }
 
 function pickRandom(arr) {

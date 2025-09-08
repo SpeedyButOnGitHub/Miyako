@@ -6,6 +6,7 @@ const { config, saveConfig } = require("./utils/storage");
 const { attachMessageEvents } = require("./events/messages");
 const { attachGuildEvents } = require("./events/guildEvents");
 const { attachInteractionEvents } = require("./events/interactionEvents");
+const ActiveMenus = require("./utils/activeMenus");
 // debug: ensure functions are imported correctly
 // console.log('attachMessageEvents typeof =', typeof attachMessageEvents);
 // console.log('attachGuildEvents typeof =', typeof attachGuildEvents);
@@ -73,6 +74,9 @@ client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   await sendBotStatusMessage();
   await setStatusChannelName(true);
+
+  // Initialize global button/session manager (restores timers and disables expired UIs)
+  try { await ActiveMenus.init(client); } catch (e) { console.error("[ActiveMenus init]", e); }
 
   // Cleanup lingering menus on restart
   if (fs.existsSync(ACTIVE_MENUS_FILE)) {
