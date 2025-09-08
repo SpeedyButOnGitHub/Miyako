@@ -107,83 +107,86 @@ async function handleHelpCommand(client, message) {
   // Button interaction for category details
   const collector = replyMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000 });
   collector.on("collect", async interaction => {
-    // Moderation category button
-    if (interaction.customId === "help_moderation") {
-      // Only allow moderators and owner
-      const isMod = interaction.member && isModerator(interaction.member);
-      const isOwner = interaction.user.id === OWNER_ID;
-      if (!isMod && !isOwner) {
-        await interaction.deferUpdate();
-        const tempMsg = await interaction.followUp({ content: "Only Moderators can use this", ephemeral: true });
-        setTimeout(() => tempMsg.delete().catch(() => {}), 3000);
-        return;
-      }
-    }
+    try {
+      const id = interaction.customId;
 
-    // Config button: only owner can use
-    if (interaction.customId === "help_config") {
-      if (interaction.user.id !== OWNER_ID) {
-        await interaction.deferUpdate();
-        const tempMsg = await interaction.followUp({ content: "Only the Owner can use this", ephemeral: true });
-        setTimeout(() => tempMsg.delete().catch(() => {}), 3000);
-        return;
-      }
-      // Delete the help menu before opening config
-      await replyMsg.delete().catch(() => {});
-      await interaction.message.delete().catch(() => {});
-      const fakeMessage = {
-        author: { id: interaction.user.id },
-        content: ".config",
-        guild: interaction.guild,
-        channel: interaction.channel,
-        reply: (...args) => interaction.channel.send(...args)
-      };
-      await handleMessageCreate(client, fakeMessage);
-      await interaction.deferUpdate();
-      return;
-    }
-
-    // Category buttons
-    const selectedCat = shownCategories.find(cat => `help_${cat.name.toLowerCase()}` === interaction.customId);
-    if (selectedCat) {
-      // Moderation category: restrict to mods/owner
-      if (selectedCat.name === "Moderation") {
+      // Moderation gate (no ack yet; reply ephemerally if blocked)
+      if (id === "help_moderation") {
         const isMod = interaction.member && isModerator(interaction.member);
         const isOwner = interaction.user.id === OWNER_ID;
         if (!isMod && !isOwner) {
-          await interaction.deferUpdate();
-          const tempMsg = await interaction.followUp({ content: "Only Moderators can use this", ephemeral: true });
-          setTimeout(() => tempMsg.delete().catch(() => {}), 3000);
+          await interaction.reply({ content: "Only Moderators can use this", ephemeral: true }).catch(() => {});
           return;
         }
       }
-      const catEmbed = new EmbedBuilder()
-        .setTitle(`${selectedCat.emoji} ${selectedCat.name} Commands`)
-        .setColor(0x5865F2)
-        .setDescription(selectedCat.commands.map(cmd => `**${cmd.name}:**\n${cmd.value}`).join("\n\n"))
-        .setFooter({ text: `Requested by ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
-        .setTimestamp();
 
-      const backRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("help_back")
-          .setLabel("⬅️ Back")
-          .setStyle(ButtonStyle.Secondary)
-      );
-      await interaction.update({ embeds: [catEmbed], components: [backRow] });
-      return;
+      // Open Config (owner only)
+      if (id === "help_config") {
+        if (interaction.user.id !== OWNER_ID) {
+          await interaction.reply({ content: "Only the Owner can use this", ephemeral: true }).catch(() => {});
+          return;
+        }
+        // Ack fast, then replace with config menu
+        await interaction.deferUpdate();
+        await replyMsg.delete().catch(() => {});
+        const fakeMessage = {
+          author: { id: interaction.user.id },
+          content: ".config",
+          guild: interaction.guild,
+          channel: interaction.channel,
+          reply: (...args) => interaction.channel.send(...args)
+        };
+        await handleMessageCreate(client, fakeMessage);
+        return;
+      }
+
+      // Category buttons
+      const selectedCat = shownCategories.find(cat => `help_${cat.name.toLowerCase()}` === id);
+      if (selectedCat) {
+        if (selectedCat.name === "Moderation") {
+          const isMod = interaction.member && isModerator(interaction.member);
+          const isOwner = interaction.user.id === OWNER_ID;
+          if (!isMod && !isOwner) {
+            await interaction.reply({ content: "Only Moderators can use this", ephemeral: true }).catch(() => {});
+            return;
+          }
+        }
+
+        const footerIcon = (message.member && message.member.user && typeof message.member.user.displayAvatarURL === "function")
+          ? message.member.user.displayAvatarURL({ dynamic: true })
+          : (typeof message.author.displayAvatarURL === "function"
+            ? message.author.displayAvatarURL({ dynamic: true })
+            : "https://cdn.discordapp.com/embed/avatars/0.png");
+
+        const catEmbed = new EmbedBuilder()
+          .setTitle(`${selectedCat.emoji} ${selectedCat.name} Commands`)
+          .setColor(0x5865F2)
+          .setDescription(selectedCat.commands.map(cmd => `**${cmd.name}:**\n${cmd.value}`).join("\n\n"))
+          .setFooter({ text: `Requested by ${message.author.tag}`, iconURL: footerIcon })
+          .setTimestamp();
+
+        const backRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId("help_back")
+            .setLabel("⬅️ Back")
+            .setStyle(ButtonStyle.Secondary)
+        );
+        await interaction.deferUpdate();
+        await replyMsg.edit({ embeds: [catEmbed], components: [backRow] }).catch(() => {});
+        return;
+      }
+
+      // Back button
+      if (id === "help_back") {
+        await interaction.deferUpdate();
+        await replyMsg.edit({ embeds: [embed], components: [row] }).catch(() => {});
+        return;
+      }
+
+      await interaction.reply({ content: `${EMOJI_ERROR} Please provide a valid input.`, ephemeral: true }).catch(() => {});
+    } catch (err) {
+      try { await interaction.reply({ content: `${EMOJI_ERROR} Something went wrong.`, ephemeral: true }); } catch {}
     }
-
-    // Back button returns to main menu
-    if (interaction.customId === "help_back") {
-      await interaction.update({ embeds: [embed], components: [row] });
-      return;
-    }
-
-    await interaction.followUp({
-      content: `${EMOJI_ERROR} Please provide a valid input.`,
-      ephemeral: true
-    });
   });
 }
 

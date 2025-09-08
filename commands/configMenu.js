@@ -20,8 +20,9 @@ const configCategories = {
         description: "Choose whether to use a whitelist or blacklist for sniping channels.",
         getDisplay: () => config.snipeMode === "blacklist" ? "Blacklist" : "Whitelist",
         buttons: [
-          { id: "setWhitelist", label: "Whitelist", style: ButtonStyle.Success },
-          { id: "setBlacklist", label: "Blacklist", style: ButtonStyle.Danger }
+          // CHANGED: use unambiguous IDs
+          { id: "modeWhitelist", label: "Whitelist", style: ButtonStyle.Success },
+          { id: "modeBlacklist", label: "Blacklist", style: ButtonStyle.Danger }
         ]
       },
       ChannelList: {
@@ -288,8 +289,24 @@ async function handleMessageCreate(client, message) {
       // Handle add/remove actions
       if (type === "settingButton") {
         const setting = configCategories[categoryName]?.settings[settingKey];
-        if (!setting)
-          return interaction.reply({ content: `${EMOJI_ERROR} Setting not found.`, ephemeral: true });
+        if (!setting) {
+          await interaction.reply({ content: `${EMOJI_ERROR} Setting not found.`, ephemeral: true }).catch(() => {});
+          return;
+        }
+
+        // CHANGED: explicit SnipeMode toggle with the new IDs
+        if (categoryName === "Sniping" && settingKey === "SnipeMode" && (action === "modeWhitelist" || action === "modeBlacklist")) {
+          const newMode = action === "modeWhitelist" ? "whitelist" : "blacklist";
+          if (config.snipeMode !== newMode) {
+            config.snipeMode = newMode;
+            saveConfig();
+          }
+          await interaction.reply({ content: `Snipe mode set to ${config.snipeMode}.`, ephemeral: true }).catch(() => {});
+          // Refresh the SnipeMode view
+          const { embed, row } = renderSettingEmbed(categoryName, settingKey);
+          await interaction.message.edit({ embeds: [embed], components: [row] }).catch(() => {});
+          return;
+        }
 
         if (
           type === "settingButton" &&
@@ -358,21 +375,6 @@ async function handleMessageCreate(client, message) {
           const { embed, row } = renderSettingEmbed(categoryName, settingKey);
           await interaction.message.edit({ embeds: [embed], components: [row] }).catch(() => {});
           await msg.delete().catch(() => {});
-          return;
-        }
-
-        // Snipe mode toggle
-        if (
-          categoryName === "Sniping" &&
-          settingKey === "SnipeMode" &&
-          (action === "setWhitelist" || action === "setBlacklist")
-        ) {
-          config.snipeMode = action === "setWhitelist" ? "whitelist" : "blacklist";
-          saveConfig();
-          await interaction.reply({ content: `Snipe mode set to ${config.snipeMode}.`, ephemeral: true });
-          // Refresh menu
-          const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-          await interaction.message.edit({ embeds: [embed], components: [row] });
           return;
         }
 
