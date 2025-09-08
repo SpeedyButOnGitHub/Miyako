@@ -9,11 +9,18 @@ const { attachGuildEvents } = require("./events/guildEvents");
 const { attachInteractionEvents } = require("./events/interactionEvents");
 const { startScheduler } = require("./utils/scheduler");
 const ActiveMenus = require("./utils/activeMenus");
+const { startVoiceLeveling } = require("./utils/voiceLeveling");
 // debug: ensure functions are imported correctly
 // console.log('attachMessageEvents typeof =', typeof attachMessageEvents);
 // console.log('attachGuildEvents typeof =', typeof attachGuildEvents);
 
 const BOT_STATUS_FILE = path.resolve(__dirname, "./config/botStatus.json");
+
+// After client ready, start voice leveling service
+// This file's ready handler likely exists below; if not, attach minimal
+if (require.main === module) {
+  // Lazy attach to client when created in this module
+}
 const STATUS_CHANNEL_ID = "1413966369296220233";
 const ACTIVE_MENUS_FILE = path.resolve(__dirname, "./config/activeMenus.json");
 
@@ -22,7 +29,8 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+  GatewayIntentBits.MessageContent,
+  GatewayIntentBits.GuildVoiceStates
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
@@ -118,6 +126,9 @@ client.once("ready", async () => {
 
   // Start the scheduler loop
   try { startScheduler(client); } catch (e) { console.error("[Scheduler] start error:", e); }
+
+  // Start voice leveling loop
+  try { startVoiceLeveling(client); } catch (e) { console.error("[VoiceLeveling] start error:", e); }
 
   // Cleanup lingering menus on restart
   if (fs.existsSync(ACTIVE_MENUS_FILE)) {

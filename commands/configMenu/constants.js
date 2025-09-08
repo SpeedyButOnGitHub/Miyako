@@ -146,6 +146,29 @@ const configCategories = {
           { id: "removeReward", label: "Remove Rewards", style: ButtonStyle.Danger, emoji: "🧹" },
           { id: "removeLevel", label: "Remove Level", style: ButtonStyle.Danger, emoji: "🗑️" }
         ]
+      },
+      VCLevelRewards: {
+        description: "Configure roles granted at VC levels (voice leveling). Separate from text chat rewards.",
+        getDisplay: () => {
+          const entries = Object.entries(config.vcLevelRewards || {});
+          if (!entries.length) return "*None*";
+          entries.sort((a,b) => Number(a[0]) - Number(b[0]));
+          return entries.map(([lvl, roleIds]) => {
+            const list = (Array.isArray(roleIds) ? roleIds : [roleIds]).map(id => `<@&${id}>`).join(", ");
+            return `Lvl ${lvl} → ${list}`;
+          }).join("\n");
+        },
+        getLabel: () => "VC Level Rewards",
+        getSummary: () => {
+          const levels = Object.keys(config.vcLevelRewards || {}).length;
+          return `${levels} tier${levels === 1 ? '' : 's'}`;
+        },
+        buttons: [
+          { id: "addLevel", label: "Add Level", style: ButtonStyle.Success, emoji: "➕" },
+          { id: "addReward", label: "Add Rewards", style: ButtonStyle.Success, emoji: "🎁" },
+          { id: "removeReward", label: "Remove Rewards", style: ButtonStyle.Danger, emoji: "🧹" },
+          { id: "removeLevel", label: "Remove Level", style: ButtonStyle.Danger, emoji: "🗑️" }
+        ]
       }
     }
   },

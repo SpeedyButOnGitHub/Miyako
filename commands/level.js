@@ -57,10 +57,10 @@ async function handleLevelCommand(client, message) {
       .setTimestamp();
   }
 
-  const rows = buildRows("rank");
+  const rows = buildRows("rank", 1, 1, "text");
   const sent = await message.reply({ embeds: [embed], components: rows }).catch(() => null);
   if (sent) {
-    ActiveMenus.registerMessage(sent, { type: "profile", userId: message.author.id, data: { view: "rank" } });
+    ActiveMenus.registerMessage(sent, { type: "profile", userId: message.author.id, data: { view: "rank", mode: "text" } });
   }
 }
 

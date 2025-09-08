@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { getXP, getLevel } = require("../utils/levels");
+const { getVCXP, getVCLevel, vcLevels } = require("../utils/vcLevels");
 const { getUserModifier } = require("../utils/leveling");
 const { config } = require("../utils/storage");
 const ActiveMenus = require("../utils/activeMenus");
@@ -41,9 +42,9 @@ function getRankFromLeaderboard(levelsObj, userId) {
   return idx === -1 ? null : idx + 1;
 }
 
-function collectUserPermissions(member) {
-  // Aggregate configured levelRewards and match against member roles
-  const rewards = config.levelRewards || {};
+function collectUserPermissions(member, mode = "text") {
+  // Aggregate configured rewards and match against member roles
+  const rewards = mode === "vc" ? (config.vcLevelRewards || {}) : (config.levelRewards || {});
   const perms = [];
   for (const [level, roleIdsOrArray] of Object.entries(rewards)) {
     const roleIds = Array.isArray(roleIdsOrArray) ? roleIdsOrArray : (roleIdsOrArray ? [roleIdsOrArray] : []);
@@ -73,14 +74,18 @@ function formatPermissionPhrases(perms) {
   return phrases.map(ph => `${emojiMap[ph] || "🏅"} ${ph}`).join("\n");
 }
 
-function buildRows(view = "main", page = 1, totalPages = 1) {
+function buildRows(view = "main", page = 1, totalPages = 1, mode = "text") {
   const isProfile = view === "main" || view === "profile";
   const isRank = view === "rank";
   const isLB = view === "leaderboard";
   const top = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("prof_home").setLabel("👤 Profile").setStyle(isProfile ? ButtonStyle.Primary : ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("prof_rank").setLabel("📊 Rank").setStyle(isRank ? ButtonStyle.Primary : ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("prof_lb").setLabel("🏆 Leaderboard").setStyle(isLB ? ButtonStyle.Primary : ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("prof_lb").setLabel("🏆 Leaderboard").setStyle(isLB ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("prof_toggle_mode")
+      .setLabel(mode === "text" ? "🎙️ VC Mode" : "💬 Text Mode")
+      .setStyle(mode === "text" ? ButtonStyle.Secondary : ButtonStyle.Success)
   );
   if (!isLB) return [top];
   const prev = new ButtonBuilder().setCustomId("lb_prev").setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(page <= 1);
@@ -90,10 +95,10 @@ function buildRows(view = "main", page = 1, totalPages = 1) {
   return [top, bottom];
 }
 
-function buildRankEmbed(member, rank, level, progressBar) {
+function buildRankEmbed(member, rank, level, progressBar, mode = "text") {
   return new EmbedBuilder()
-    .setTitle("📊 Your Rank")
-  .setColor(theme.colors.primary)
+    .setTitle(mode === "text" ? "📊 Your Rank" : "🎙️ Your VC Rank")
+  .setColor(mode === "text" ? theme.colors.primary : theme.colors.danger)
     .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
     .addFields(
@@ -104,7 +109,7 @@ function buildRankEmbed(member, rank, level, progressBar) {
     .setTimestamp();
 }
 
-function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 10) {
+function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 10, mode = "text") {
   const entries = Object.entries(levelsObj || {}).map(([uid, data]) => ({
     userId: uid,
     xp: data?.xp || 0,
@@ -128,8 +133,8 @@ function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 
     ? `\n— —\nYou: **#${rank}** <@${viewerId}>`
     : "";
   return new EmbedBuilder()
-    .setTitle("🏆 Leaderboard")
-  .setColor(theme.colors.warning)
+    .setTitle(mode === "text" ? "🏆 Leaderboard" : "🎙️ VC Leaderboard")
+  .setColor(mode === "text" ? theme.colors.warning : theme.colors.danger)
     .setDescription(lines.length ? lines.join("\n") + extra : "No data yet.")
     .setFooter({ text: rank ? `Your rank: #${rank} • Page ${safePage}/${totalPages}` : `Page ${safePage}/${totalPages}` })
     .setTimestamp();
@@ -140,6 +145,7 @@ async function handleProfileCommand(client, message) {
   if (!member) return; // Ensure member is defined
 
   const userId = member.id;
+  const mode = "text"; // initial
   const xp = getXP(userId);
   const level = getLevel(userId);
   const nextLevel = level + 1;
@@ -156,7 +162,7 @@ async function handleProfileCommand(client, message) {
   const levels = require("../utils/levels").levels; // Adjusted to match original context
   const rank = getRankFromLeaderboard(levels, userId);
 
-  const userPerms = collectUserPermissions(member);
+  const userPerms = collectUserPermissions(member, mode);
   const permsDisplay = formatPermissionPhrases(userPerms);
 
   const embed = new EmbedBuilder()
@@ -177,11 +183,12 @@ async function handleProfileCommand(client, message) {
     .setTimestamp();
 
   // Optional: show next unlock preview
-  const upcoming = Object.keys(config.levelRewards || {})
+  const rewardsMap = mode === "vc" ? (config.vcLevelRewards || {}) : (config.levelRewards || {});
+  const upcoming = Object.keys(rewardsMap || {})
     .map(n => Number(n)).filter(n => Number.isFinite(n) && n > level)
     .sort((a,b) => a-b)[0];
   if (upcoming) {
-    const roles = config.levelRewards[String(upcoming)];
+    const roles = rewardsMap[String(upcoming)];
     const roleIds = Array.isArray(roles) ? roles : (roles ? [roles] : []);
     if (roleIds.length) {
       const mentions = roleIds.map(id => `<@&${id}>`).join(", ");
@@ -190,8 +197,8 @@ async function handleProfileCommand(client, message) {
   }
 
   // Send and register a persistent session. Handling is done in ActiveMenus.registerHandler below.
-  const sent = await message.reply({ embeds: [embed], components: buildRows("main") });
-  ActiveMenus.registerMessage(sent, { type: "profile", userId: message.author.id, data: { view: "main" } });
+  const sent = await message.reply({ embeds: [embed], components: buildRows("main", 1, 1, mode) });
+  ActiveMenus.registerMessage(sent, { type: "profile", userId: message.author.id, data: { view: "main", mode } });
 }
 
 // Global handler for profile sessions
@@ -203,57 +210,122 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
     return;
   }
   const uid = member.id;
-  const xp = getXP(uid);
-  const lvl = getLevel(uid);
+  const mode = session?.data?.mode === "vc" ? "vc" : "text";
+  const xp = mode === "vc" ? getVCXP(uid) : getXP(uid);
+  const lvl = mode === "vc" ? getVCLevel(uid) : getLevel(uid);
   const next = lvl + 1;
   const xpNext = getLevelXP(next);
   const xpCurr = getLevelXP(lvl);
   const into = Math.max(0, xp - xpCurr);
   const need = Math.max(1, xpNext - xpCurr);
   const bar = createProgressBar(into, need, 20);
-  const levelsSource = session?.data?.levelsOverride || levelsObj;
+  const levelsSource = session?.data?.levelsOverride || (mode === "vc" ? vcLevels : levelsObj);
   const rank = getRankFromLeaderboard(levelsSource, uid);
 
+  if (interaction.customId === "prof_toggle_mode") {
+    session.data.mode = mode === "vc" ? "text" : "vc";
+    // Re-render current view in new mode
+    const m = session.data.mode;
+    const source = m === "vc" ? vcLevels : levelsObj;
+    const userXP = m === "vc" ? getVCXP(uid) : getXP(uid);
+    const userLvl = m === "vc" ? getVCLevel(uid) : getLevel(uid);
+    const next = userLvl + 1;
+    const xpNext = getLevelXP(next);
+    const xpCurr = getLevelXP(userLvl);
+    const into = Math.max(0, userXP - xpCurr);
+    const need = Math.max(1, xpNext - xpCurr);
+    const bar = createProgressBar(into, need, 20);
+    const r = getRankFromLeaderboard(source, uid);
+    let embed;
+  if (session.data.view === "leaderboard") {
+      const page = Number(session.data.page) || 1;
+      const totalPages = Math.max(1, Math.ceil(Object.keys(source || {}).length / 10));
+      embed = buildLeaderboardEmbed(interaction.guild, source, uid, Math.min(page, totalPages), 10, m);
+      await interaction.update({ embeds: [embed], components: buildRows("leaderboard", Math.min(page, totalPages), totalPages, m) });
+      return;
+  } else if (session.data.view === "rank") {
+      embed = buildRankEmbed(member, r, userLvl, bar, m);
+      await interaction.update({ embeds: [embed], components: buildRows("rank", 1, 1, m) });
+      return;
+    } else {
+      // profile
+      const userMod = getUserModifier(uid) || 1.0;
+      const globalMod = typeof config.globalXPMultiplier === "number" ? config.globalXPMultiplier : 1.0;
+      const eff = Math.max(0, +(userMod * globalMod).toFixed(2));
+      const pEmbed = new EmbedBuilder()
+        .setColor(m === "text" ? theme.colors.primary : theme.colors.danger)
+        .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
+        .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
+        .setTitle(m === "text" ? "Your profile" : "Your VC profile")
+        .addFields(
+          { name: "Level", value: `\`Lv. ${userLvl}\``, inline: true },
+          { name: "Rank", value: r ? `#${r}` : "—", inline: true },
+          { name: m === "text" ? "XP Modifier" : "VC XP Modifier", value: `x${eff.toFixed(2)}`, inline: true },
+        )
+        .addFields(
+          { name: "Progress", value: `${bar}`, inline: false },
+          { name: "Unlocked Perks", value: formatPermissionPhrases(collectUserPermissions(member, m)), inline: false },
+        )
+        .setFooter({ text: member.guild.name })
+        .setTimestamp();
+      // Next Unlock for the current mode after toggle
+      const rewardsMapToggle = m === "vc" ? (config.vcLevelRewards || {}) : (config.levelRewards || {});
+      const nextTier = Object.keys(rewardsMapToggle)
+        .map(n => Number(n)).filter(n => Number.isFinite(n) && n > userLvl)
+        .sort((a,b) => a-b)[0];
+      if (nextTier) {
+        const rids = rewardsMapToggle[String(nextTier)];
+        const ids = Array.isArray(rids) ? rids : (rids ? [rids] : []);
+        if (ids.length) {
+          const mentions = ids.map(id => `<@&${id}>`).join(", ");
+          pEmbed.addFields({ name: "Next Unlock", value: `Level ${nextTier}: ${mentions}`, inline: false });
+        }
+      }
+      await interaction.update({ embeds: [pEmbed], components: buildRows("main", 1, 1, m) });
+      return;
+    }
+  }
   if (interaction.customId === "prof_lb") {
     const page = 1;
-    const src = session?.data?.levelsOverride || levelsObj;
-    const lbEmbed = buildLeaderboardEmbed(interaction.guild, src, uid, page);
+    const src = session?.data?.levelsOverride || (mode === "vc" ? vcLevels : levelsObj);
+    const lbEmbed = buildLeaderboardEmbed(interaction.guild, src, uid, page, 10, mode);
     session.data.view = "leaderboard";
     session.data.page = page;
     const totalPages = Math.max(1, Math.ceil(Object.keys(src || {}).length / 10));
-    await interaction.update({ embeds: [lbEmbed], components: buildRows("leaderboard", page, totalPages) });
+    await interaction.update({ embeds: [lbEmbed], components: buildRows("leaderboard", page, totalPages, mode) });
     return;
   }
   if (interaction.customId === "lb_prev" || interaction.customId === "lb_next") {
-    const src = session?.data?.levelsOverride || levelsObj;
+    const src = session?.data?.levelsOverride || (mode === "vc" ? vcLevels : levelsObj);
     const totalPages = Math.max(1, Math.ceil(Object.keys(src || {}).length / 10));
     let page = Number(session.data.page) || 1;
     page += interaction.customId === "lb_next" ? 1 : -1;
     if (page < 1) page = 1;
     if (page > totalPages) page = totalPages;
     session.data.page = page;
-    const lbEmbed = buildLeaderboardEmbed(interaction.guild, src, uid, page);
-    await interaction.update({ embeds: [lbEmbed], components: buildRows("leaderboard", page, totalPages) });
+    const lbEmbed = buildLeaderboardEmbed(interaction.guild, src, uid, page, 10, mode);
+    await interaction.update({ embeds: [lbEmbed], components: buildRows("leaderboard", page, totalPages, mode) });
     return;
   }
   if (interaction.customId === "prof_rank") {
-    const rEmbed = buildRankEmbed(member, rank, lvl, bar);
+    const rEmbed = buildRankEmbed(member, rank, lvl, bar, mode);
     session.data.view = "rank";
-    await interaction.update({ embeds: [rEmbed], components: buildRows("rank") });
+    await interaction.update({ embeds: [rEmbed], components: buildRows("rank", 1, 1, mode) });
     return;
   }
   // prof_home
   const userMod = getUserModifier(uid) || 1.0;
   const globalMod = typeof config.globalXPMultiplier === "number" ? config.globalXPMultiplier : 1.0;
   const eff = Math.max(0, +(userMod * globalMod).toFixed(2));
-  const upcoming = Object.keys(config.levelRewards || {})
+  const rewardsForMode = mode === "vc" ? (config.vcLevelRewards || {}) : (config.levelRewards || {})
+  const upcoming = Object.keys(rewardsForMode || {})
     .map(n => Number(n)).filter(n => Number.isFinite(n) && n > lvl)
     .sort((a,b) => a-b)[0];
   const pEmbed = new EmbedBuilder()
-    .setColor(theme.colors.primary)
+    .setColor(mode === "text" ? theme.colors.primary : theme.colors.danger)
     .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-    .setTitle("Your profile")
+    .setTitle(mode === "text" ? "Your profile" : "Your VC profile")
     .addFields(
       { name: "Level", value: `\`Lv. ${lvl}\``, inline: true },
       { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
@@ -266,7 +338,7 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
     .setFooter({ text: member.guild.name })
     .setTimestamp();
   if (upcoming) {
-    const roles = config.levelRewards[String(upcoming)];
+    const roles = rewardsForMode[String(upcoming)];
     const roleIds = Array.isArray(roles) ? roles : (roles ? [roles] : []);
     if (roleIds.length) {
       const mentions = roleIds.map(id => `<@&${id}>`).join(", ");
@@ -274,7 +346,7 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
     }
   }
   session.data.view = "main";
-  await interaction.update({ embeds: [pEmbed], components: buildRows("main") });
+  await interaction.update({ embeds: [pEmbed], components: buildRows("main", 1, 1, mode) });
 });
 
 module.exports = { handleProfileCommand, buildLeaderboardEmbed, buildRows };

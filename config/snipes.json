@@ -1,32 +1,20 @@
 {
+  "1413966369296220233": {
+    "content": "meow",
+    "nickname": "Lynx",
+    "avatarURL": "https://cdn.discordapp.com/guilds/1232701768316620840/users/349282473085239298/avatars/a26dbc32926eb6912407de6b2489b278.webp",
+    "timestamp": 1757347588734,
+    "attachments": [],
+    "expiresAt": 1757354788734,
+    "deleted": false,
+    "embedData": null
+  },
   "1232701768383729790": {
     "deleted": true,
-    "embedData": {
-      "author": {
-        "name": "Lynx",
-        "icon_url": "https://cdn.discordapp.com/guilds/1232701768316620840/users/349282473085239298/avatars/a26dbc32926eb6912407de6b2489b278.webp"
-      },
-      "description": "meow",
-      "color": 5793266,
-      "footer": {
-        "text": "Today at 18:19"
-      },
-      "timestamp": 1757175561265
-    }
+    "embedData": null
   },
   "1232701768987578460": {
     "deleted": true,
-    "embedData": {
-      "author": {
-        "name": "Lynx",
-        "icon_url": "https://cdn.discordapp.com/guilds/1232701768316620840/users/349282473085239298/avatars/a26dbc32926eb6912407de6b2489b278.webp"
-      },
-      "description": "meow",
-      "color": 5793266,
-      "footer": {
-        "text": "Today at 18:53"
-      },
-      "timestamp": 1757177639622
-    }
+    "embedData": null
   }
 }

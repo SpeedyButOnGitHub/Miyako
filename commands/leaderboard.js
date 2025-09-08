@@ -3,6 +3,7 @@ const { config } = require("../utils/storage");
 const { levels } = require("../utils/levels");
 const ActiveMenus = require("../utils/activeMenus");
 const { buildLeaderboardEmbed, buildRows } = require("./profile");
+const { vcLevels } = require("../utils/vcLevels");
 const theme = require("../utils/theme");
 
 function createProgressBar(current, max, size = 14) {
@@ -75,11 +76,11 @@ async function handleLeaderboardCommand(client, message) {
   }
   if (page > totalPages) page = totalPages;
 
-  const embed = buildLeaderboardEmbed(guild, dataset, viewerId, page, 10);
-  const rows = buildRows("leaderboard", page, totalPages);
+  const embed = buildLeaderboardEmbed(guild, dataset, viewerId, page, 10, "text");
+  const rows = buildRows("leaderboard", page, totalPages, "text");
   const sent = await message.reply({ embeds: [embed], components: rows }).catch(() => null);
   if (sent) {
-    ActiveMenus.registerMessage(sent, { type: "profile", userId: message.author.id, data: { view: "leaderboard", page, levelsOverride: config.testingMode ? dataset : undefined } });
+    ActiveMenus.registerMessage(sent, { type: "profile", userId: message.author.id, data: { view: "leaderboard", page, mode: "text", levelsOverride: config.testingMode ? dataset : undefined } });
   }
 }
 

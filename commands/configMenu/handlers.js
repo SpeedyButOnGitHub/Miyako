@@ -395,6 +395,107 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     }
   }
 
+  // VC Level Rewards management
+  if (categoryName === 'Leveling' && settingName === 'VCLevelRewards' && (action === 'addLevel' || action === 'removeLevel' || action === 'addReward' || action === 'removeReward')) {
+    if (!interaction.guild) return interaction.reply({ content: 'Guild only.', ephemeral: true });
+    const parseRolesCsv = (txt) =>
+      (txt || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => s.replace(/[^0-9]/g, ''))
+        .filter(Boolean);
+    const ensureLevelArr = (lvl) => {
+      if (typeof config.vcLevelRewards !== 'object' || !config.vcLevelRewards) config.vcLevelRewards = {};
+      if (!Array.isArray(config.vcLevelRewards[lvl])) config.vcLevelRewards[lvl] = [];
+      return config.vcLevelRewards[lvl];
+    };
+
+    if (action === 'addLevel' || action === 'removeLevel') {
+      const modalId = `config:modal:vclevelrewards:${action}:${Date.now()}`;
+      const modal = new ModalBuilder().setCustomId(modalId).setTitle(action === 'addLevel' ? 'Add VC Level' : 'Remove VC Level');
+      const levelInput = new TextInputBuilder()
+        .setCustomId('level')
+        .setLabel('Level (number)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(6);
+      modal.addComponents(new ActionRowBuilder().addComponents(levelInput));
+      await interaction.showModal(modal);
+      const submitted = await interaction.awaitModalSubmit({ time: 30000, filter: i => i.customId === modalId && i.user.id === interaction.user.id }).catch(() => null);
+      if (!submitted) return;
+      const levelStr = submitted.fields.getTextInputValue('level');
+      const lvlNum = Number(levelStr);
+      if (!Number.isInteger(lvlNum) || lvlNum < 0 || lvlNum > 10000) {
+        return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', ephemeral: true });
+      }
+      if (action === 'addLevel') {
+        ensureLevelArr(String(lvlNum));
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Created VC Level ${lvlNum} in vcLevelRewards.` });
+        await submitted.reply({ content: `Created VC level ${lvlNum}.`, ephemeral: true });
+      } else {
+        if (config.vcLevelRewards && config.vcLevelRewards[String(lvlNum)]) delete config.vcLevelRewards[String(lvlNum)];
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Removed VC Level ${lvlNum} from vcLevelRewards.` });
+        await submitted.reply({ content: `Removed VC level ${lvlNum}.`, ephemeral: true });
+      }
+      await refreshSettingMessage(interaction.message, categoryName, settingName);
+      return;
+    }
+
+    if (action === 'addReward' || action === 'removeReward') {
+      const modalId = `config:modal:vclevelrewards:${action}:${Date.now()}`;
+      const modal = new ModalBuilder().setCustomId(modalId).setTitle(action === 'addReward' ? 'Add VC Rewards' : 'Remove VC Rewards');
+      const levelInput = new TextInputBuilder()
+        .setCustomId('level')
+        .setLabel('Level (number)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(6);
+      const rolesInput = new TextInputBuilder()
+        .setCustomId('roles')
+        .setLabel('Role IDs or mentions (comma-separated)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setMaxLength(400);
+      modal.addComponents(new ActionRowBuilder().addComponents(levelInput));
+      modal.addComponents(new ActionRowBuilder().addComponents(rolesInput));
+      await interaction.showModal(modal);
+      const submitted = await interaction.awaitModalSubmit({ time: 30000, filter: i => i.customId === modalId && i.user.id === interaction.user.id }).catch(() => null);
+      if (!submitted) return;
+      const levelStr = submitted.fields.getTextInputValue('level');
+      const rolesStr = submitted.fields.getTextInputValue('roles');
+      const lvlNum = Number(levelStr);
+      if (!Number.isInteger(lvlNum) || lvlNum < 0 || lvlNum > 10000) {
+        return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', ephemeral: true });
+      }
+      const ids = parseRolesCsv(rolesStr);
+      if (!ids.length) return submitted.reply({ content: 'Provide at least one role.', ephemeral: true });
+      const validIds = ids.filter(id => !!interaction.guild.roles.cache.get(id));
+      if (!validIds.length) return submitted.reply({ content: 'No valid roles found in input.', ephemeral: true });
+
+      const key = String(lvlNum);
+      const arr = ensureLevelArr(key);
+      if (action === 'addReward') {
+        for (const id of validIds) if (!arr.includes(id)) arr.push(id);
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to VC Level ${lvlNum}.` });
+        await submitted.reply({ content: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to VC level ${lvlNum}.`, ephemeral: true });
+      } else {
+        const before = arr.length;
+        const set = new Set(validIds);
+        config.vcLevelRewards[key] = arr.filter(id => !set.has(id));
+        const after = config.vcLevelRewards[key].length;
+        await saveConfig();
+        await logConfigChange(interaction.client, { user: interaction.user, change: `Removed ${before - after} role(s) from VC Level ${lvlNum}.` });
+        await submitted.reply({ content: `Removed ${before - after} role(s) from VC level ${lvlNum}.`, ephemeral: true });
+      }
+      await refreshSettingMessage(interaction.message, categoryName, settingName);
+      return;
+    }
+  }
+
   return interaction.reply({ content: 'This action is not implemented yet in the modular UI.', ephemeral: true });
 }
 

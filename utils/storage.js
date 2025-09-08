@@ -21,6 +21,8 @@ const defaultConfig = {
   snipingChannelList: [],
   // Level rewards: { [level]: string[] }
   levelRewards: {},
+  // VC Level rewards: { [level]: string[] }
+  vcLevelRewards: {},
   // Leveling gating
   levelingMode: "blacklist",
   levelingChannelList: [],
@@ -46,6 +48,7 @@ function validateConfig(cfg) {
   if (!["whitelist", "blacklist"].includes(cfg.snipeMode)) cfg.snipeMode = "whitelist";
   if (!Array.isArray(cfg.snipingChannelList)) cfg.snipingChannelList = [];
   if (typeof cfg.levelRewards !== "object" || cfg.levelRewards === null) cfg.levelRewards = {};
+  if (typeof cfg.vcLevelRewards !== "object" || cfg.vcLevelRewards === null) cfg.vcLevelRewards = {};
   if (!["whitelist", "blacklist"].includes(cfg.levelingMode)) cfg.levelingMode = "blacklist";
   if (!Array.isArray(cfg.levelingChannelList)) cfg.levelingChannelList = [];
   if (!Array.isArray(cfg.roleXPBlacklist)) cfg.roleXPBlacklist = [];
@@ -64,6 +67,20 @@ function validateConfig(cfg) {
     if (roleIds.length) cleanedRewards[String(n)] = Array.from(new Set(roleIds));
   }
   cfg.levelRewards = cleanedRewards;
+
+  // Sanitize vcLevelRewards similarly
+  const cleanedVCRewards = {};
+  for (const [lvl, val] of Object.entries(cfg.vcLevelRewards)) {
+    const n = Number(lvl);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    const arr = Array.isArray(val) ? val : (val ? [val] : []);
+    const roleIds = arr
+      .map(v => (typeof v === "string" ? v : String(v || "")))
+      .map(s => s.replace(/[^0-9]/g, ""))
+      .filter(Boolean);
+    if (roleIds.length) cleanedVCRewards[String(n)] = Array.from(new Set(roleIds));
+  }
+  cfg.vcLevelRewards = cleanedVCRewards;
 
   // Ensure escalation sub-keys
   if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
