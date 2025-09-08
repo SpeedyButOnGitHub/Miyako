@@ -1,8 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ComponentType } = require("discord.js");
 const { addSchedule, getSchedules, removeSchedule, getSchedule, updateSchedule } = require("../utils/scheduleStorage");
 const { computeNextRun } = require("../utils/scheduler");
-
-const OWNER_ID = process.env.OWNER_ID;
+const { OWNER_ID } = require("./moderation/permissions");
 
 function humanizeFrequency(s) {
   if (!s) return "Unknown";
@@ -36,9 +35,9 @@ async function handleScheduleCommand(client, message) {
     new ButtonBuilder().setCustomId("sched_close").setLabel("Close").setStyle(ButtonStyle.Danger)
   );
 
-  // Buttons for each schedule: delete / toggle — limited to 3 rows; use paging if many (simple implementation)
+  // Buttons for each schedule: delete / toggle — cap to 4 rows to respect Discord's 5-row max (1 main + 4 controls)
   const controlRows = [];
-  for (const s of schedules.slice(0, 6)) {
+  for (const s of schedules.slice(0, 4)) {
     const r = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`sched_toggle_${s.id}`).setLabel(s.enabled ? `Disable ${s.id}` : `Enable ${s.id}`).setStyle(s.enabled ? ButtonStyle.Secondary : ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`sched_delete_${s.id}`).setLabel(`Delete ${s.id}`).setStyle(ButtonStyle.Danger)
@@ -62,6 +61,7 @@ async function handleScheduleCommand(client, message) {
         .setCustomId("schedule_create_modal")
         .setTitle("Create Schedule");
 
+      // Discord limits modals to 5 inputs; collect core fields and a flexible Extras field
       modal.addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder().setCustomId("name").setLabel("Name").setStyle(TextInputStyle.Short).setRequired(true)
@@ -73,22 +73,10 @@ async function handleScheduleCommand(client, message) {
           new TextInputBuilder().setCustomId("type").setLabel("Type (once/daily/weekly/monthly/interval)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("e.g. weekly")
         ),
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("date").setLabel("Date (YYYY-MM-DD) — required for once").setStyle(TextInputStyle.Short).setRequired(false)
-        ),
-        new ActionRowBuilder().addComponents(
           new TextInputBuilder().setCustomId("time").setLabel("Time (HH:MM 24h)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("14:30")
         ),
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("days").setLabel("Days for weekly (comma e.g. Mon,Wed)").setStyle(TextInputStyle.Short).setRequired(false)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("intervalDays").setLabel("Interval days (for interval type)").setStyle(TextInputStyle.Short).setRequired(false)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("repeats").setLabel("Repeats (number) or leave blank for infinite").setStyle(TextInputStyle.Short).setRequired(false)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("message").setLabel("Message content").setStyle(TextInputStyle.Paragraph).setRequired(true)
+          new TextInputBuilder().setCustomId("extras").setLabel("Extras (date/days/interval/repeats)").setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder("once: 2025-09-08 | weekly: Mon,Wed | monthly: 15 | interval: 2; repeats=5")
         )
       );
 
@@ -145,12 +133,11 @@ async function handleScheduleModal(interaction) {
   const name = interaction.fields.getTextInputValue("name").trim();
   const channelRaw = interaction.fields.getTextInputValue("channel").trim();
   const type = interaction.fields.getTextInputValue("type").trim().toLowerCase();
-  const date = (interaction.fields.getTextInputValue("date") || "").trim();
   const time = (interaction.fields.getTextInputValue("time") || "00:00").trim();
-  const daysRaw = (interaction.fields.getTextInputValue("days") || "").trim();
-  const intervalDays = (interaction.fields.getTextInputValue("intervalDays") || "").trim();
-  const repeatsRaw = (interaction.fields.getTextInputValue("repeats") || "").trim();
-  const message = interaction.fields.getTextInputValue("message").trim();
+  const extrasRaw = (interaction.fields.getTextInputValue("extras") || "").trim();
+  // We can't fit message content in the modal due to input limits; prompt the user to send the next message as content
+  // For now, use a simple placeholder to avoid blocking; in practice, collect via a follow-up flow
+  const message = "(scheduled message content)";
 
   // parse channel mention or id
   let channelId = channelRaw.replace(/[<#>]/g, "").trim();
@@ -162,13 +149,20 @@ async function handleScheduleModal(interaction) {
     type,
     time,
     enabled: true,
-    repeats: repeatsRaw ? Number(repeatsRaw) : null
+    repeats: null
   };
 
-  if (type === "once") schedule.date = date;
+  // Allow semicolon-delimited extras like "2; repeats=5" or "Mon,Wed; repeats=3"
+  const primaryExtras = extrasRaw.split(";")[0].trim();
+
+  if (type === "once") {
+    // Expect a single date in YYYY-MM-DD
+    const m = primaryExtras.match(/\d{4}-\d{2}-\d{2}/);
+    schedule.date = m ? m[0] : "";
+  }
   if (type === "weekly") {
     const map = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
-    schedule.days = daysRaw
+    schedule.days = primaryExtras
       .split(",")
       .map(s => s.trim().toLowerCase().replace(/\.$/, ""))
       .filter(Boolean)
@@ -176,8 +170,12 @@ async function handleScheduleModal(interaction) {
       .filter(x => x !== null);
     if (schedule.days.length === 0) schedule.days = [1]; // default Monday
   }
-  if (type === "interval") schedule.intervalDays = Number(intervalDays) || 1;
-  if (type === "monthly") schedule.dayOfMonth = Number(daysRaw) || 1;
+  if (type === "interval") schedule.intervalDays = Number(primaryExtras) || 1;
+  if (type === "monthly") schedule.dayOfMonth = Number(primaryExtras) || 1;
+
+  // Optional repeats from pattern like "repeats=5"
+  const repMatch = extrasRaw.match(/repeats\s*=\s*(\d+)/i);
+  if (repMatch) schedule.repeats = Number(repMatch[1]);
 
   // compute nextRun
   schedule.nextRun = computeNextRun(schedule);

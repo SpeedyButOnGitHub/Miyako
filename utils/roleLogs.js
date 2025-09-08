@@ -1,9 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { config } = require("./storage");
 const theme = require("./theme");
-
-const ROLE_LOG_CHANNEL = "1232739307736010854";
-const TEST_LOG_CHANNEL = "1413966369296220233";
+const { ROLE_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
 
 async function logRoleChange(client, member, role, action) {
   if (config.roleLogBlacklist.includes(role.id)) return;

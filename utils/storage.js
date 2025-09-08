@@ -9,9 +9,9 @@ const defaultConfig = {
   moderatorRoles: [],
   warnings: {},
   escalation: {
-  muteThreshold: 3,
-  muteDuration: 2 * 60 * 60 * 1000,
-  kickThreshold: 5
+    muteThreshold: 3,
+    muteDuration: 2 * 60 * 60 * 1000,
+    kickThreshold: 5
   },
   defaultMuteDuration: 60 * 60 * 1000,
   modLogChannelId: "1232701768383729791",

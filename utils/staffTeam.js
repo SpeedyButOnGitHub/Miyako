@@ -1,25 +1,10 @@
 const { ROLES, ROLE_ORDER, ROLE_EMOJIS, CHANNEL_ID } = require("../config/roles");
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { STAFF_MANAGER_ROLE, STAFF_SECURITY_ROLE, STAFF_MODERATOR_ROLE, STAFF_STAFF_ROLE, STAFF_ADMIN_ROLE, ALLOWED_ROLES, CHATBOX_BUTTON_ID } = require("../commands/moderation/permissions");
 
 const BOT_PREFIX = "**🌙 Late Night Hours Staff Team**\n\n";
 
-// Allowed staff chatbox roles as constants
-const STAFF_MANAGER_ROLE = "1380277718091829368";
-const STAFF_SECURITY_ROLE = "1380323145621180466";
-const STAFF_MODERATOR_ROLE = "1375958589658632313";
-const STAFF_STAFF_ROLE = "1375958480380493844";
-const STAFF_ADMIN_ROLE = "1381077407074750594";
-
-const ALLOWED_ROLES = [
-  STAFF_MANAGER_ROLE,
-  STAFF_SECURITY_ROLE,
-  STAFF_MODERATOR_ROLE,
-  STAFF_STAFF_ROLE,
-  STAFF_ADMIN_ROLE
-];
-
-const CHATBOX_BUTTON_ID = "staffteam_chatbox";
-const CHATBOX_CHANNEL_ID = "1232701768383729790";
+// Reuse centralized constants for roles and chatbox button; keep channel from roles config
 
 const formatMembersListInline = (membersArray) =>
   membersArray.length ? membersArray.map(m => `<@${m.id}>`).join(", ") : "*None*";

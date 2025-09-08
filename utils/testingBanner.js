@@ -1,10 +1,9 @@
 const { EmbedBuilder } = require("discord.js");
-
-const STATUS_CHANNEL_ID = "1413966369296220233";
+const { CONFIG_LOG_CHANNEL } = require("./logChannels");
 
 async function updateTestingStatus(client, enabled, actor) {
   try {
-    const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
+  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
     if (!channel) return;
 
     const embed = new EmbedBuilder()

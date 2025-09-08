@@ -40,8 +40,7 @@ function computeNextRun(schedule) {
   if (type === "once") {
     if (schedule.date && schedule.time) {
       const [y, m, d] = schedule.date.split("-").map(Number);
-      const dt = new Date(y, (m || 1) - 1, d || 1);
-      const next = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), ...((schedule.time || "00:00").split(":").map(Number)));
+      const next = new Date(y, (m || 1) - 1, d || 1, ...((schedule.time || "00:00").split(":").map(Number)));
       return next.getTime();
     }
     // fallback: schedule.nextRun if present
@@ -68,15 +67,13 @@ function computeNextRun(schedule) {
   if (type === "weekly") {
     // schedule.days array of weekday numbers [0..6]
     const days = Array.isArray(schedule.days) && schedule.days.length ? schedule.days : [1]; // default Monday
-    // find next occurrence (including today if time in future)
     const nowDate = new Date();
-    const todayWeekday = nowDate.getDay(); // 0..6
     const [hh = 0, mm = 0] = (schedule.time || "00:00").split(":").map(Number);
 
-    // generate candidate for each upcoming day within next 7 days
+    // search next 14 days for the next scheduled day/time
     for (let offset = 0; offset < 14; offset++) {
       const d = new Date(nowDate.getTime() + offset * 24 * 3600000);
-      const wd = d.getDay();
+      const wd = d.getDay(); // 0..6
       if (days.includes(wd)) {
         const candidate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hh, mm, 0, 0);
         if (candidate.getTime() > now) return candidate.getTime();
@@ -94,7 +91,6 @@ function computeNextRun(schedule) {
     candidate.setDate(day);
     candidate.setHours(hh, mm, 0, 0);
     if (candidate.getTime() <= now) {
-      // move to next month
       const next = new Date(candidate.getFullYear(), candidate.getMonth() + 1, day, hh, mm, 0, 0);
       return next.getTime();
     }
@@ -131,7 +127,6 @@ function computeAfterRun(schedule) {
 }
 
 function startScheduler(client, opts = {}) {
-  // run every 15 seconds to be responsive (cheap)
   const tickInterval = opts.intervalMs || 15 * 1000;
 
   // ensure existing schedules have nextRun computed

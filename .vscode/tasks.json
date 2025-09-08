@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Smoke test bot requires compile",
+			"type": "shell",
+			"command": "node ./scripts/smoke-load.js",
+			"args": [],
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}

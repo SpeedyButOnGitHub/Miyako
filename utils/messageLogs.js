@@ -1,9 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { config } = require("./storage");
 const theme = require("./theme");
-
-const MESSAGE_LOG_CHANNEL = "1232701769859993622";
-const TEST_LOG_CHANNEL = "1413966369296220233";
+const { MESSAGE_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
 
 async function logMessageDelete(client, message) {
   const logChannelId = config.testingMode ? TEST_LOG_CHANNEL : MESSAGE_LOG_CHANNEL;

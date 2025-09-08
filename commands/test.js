@@ -3,10 +3,12 @@ const { OWNER_ID } = require("./moderation/permissions");
 const { sendModLog } = require("../utils/modLogs");
 const { config, saveConfig } = require("../utils/storage");
 const { logMemberLeave } = require("../utils/memberLogs");
+const { TEST_LOG_CHANNEL, MOD_ACTION_LOG_CHANNEL, MEMBER_LEAVE_LOG_CHANNEL: MEMBER_LEAVE_LOG_CHANNEL_CONST } = require("../utils/logChannels");
 
-const TEST_CHANNEL_ID = "1413966369296220233";
-const MOD_LOG_CHANNEL_ID = "1232701768383729791";
-const MEMBER_LEAVE_LOG_CHANNEL = "1232701769859993628";
+// Preserve legacy variable names for downstream references
+const TEST_CHANNEL_ID = TEST_LOG_CHANNEL;
+const MOD_LOG_CHANNEL_ID = MOD_ACTION_LOG_CHANNEL;
+const MEMBER_LEAVE_LOG_CHANNEL = MEMBER_LEAVE_LOG_CHANNEL_CONST;
 
 // Track test log message IDs in memory and export for use in moderationCommands.js
 let testLogMessageIds = [];
@@ -126,7 +128,7 @@ function getNativeTestRows() {
  */
 async function handleTestCommand(client, message) {
   if (message.author.id !== OWNER_ID) {
-    return message.reply({ content: "Only the Owner can use this command.", ephemeral: true });
+    return message.reply({ content: "Only the Owner can use this command." });
   }
 
   // Quick prefix: .test testing on/off
@@ -333,7 +335,8 @@ async function handleTestCommand(client, message) {
             `[Native Discord Test]\nReason: ${reason}`,
             false
           );
-          await interaction.followUp({ content: `Native Discord unban test sent for <@${subject.id}>!`, ephemeral: true });
+          // interaction.update/reply used earlier for category selection; use reply here to acknowledge
+          await interaction.reply({ content: `Native Discord unban test sent for <@${subject.id}>!`, ephemeral: true });
         } else if (interaction.customId === "native_kick") {
           await sendModLog(
             client,

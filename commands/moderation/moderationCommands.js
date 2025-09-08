@@ -1,12 +1,11 @@
 const { sendModLog } = require("../../utils/modLogs");
 const { replySuccess, replyError } = require("./replies");
 const { sendUserDM } = require("./dm");
-const { isModerator } = require("./permissions");
+const { isModerator, OWNER_ID } = require("./permissions");
 const { config, saveConfig } = require("../../utils/storage");
 const ms = require("ms");
 const { parseDurationAndReason } = require("../../utils/time");
 
-const OWNER_ID = process.env.OWNER_ID || "349282473085239298";
 const MUTE_ROLE_ID = "1391535514901020744";
 const DEFAULT_MUTE = config.defaultMuteDuration || 60 * 60 * 1000;
 

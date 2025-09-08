@@ -17,7 +17,10 @@ yarn-error.log*
 .DS_Store
 .env
 
-botConfig.json
+# Project data (explicitly list known local-only files)
 config/snipes.json
-*.json
 config/changelogSnapshot.json
+config/buttonSessions.json
+config/botStatus.json
+
+# Allow JSON by default; do not ignore all JSON globally

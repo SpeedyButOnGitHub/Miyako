@@ -1,7 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const fs = require("fs");
-
-const STATUS_CHANNEL_ID = "1413966369296220233";
+const { CONFIG_LOG_CHANNEL } = require("./logChannels");
 const BOT_STATUS_FILE = "./config/botStatus.json";
 
 async function sendBotStatusMessage(client) {
@@ -14,7 +13,7 @@ async function sendBotStatusMessage(client) {
   }
   const now = Date.now();
   const diff = now - lastOnline;
-  const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
+  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
   if (channel) {
     const restarted = diff >= 5 * 60 * 1000;
     const embed = new EmbedBuilder()
@@ -29,7 +28,7 @@ async function sendBotStatusMessage(client) {
 }
 
 async function sendBotShutdownMessage(client) {
-  const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
+  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
   if (channel) {
     const embed = new EmbedBuilder()
       .setTitle("🔴 Shutting Down")
@@ -42,7 +41,7 @@ async function sendBotShutdownMessage(client) {
 }
 
 async function setStatusChannelName(client, online) {
-  const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
+  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
   if (!channel || typeof channel.setName !== "function") return;
   const name = online
     ? "🟢︱𝙼𝚒𝚢𝚊𝚔𝚘𝚜-𝙲𝚑𝚊𝚖𝚋𝚎𝚛"

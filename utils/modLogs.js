@@ -2,10 +2,9 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("
 const ms = require("ms");
 const { config } = require("./storage");
 const theme = require("./theme");
+const { MOD_ACTION_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
 
-// Only log moderation actions in the user action channel; testing mode uses test channel
-const USER_ACTION_LOG_CHANNEL = "1232701768383729791";
-const TEST_LOG_CHANNEL = "1413966369296220233";
+// Testing mode routes to test channel; otherwise prefer config.modLogChannelId, then MOD_ACTION_LOG_CHANNEL
 
 /**
  * Logs moderation actions in the user action channel only
@@ -30,7 +29,7 @@ async function sendModLog(
   currentWarnings = null
 ) {
   const isTest = !!config.testingMode;
-  const channelId = isTest ? TEST_LOG_CHANNEL : (config.modLogChannelId || USER_ACTION_LOG_CHANNEL);
+  const channelId = isTest ? TEST_LOG_CHANNEL : (config.modLogChannelId || MOD_ACTION_LOG_CHANNEL);
   const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!channel) return null;
 
