@@ -81,8 +81,8 @@ async function handleModerationCommands(client, message, command, args) {
 
   // Ensure escalation config exists
   const escalation = config.escalation || {};
-  const kickThreshold = typeof escalation.kickThreshold === "number" ? escalation.kickThreshold : 3;
-  const muteThreshold = typeof escalation.muteThreshold === "number" ? escalation.muteThreshold : 2;
+  const kickThreshold = 5;
+  const muteThreshold = 3;
   const muteDuration = typeof escalation.muteDuration === "number" ? escalation.muteDuration : 2 * 60 * 60 * 1000;
 
   // Parse duration and reason from args (after user mention/user id)
@@ -134,8 +134,8 @@ async function handleModerationCommands(client, message, command, args) {
 
         // Determine thresholds using the new count
         const newCount = warnings.length;
-        let escalationNote = null;
-        let escalationDurationText = null;
+    let escalationNote = null;
+    let escalationDurationText = null;
         if (member) {
           if (newCount >= kickThreshold) {
             if (!isTesting) await member.kick("Auto-kicked for reaching warning threshold");
@@ -145,16 +145,22 @@ async function handleModerationCommands(client, message, command, args) {
               await member.timeout(muteDuration, "Auto-muted for reaching warning threshold");
               if (!member.roles.cache.has(MUTE_ROLE_ID)) await member.roles.add(MUTE_ROLE_ID).catch(() => {});
             }
-            escalationDurationText = formatDuration(muteDuration);
-            escalationNote = `Auto-muted for ${escalationDurationText} (threshold ${muteThreshold})`;
+      escalationDurationText = formatDuration(muteDuration);
+      const endTs = `<t:${Math.floor((Date.now() + muteDuration) / 1000)}:R>`;
+      escalationNote = `Auto-muted for ${escalationDurationText} (threshold ${muteThreshold}) (ends ${endTs})`;
           }
         }
 
-        // DM the user (no public escalation text in channel)
-        await sendUserDM(member || userObj, "warned", null, finalReason, `Current warnings: ${newCount}${escalationNote ? `\n${escalationNote}` : ""}`);
+    // Remaining-to-threshold info
+    const remainingToMute = Math.max(0, muteThreshold - newCount);
+    const remainingToKick = Math.max(0, kickThreshold - newCount);
+    const remainingLine = `Warnings until actions: ${remainingToMute} to auto-mute, ${remainingToKick} to auto-kick.`;
+
+    // DM the user (no public escalation text in channel)
+    await sendUserDM(member || userObj, "warned", escalationDurationText, finalReason, `Current warnings: ${newCount}\n${remainingLine}${escalationNote ? `\n${escalationNote}` : ""}`);
 
         // Single consolidated log for the warning (and any escalation)
-        const combinedReason = escalationNote ? `${finalReason} • ${escalationNote}` : finalReason;
+    const combinedReason = `${finalReason} • ${remainingLine}${escalationNote ? ` • ${escalationNote}` : ""}`;
         let logMsg = await sendModLog(
           client,
           member || userObj,
@@ -194,8 +200,12 @@ async function handleModerationCommands(client, message, command, args) {
         const removed = config.warnings[warnId].splice(index - 1, 1)[0];
         saveConfig();
 
-        await sendUserDM(member || userObj, "warning removed", null, removed.reason, `Current warnings: ${config.warnings[warnId].length}`);
-        let logMsg = await sendModLog(client, member || userObj, message.author, "warning removed", removed.reason, true, null, config.warnings[warnId].length);
+  const remainingToMute2 = Math.max(0, muteThreshold - config.warnings[warnId].length);
+  const remainingToKick2 = Math.max(0, kickThreshold - config.warnings[warnId].length);
+  const remainingLine2 = `Warnings until actions: ${remainingToMute2} to auto-mute, ${remainingToKick2} to auto-kick.`;
+
+  await sendUserDM(member || userObj, "warning removed", null, removed.reason, `Current warnings: ${config.warnings[warnId].length}\n${remainingLine2}`);
+  let logMsg = await sendModLog(client, member || userObj, message.author, "warning removed", `${removed.reason} • ${remainingLine2}`, true, null, config.warnings[warnId].length);
         if (isTesting && logMsg && logMsg.id) testLogMessageIds.push(logMsg.id);
 
         await replySuccess(message, `Removed warning #${index} from <@${warnId}>${removed.reason ? `: **${removed.reason}**` : ""}`);

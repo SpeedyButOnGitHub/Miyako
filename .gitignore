@@ -3,3 +3,4 @@
 botConfig.json
 config/snipes.json
 *.json
+config/changelogSnapshot.json

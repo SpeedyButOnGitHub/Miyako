@@ -13,10 +13,43 @@
     "1375957925356638228"
   ],
   "warnings": {
-    "432610292342587392": [],
+    "432610292342587392": [
+      {
+        "moderator": "349282473085239298",
+        "reason": "No reason provided",
+        "date": 1757322479580,
+        "logMsgId": "1414537744696348693"
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "No reason provided",
+        "date": 1757322482862,
+        "logMsgId": "1414537759418351796"
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "No reason provided",
+        "date": 1757323103546,
+        "logMsgId": "1414540365096030222"
+      }
+    ],
     "1413738051779428362": [],
     "349282473085239298": [],
-    "1165431695953121372": []
+    "1165431695953121372": [],
+    "475744554910351370": [
+      {
+        "moderator": "349282473085239298",
+        "reason": "No reason provided",
+        "date": 1757323130846,
+        "logMsgId": "1414540476245344338"
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "No reason provided",
+        "date": 1757323134972,
+        "logMsgId": "1414540495534821510"
+      }
+    ]
   },
   "escalation": {
     "muteThreshold": 2,
@@ -30,7 +63,7 @@
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
-  "testingMode": true,
+  "testingMode": false,
   "roleLogBlacklist": [
     "1232701768329199666",
     "1232701768341655617",

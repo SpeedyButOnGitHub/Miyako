@@ -3,6 +3,7 @@ const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require("discord.j
 const fs = require("fs");
 const path = require("path");
 const { config, saveConfig } = require("./utils/storage");
+const { postStartupChangelog } = require("./utils/changelog");
 const { attachMessageEvents } = require("./events/messages");
 const { attachGuildEvents } = require("./events/guildEvents");
 const { attachInteractionEvents } = require("./events/interactionEvents");
@@ -34,18 +35,51 @@ async function sendBotStatusMessage() {
   const diff = now - lastOnline;
   const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
   if (channel) {
-    const starting = new EmbedBuilder()
-      .setTitle(diff >= 5 * 60 * 1000 ? "🟢 Starting" : "🔄 Restarting")
-      .setColor(diff >= 5 * 60 * 1000 ? 0x5865F2 : 0xffd700)
-      .setDescription(diff >= 5 * 60 * 1000 ? "Miyako has woken up." : "Miyako is restarting...")
+    // Build a single, modern embed with inline smart changelog
+    const isColdStart = diff >= 5 * 60 * 1000;
+    const title = isColdStart ? "🟢 Miyako is Online" : "🔄 Miyako Restarted";
+    const color = isColdStart ? 0x5865F2 : 0xFFD700;
+
+    const embed = new EmbedBuilder()
+      .setTitle(title)
+      .setColor(color)
+      .setDescription(isColdStart ? "All systems are up. Here's what changed since last run:" : "Restart complete. Here's what changed since last run:")
       .setTimestamp();
-    const sent = await channel.send({ embeds: [starting] }).catch(() => null);
-    if (sent && diff < 5 * 60 * 1000) {
-      setTimeout(async () => {
-        const awake = new EmbedBuilder().setTitle("🟢 Starting").setColor(0x5865F2).setDescription("Miyako has woken up.").setTimestamp();
-        await sent.edit({ embeds: [awake] }).catch(() => {});
-      }, 5000);
+
+    // Inline changelog: compute diff and add as fields/description
+    try {
+      const { createSnapshot, compareSnapshots } = require("./utils/changelog");
+      const snapshotFile = path.resolve(__dirname, "./config/changelogSnapshot.json");
+      let prev = null;
+      try { if (fs.existsSync(snapshotFile)) prev = JSON.parse(fs.readFileSync(snapshotFile, "utf8")); } catch {}
+      const curr = createSnapshot(path.resolve(__dirname));
+      const result = compareSnapshots(prev, curr);
+      // save new snapshot
+      try { fs.writeFileSync(snapshotFile, JSON.stringify({ createdAt: Date.now(), files: curr }, null, 2)); } catch {}
+
+      const total = result.added.length + result.removed.length + result.modified.length;
+      if (total === 0) {
+        embed.addFields({ name: "Changelog", value: "No changes have been made since last restart." });
+      } else {
+        const lines = [];
+        const cap = (arr, n) => arr.slice(0, n);
+        for (const it of cap(result.added, 4)) lines.push(`➕ ${it.path}`);
+        for (const it of cap(result.removed, 4)) lines.push(`✖️ ${it.path}`);
+        for (const it of cap(result.modified, 6)) {
+          const ld = it.linesDelta === 0 ? "±0" : (it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`);
+          lines.push(`� ${it.path} (${ld} lines)`);
+        }
+        // Simple "smart" grouping summary
+        const summary = `Files changed: ${total} (➕ ${result.added.length}, ✖️ ${result.removed.length}, 🔧 ${result.modified.length})`;
+        embed.addFields({ name: "Changelog", value: summary });
+        if (lines.length) embed.addFields({ name: "Details", value: lines.join("\n").slice(0, 1024) });
+      }
+    } catch (e) {
+      // Fallback description
+      embed.addFields({ name: "Changelog", value: "No changes have been made since last restart." });
     }
+
+    await channel.send({ embeds: [embed] }).catch(() => null);
   }
   fs.writeFileSync(BOT_STATUS_FILE, JSON.stringify({ lastOnline: now }, null, 2));
 }
@@ -65,6 +99,8 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
     config.testingMode = false;
     saveConfig();
     if (client.isReady()) await setStatusChannelName(false);
+  // Best-effort: create a fresh snapshot on shutdown so next start has a baseline
+  try { require("./utils/changelog").createSnapshot && require("./utils/changelog").createSnapshot(path.resolve(__dirname)); } catch {}
     process.exit(0);
   });
 }
@@ -74,6 +110,7 @@ client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   await sendBotStatusMessage();
   await setStatusChannelName(true);
+  // Changelog now included inside the status embed above
 
   // Initialize global button/session manager (restores timers and disables expired UIs)
   try { await ActiveMenus.init(client); } catch (e) { console.error("[ActiveMenus init]", e); }

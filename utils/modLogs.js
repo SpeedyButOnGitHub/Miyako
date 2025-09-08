@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
+const ms = require("ms");
 const { config } = require("./storage");
 
 // Only log moderation actions in the user action channel; testing mode uses test channel
@@ -47,25 +48,43 @@ async function sendModLog(
   if (a.includes("removed")) color = 0x00c853;
   if (a.includes("mute") || a.includes("ban") || a.includes("kick")) color = 0xff5555;
 
-  const lines = [];
-  if (reason) lines.push(`📝 Reason: ${reason}`);
-  if (duration) lines.push(`⏰ Duration: ${duration}`);
-  if (typeof currentWarnings === "number") lines.push(`⚠️ Warnings: ${currentWarnings}`);
+  const main = [];
+  const bottom = [];
+  // Main details first
+  if (reason) main.push(`📝 Reason: ${reason}`);
+  if (duration) main.push(`⏰ Duration: ${duration}`);
+  if (typeof currentWarnings === "number") main.push(`⚠️ Warnings: ${currentWarnings}`);
+  // Auto moderation note and advanced info at the bottom
+  const isAutoMute = a.includes("mute") && isPunishment && duration && typeof currentWarnings === "number";
+  if (isAutoMute) {
+    const durMs = typeof duration === "string" ? (ms(duration) || 0) : 0;
+    const endTs = durMs > 0 ? `<t:${Math.floor((Date.now() + durMs) / 1000)}:R>` : null;
+    bottom.push(`🚨 Due to reaching ${currentWarnings} warning${currentWarnings === 1 ? "" : "s"}, this user has been auto-muted for ${duration}${endTs ? ` (ends ${endTs})` : ""}.`);
+  }
+  // Kick case: when action text contains 'kicked' and we know warnings
+  const isAutoKick = a.includes("kick") && isPunishment && typeof currentWarnings === "number";
+  if (isAutoKick) {
+    bottom.push(`🚨 Due to reaching ${currentWarnings} warning${currentWarnings === 1 ? "" : "s"}, this user has been auto-kicked.`);
+  }
+  bottom.push(`🔎 User ID: ${targetId}`);
+
+  const toTitleCase = (s) => String(s || "").replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.substr(1));
+  const actionTitle = toTitleCase(action);
 
   const embed = new EmbedBuilder()
     .setColor(color)
     .setAuthor({ name: modTag, iconURL: modUser?.displayAvatarURL ? modUser.displayAvatarURL({ dynamic: true }) : undefined })
     .setTitle(targetTag)
-    .setDescription(lines.join("\n"))
+    .setDescription([main.join("\n"), bottom.length ? "\n" + bottom.join("\n") : null].filter(Boolean).join(""))
     .addFields(
-      { name: "Action", value: `**${action}**`, inline: true },
-      { name: "Target", value: `<@${targetId}> (${targetId})`, inline: true },
-      { name: "Moderator", value: `<@${modId}>`, inline: true }
+      { name: "Action", value: `**${actionTitle}**` },
+      { name: "Target", value: `<@${targetId}>` },
+      { name: "Moderator", value: `<@${modId}>` }
     )
     .setTimestamp();
 
-  const avatarUrl = targetUser?.displayAvatarURL ? targetUser.displayAvatarURL({ dynamic: true, size: 1024 }) : null;
-  if (avatarUrl) embed.setImage(avatarUrl);
+  const avatarUrl = targetUser?.displayAvatarURL ? targetUser.displayAvatarURL({ dynamic: true, size: 256 }) : null;
+  if (avatarUrl) embed.setThumbnail(avatarUrl);
 
   try {
     return await channel.send({ embeds: [embed] });

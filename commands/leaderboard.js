@@ -45,7 +45,7 @@ async function handleLeaderboardCommand(client, message) {
       // Last resort: use existing level keys present
       pool = Object.keys(levels);
     }
-    const n = Math.min(10, pool.length);
+    const n = Math.min(50, pool.length);
     const chosen = new Set();
     while (chosen.size < n && chosen.size < pool.length) chosen.add(pickRandom(pool));
     entries = Array.from(chosen).map(userId => {
