@@ -110,23 +110,17 @@ async function handleHelpCommand(client, message) {
     try {
       const id = interaction.customId;
 
-      // Moderation gate (no ack yet; reply ephemerally if blocked)
-      if (id === "help_moderation") {
-        const isMod = interaction.member && isModerator(interaction.member);
-        const isOwner = interaction.user.id === OWNER_ID;
-        if (!isMod && !isOwner) {
-          await interaction.reply({ content: "Only Moderators can use this", ephemeral: true }).catch(() => {});
-          return;
-        }
-      }
-
       // Open Config (owner only)
       if (id === "help_config") {
         if (interaction.user.id !== OWNER_ID) {
           await interaction.reply({ content: "Only the Owner can use this", ephemeral: true }).catch(() => {});
           return;
         }
-        // Ack fast, then replace with config menu
+
+        // Stop this collector first so its 'end' handler won't race and delete after we switch
+        try { collector.stop("switch"); } catch {}
+
+        // Ack, delete help, then open config
         await interaction.deferUpdate();
         await replyMsg.delete().catch(() => {});
         const fakeMessage = {
@@ -138,6 +132,16 @@ async function handleHelpCommand(client, message) {
         };
         await handleMessageCreate(client, fakeMessage);
         return;
+      }
+
+      // Moderation gate (no ack yet; reply ephemerally if blocked)
+      if (id === "help_moderation") {
+        const isMod = interaction.member && isModerator(interaction.member);
+        const isOwner = interaction.user.id === OWNER_ID;
+        if (!isMod && !isOwner) {
+          await interaction.reply({ content: "Only Moderators can use this", ephemeral: true }).catch(() => {});
+          return;
+        }
       }
 
       // Category buttons
@@ -185,7 +189,7 @@ async function handleHelpCommand(client, message) {
 
       await interaction.reply({ content: `${EMOJI_ERROR} Please provide a valid input.`, ephemeral: true }).catch(() => {});
     } catch (err) {
-      try { await interaction.reply({ content: `${EMOJI_ERROR} Something went wrong.`, ephemeral: true }); } catch {}
+      try { await interaction.reply({ content: "❌ Something went wrong.", ephemeral: true }); } catch {}
     }
   });
 }

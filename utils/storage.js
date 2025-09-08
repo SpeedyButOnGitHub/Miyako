@@ -16,7 +16,9 @@ const defaultConfig = {
   testingMode: false,
   roleLogBlacklist: [],
   snipeMode: "whitelist",
-  snipingChannelList: []
+  snipingChannelList: [],
+  // Map of level -> roleId
+  levelRewards: {}
 };
 
 function validateConfig(cfg) {
@@ -30,6 +32,20 @@ function validateConfig(cfg) {
   if (!Array.isArray(cfg.roleLogBlacklist)) cfg.roleLogBlacklist = [];
   if (!["whitelist", "blacklist"].includes(cfg.snipeMode)) cfg.snipeMode = "whitelist";
   if (!Array.isArray(cfg.snipingChannelList)) cfg.snipingChannelList = [];
+  if (typeof cfg.levelRewards !== "object" || cfg.levelRewards === null) cfg.levelRewards = {};
+  // Sanitize levelRewards: ensure string numeric keys mapping to arrays of role IDs (strings)
+  const cleanedRewards = {};
+  for (const [lvl, val] of Object.entries(cfg.levelRewards)) {
+    const n = Number(lvl);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    const arr = Array.isArray(val) ? val : (val ? [val] : []);
+    const roleIds = arr
+      .map(v => (typeof v === "string" ? v : String(v || "")))
+      .map(s => s.replace(/[^0-9]/g, ""))
+      .filter(s => s.length > 0);
+    if (roleIds.length) cleanedRewards[String(n)] = Array.from(new Set(roleIds));
+  }
+  cfg.levelRewards = cleanedRewards;
   // escalation sub-keys
   if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
   if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;

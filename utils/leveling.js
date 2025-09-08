@@ -1,4 +1,5 @@
 const { addXP, saveLevels } = require("./levels");
+const { config } = require("./storage");
 
 const userCooldowns = new Map();
 const userModifiers = new Map();
@@ -39,10 +40,20 @@ async function handleLeveling(message, LEVEL_ROLES = {}) {
     userCooldowns.set(userId, now);
 
     if (leveledUp) {
-      const roleId = LEVEL_ROLES[leveledUp];
-      if (roleId) {
+      const key = String(leveledUp);
+      const configured = config.levelRewards ? config.levelRewards[key] : null;
+      const rewards = Array.isArray(configured)
+        ? configured
+        : (configured ? [configured] : (LEVEL_ROLES[leveledUp] ? [LEVEL_ROLES[leveledUp]] : []));
+      if (rewards.length) {
         const member = await message.guild.members.fetch(userId).catch(() => null);
-        if (member) await member.roles.add(roleId).catch(() => {});
+        if (member) {
+          for (const roleId of rewards) {
+            if (!member.roles.cache.has(roleId)) {
+              await member.roles.add(roleId).catch(() => {});
+            }
+          }
+        }
       }
       await message.reply(`🎉 Congrats <@${userId}>, you reached level ${leveledUp}!`).catch(() => {});
     }

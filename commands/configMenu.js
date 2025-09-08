@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, StringSelectMenuBuilder } = require("discord.js");
 const { config, saveConfig } = require("../utils/storage");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
 const { OWNER_ID } = require("./moderation/permissions");
@@ -75,6 +75,29 @@ const configCategories = {
       }
     }
   }
+  ,
+  Leveling: {
+    description: "Settings for the leveling system.",
+    settings: {
+      LevelRewards: {
+        description: "Configure roles automatically granted at levels. Supports multiple roles per level.",
+        getDisplay: () => {
+          const entries = Object.entries(config.levelRewards || {});
+          if (!entries.length) return "*None*";
+          entries.sort((a,b) => Number(a[0]) - Number(b[0]));
+          return entries.map(([lvl, roleIds]) => {
+            const list = (Array.isArray(roleIds) ? roleIds : [roleIds]).map(id => `<@&${id}>`).join(", ");
+            return `Lvl ${lvl} → ${list}`;
+          }).join("\n");
+        },
+        buttons: [
+          { id: "addLevel", label: "Add level", style: ButtonStyle.Success },
+          { id: "addReward", label: "Add rewards", style: ButtonStyle.Success },
+          { id: "removeReward", label: "Remove rewards", style: ButtonStyle.Danger }
+        ]
+      }
+    }
+  }
 };
 
 // Helper to format a setting embed with buttons
@@ -104,8 +127,15 @@ function renderSettingEmbed(categoryName, settingKey) {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  // Only add Help Menu button if NOT ModeratorRoles or RoleLogBlacklist
-  if (!(categoryName === "Moderation" && (settingKey === "ModeratorRoles" || settingKey === "RoleLogBlacklist"))) {
+  // SHOW Help only when not in Sniping SnipeMode/ChannelList (and not in the excluded Moderation settings)
+  const shouldShowHelp =
+    !(
+      (categoryName === "Sniping" && (settingKey === "SnipeMode" || settingKey === "ChannelList")) ||
+      (categoryName === "Moderation" && (settingKey === "ModeratorRoles" || settingKey === "RoleLogBlacklist")) ||
+      (categoryName === "Leveling" && (settingKey === "LevelRewards"))
+    );
+
+  if (shouldShowHelp) {
     itemRow.addComponents(
       new ButtonBuilder()
         .setCustomId("config_help")
@@ -175,10 +205,7 @@ async function handleMessageCreate(client, message) {
 
   function startCollector() {
     if (collector) collector.stop("reset");
-    collector = mainMsg.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      time: collectorTimeout
-    });
+  collector = mainMsg.createMessageComponentCollector({ time: collectorTimeout });
 
     collector.on("collect", async interaction => {
       if (String(interaction.user.id) !== String(OWNER_ID)) {
@@ -186,18 +213,145 @@ async function handleMessageCreate(client, message) {
         return;
       }
 
+      // Handle select menus for LevelRewards flow
+  if (interaction.isStringSelectMenu()) {
+        // Pick level to remove from
+        if (interaction.customId === "lr_pickLevel") {
+          const levelStr = interaction.values[0];
+          const roles = Array.isArray(config.levelRewards[levelStr]) ? config.levelRewards[levelStr] : (config.levelRewards[levelStr] ? [config.levelRewards[levelStr]] : []);
+          const valid = roles.filter(id => interaction.guild.roles.cache.has(id));
+          if (!valid.length) {
+            await interaction.update({
+              embeds: [new EmbedBuilder().setTitle("⚙️ Leveling — LevelRewards").setColor(0x5865F2).setDescription(`No valid roles configured for level ${levelStr}.`)],
+              components: [
+                new ActionRowBuilder().addComponents(
+                  new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary)
+                )
+              ]
+            }).catch(() => {});
+            return;
+          }
+
+          const select = new StringSelectMenuBuilder()
+            .setCustomId(`lr_pickRoles_${levelStr}`)
+            .setPlaceholder(`Select reward roles to remove (level ${levelStr})`)
+            .setMinValues(1)
+            .setMaxValues(Math.min(25, valid.length))
+            .addOptions(valid.slice(0, 25).map(id => ({ label: interaction.guild.roles.cache.get(id)?.name || id, value: id })));
+
+          const embed = new EmbedBuilder()
+            .setTitle(`⚙️ Leveling — Remove rewards for level ${levelStr}`)
+            .setColor(0x5865F2)
+            .setDescription(`Select one or more rewards to remove. Selecting all will clear the level.`);
+
+          await interaction.update({
+            embeds: [embed],
+            components: [
+              new ActionRowBuilder().addComponents(select),
+              new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary)
+              )
+            ]
+          }).catch(() => {});
+          return;
+        }
+
+        // Remove selected roles for given level
+        if (interaction.customId.startsWith("lr_pickRoles_")) {
+          const levelStr = interaction.customId.substring("lr_pickRoles_".length);
+          const selected = interaction.values;
+          const current = Array.isArray(config.levelRewards[levelStr]) ? config.levelRewards[levelStr] : (config.levelRewards[levelStr] ? [config.levelRewards[levelStr]] : []);
+          const filtered = current.filter(id => !selected.includes(id));
+          if (filtered.length) config.levelRewards[levelStr] = Array.from(new Set(filtered)); else delete config.levelRewards[levelStr];
+          saveConfig();
+
+          const { embed, row } = renderSettingEmbed("Leveling", "LevelRewards");
+          await interaction.update({ embeds: [embed], components: [row] }).catch(() => {});
+          return;
+        }
+
+        // Add rewards: pick a level to add roles to
+        if (interaction.customId === "lr_add_pickLevel") {
+          const levelStr = interaction.values[0];
+          const embed = new EmbedBuilder()
+            .setTitle(`⚙️ Leveling — Add rewards for level ${levelStr}`)
+            .setColor(0x5865F2)
+            .setDescription("Type the role(s) to add: mention them or paste role IDs, separated by spaces.");
+
+          await interaction.update({
+            embeds: [embed],
+            components: [
+              new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary)
+              )
+            ]
+          }).catch(() => {});
+
+          // Wait for owner input
+          const filter = m => m.author.id === OWNER_ID && m.channel.id === interaction.channel.id;
+          const collected = await interaction.channel.awaitMessages({ filter, max: 1, time: 20000 }).catch(() => null);
+          const msg = collected && collected.first ? collected.first() : null;
+          if (!msg) {
+            await interaction.followUp({ content: `${EMOJI_ERROR} No input provided.`, ephemeral: true }).catch(() => {});
+            return;
+          }
+          const parts = msg.content.trim().split(/\s+/);
+          const mentioned = [...msg.mentions.roles.keys()];
+          const idsFromText = parts.map(p => p.replace(/[^0-9]/g, "")).filter(Boolean);
+          const roleIds = Array.from(new Set([...mentioned, ...idsFromText]));
+          if (!roleIds.length) {
+            await interaction.followUp({ content: `${EMOJI_ERROR} No roles provided.`, ephemeral: true }).catch(() => {});
+            await msg.delete().catch(() => {});
+            return;
+          }
+          const validIds = roleIds.filter(id => interaction.guild.roles.cache.has(id));
+          if (!validIds.length) {
+            await interaction.followUp({ content: `${EMOJI_ERROR} None of the provided roles exist in this server.`, ephemeral: true }).catch(() => {});
+            await msg.delete().catch(() => {});
+            return;
+          }
+          const current = Array.isArray(config.levelRewards[levelStr]) ? config.levelRewards[levelStr] : (config.levelRewards[levelStr] ? [config.levelRewards[levelStr]] : []);
+          const merged = Array.from(new Set([...(current || []), ...validIds]));
+          config.levelRewards[levelStr] = merged;
+          saveConfig();
+          await interaction.followUp({ content: `${EMOJI_SUCCESS} Added to level ${levelStr}: ${validIds.map(id => `<@&${id}>`).join(', ')}`, ephemeral: true }).catch(() => {});
+          const { embed: backEmbed, row } = renderSettingEmbed("Leveling", "LevelRewards");
+          await interaction.message.edit({ embeds: [backEmbed], components: [row] }).catch(() => {});
+          await msg.delete().catch(() => {});
+          return;
+        }
+      }
+
+      // Handle button interactions
+      if (!interaction.isButton()) return;
+
       // Help Menu button
       if (interaction.customId === "config_help") {
-        await interaction.deferUpdate();
+        // Stop this collector with a custom reason so the 'end' handler won't delete anything
+        try { collector.stop("switch"); } catch {}
+
+        // remove this menu from activeMenus
+        try {
+          activeMenus = activeMenus.filter(
+            m => m.messageId !== mainMsg.id && m.commandId !== message.id
+          );
+          fs.writeFileSync(ACTIVE_MENUS_FILE, JSON.stringify(activeMenus, null, 2));
+        } catch {}
+
+        // delete the current config menu and the triggering .config command
+        await interaction.message.delete().catch(() => {});
+        await message.delete().catch(() => {});
+
+        // open help menu
+        const { handleHelpCommand } = require("./help");
         const fakeHelpMsg = {
-          author: { id: interaction.user.id },
+          author: interaction.user,
           guild: interaction.guild,
           channel: interaction.channel,
           reply: (...args) => interaction.channel.send(...args)
         };
-        const { handleHelpCommand } = require("./help");
         await handleHelpCommand(client, fakeHelpMsg);
-        return startCollector();
+        return; // do not restart this collector
       }
 
       // Back to main menu
@@ -294,31 +448,23 @@ async function handleMessageCreate(client, message) {
           return;
         }
 
-        // CHANGED: explicit SnipeMode toggle with the new IDs
+        // Sniping: toggle mode
         if (categoryName === "Sniping" && settingKey === "SnipeMode" && (action === "modeWhitelist" || action === "modeBlacklist")) {
           const newMode = action === "modeWhitelist" ? "whitelist" : "blacklist";
           if (config.snipeMode !== newMode) {
             config.snipeMode = newMode;
             saveConfig();
           }
-          await interaction.reply({ content: `Snipe mode set to ${config.snipeMode}.`, ephemeral: true }).catch(() => {});
-          // Refresh the SnipeMode view
-          const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-          await interaction.message.edit({ embeds: [embed], components: [row] }).catch(() => {});
-          return;
+          const { embed, row } = renderSettingEmbed("Sniping", "SnipeMode");
+          await interaction.update({ embeds: [embed], components: [row] }).catch(() => {});
+          return startCollector();
         }
 
-        if (
-          type === "settingButton" &&
-          categoryName === "Sniping" &&
-          settingKey === "ChannelList" &&
-          (action === "addChannel" || action === "removeChannel")
-        ) {
+        // Sniping: channel list add/remove
+        if (categoryName === "Sniping" && settingKey === "ChannelList" && (action === "addChannel" || action === "removeChannel")) {
           await interaction.reply({ content: `Please mention or type the channel ID to ${action === "addChannel" ? "add" : "remove"}:`, ephemeral: true });
-
-          // Wait for the next message from the owner in this channel
           const filter = m => m.author.id === OWNER_ID && m.channel.id === interaction.channel.id;
-          const collected = await interaction.channel.awaitMessages({ filter, max: 1, time: 15000 });
+          const collected = await interaction.channel.awaitMessages({ filter, max: 1, time: 20000 });
           const msg = collected.first();
           if (!msg) {
             await interaction.followUp({ content: `${EMOJI_ERROR} No channel provided.`, ephemeral: true });
@@ -332,54 +478,124 @@ async function handleMessageCreate(client, message) {
             return;
           }
 
-          if (config.snipeMode === "whitelist") {
-            if (action === "addChannel") {
-              if (!config.snipingWhitelist.includes(channelId)) {
-                config.snipingWhitelist.push(channelId);
-                saveConfig();
-                await interaction.followUp({ content: `${EMOJI_SUCCESS} Channel <#${channelId}> added to whitelist.`, ephemeral: true });
-              } else {
-                await interaction.followUp({ content: `${EMOJI_ERROR} Channel already in whitelist.`, ephemeral: true });
-              }
+          const listKey = config.snipeMode === "whitelist" ? "snipingWhitelist" : "snipingChannelList";
+          const list = config[listKey] || [];
+          if (action === "addChannel") {
+            if (!list.includes(channelId)) {
+              list.push(channelId);
+              config[listKey] = list;
+              saveConfig();
+              await interaction.followUp({ content: `${EMOJI_SUCCESS} Channel <#${channelId}> added.`, ephemeral: true });
             } else {
-              if (config.snipingWhitelist.includes(channelId)) {
-                config.snipingWhitelist = config.snipingWhitelist.filter(id => id !== channelId);
-                saveConfig();
-                await interaction.followUp({ content: `${EMOJI_SUCCESS} Channel <#${channelId}> removed from whitelist.`, ephemeral: true });
-              } else {
-                await interaction.followUp({ content: `${EMOJI_ERROR} Channel not in whitelist.`, ephemeral: true });
-              }
+              await interaction.followUp({ content: `${EMOJI_ERROR} Channel already listed.`, ephemeral: true });
             }
           } else {
-            // blacklist mode
-            if (action === "addChannel") {
-              if (!config.snipingChannelList.includes(channelId)) {
-                config.snipingChannelList.push(channelId);
-                saveConfig();
-                await interaction.followUp({ content: `${EMOJI_SUCCESS} Channel <#${channelId}> added to blacklist.`, ephemeral: true });
-              } else {
-                await interaction.followUp({ content: `${EMOJI_ERROR} Channel already in blacklist.`, ephemeral: true });
-              }
+            if (list.includes(channelId)) {
+              config[listKey] = list.filter(id => id !== channelId);
+              saveConfig();
+              await interaction.followUp({ content: `${EMOJI_SUCCESS} Channel <#${channelId}> removed.`, ephemeral: true });
             } else {
-              if (config.snipingChannelList.includes(channelId)) {
-                config.snipingChannelList = config.snipingChannelList.filter(id => id !== channelId);
-                saveConfig();
-                await interaction.followUp({ content: `${EMOJI_SUCCESS} Channel <#${channelId}> removed from blacklist.`, ephemeral: true });
-              } else {
-                await interaction.followUp({ content: `${EMOJI_ERROR} Channel not in blacklist.`, ephemeral: true });
-              }
+              await interaction.followUp({ content: `${EMOJI_ERROR} Channel not in list.`, ephemeral: true });
             }
           }
 
-          // Refresh menu
-          const { embed, row } = renderSettingEmbed(categoryName, settingKey);
+          const { embed, row } = renderSettingEmbed("Sniping", "ChannelList");
           await interaction.message.edit({ embeds: [embed], components: [row] }).catch(() => {});
           await msg.delete().catch(() => {});
-          return;
+          return startCollector();
         }
 
-        // Moderation role/blacklist add/remove (same pattern as above)
-        // ...existing moderation logic...
+        // Leveling: add rewards -> open level select flow
+        if (categoryName === "Leveling" && settingKey === "LevelRewards" && action === "addReward") {
+          const levelKeys = Object.keys(config.levelRewards || {}).sort((a,b) => Number(a) - Number(b));
+          if (!levelKeys.length) {
+            await interaction.reply({ content: `${EMOJI_ERROR} No levels configured yet. Use 'Add level' first.`, ephemeral: true }).catch(() => {});
+            return;
+          }
+
+          const levelSelect = new StringSelectMenuBuilder()
+            .setCustomId("lr_add_pickLevel")
+            .setPlaceholder("Select a level to add rewards to")
+            .setMinValues(1)
+            .setMaxValues(1)
+            .addOptions(levelKeys.slice(0,25).map(lvl => ({ label: `Level ${lvl}`, value: String(lvl) })));
+
+          const embed = new EmbedBuilder()
+            .setTitle("⚙️ Leveling — Choose level")
+            .setColor(0x5865F2)
+            .setDescription("Pick a level. You’ll then type the role(s) to add.");
+
+          await interaction.update({
+            embeds: [embed],
+            components: [
+              new ActionRowBuilder().addComponents(levelSelect),
+              new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary))
+            ]
+          }).catch(() => {});
+          return startCollector();
+        }
+
+        // Leveling: add level
+        if (categoryName === "Leveling" && settingKey === "LevelRewards" && action === "addLevel") {
+          await interaction.reply({ content: "Enter a level number to add:", ephemeral: true }).catch(() => {});
+          const filter = m => m.author.id === OWNER_ID && m.channel.id === interaction.channel.id;
+          const collected = await interaction.channel.awaitMessages({ filter, max: 1, time: 20000 }).catch(() => null);
+          const msg = collected && collected.first ? collected.first() : null;
+          if (!msg) {
+            await interaction.followUp({ content: `${EMOJI_ERROR} No input provided.`, ephemeral: true }).catch(() => {});
+            return;
+          }
+          const levelNum = Number(msg.content.trim());
+          if (!Number.isFinite(levelNum) || levelNum <= 0) {
+            await interaction.followUp({ content: `${EMOJI_ERROR} Invalid level.`, ephemeral: true }).catch(() => {});
+            await msg.delete().catch(() => {});
+            return;
+          }
+          const key = String(levelNum);
+          if (!config.levelRewards[key]) {
+            config.levelRewards[key] = [];
+            saveConfig();
+            await interaction.followUp({ content: `${EMOJI_SUCCESS} Added level ${levelNum}.`, ephemeral: true }).catch(() => {});
+          } else {
+            await interaction.followUp({ content: `${EMOJI_ERROR} Level ${levelNum} already exists.`, ephemeral: true }).catch(() => {});
+          }
+          const { embed, row } = renderSettingEmbed("Leveling", "LevelRewards");
+          await interaction.message.edit({ embeds: [embed], components: [row] }).catch(() => {});
+          await msg.delete().catch(() => {});
+          return startCollector();
+        }
+
+        // Leveling: remove rewards -> open select flow
+        if (categoryName === "Leveling" && settingKey === "LevelRewards" && action === "removeReward") {
+          const levelKeys = Object.keys(config.levelRewards || {}).sort((a,b) => Number(a) - Number(b));
+          if (!levelKeys.length) {
+            await interaction.reply({ content: `${EMOJI_ERROR} No levels have rewards configured.`, ephemeral: true });
+            return;
+          }
+
+          const levelSelect = new StringSelectMenuBuilder()
+            .setCustomId("lr_pickLevel")
+            .setPlaceholder("Select a level to remove rewards from")
+            .setMinValues(1)
+            .setMaxValues(1)
+            .addOptions(levelKeys.slice(0,25).map(lvl => ({ label: `Level ${lvl}`, value: String(lvl) })));
+
+          const embed = new EmbedBuilder()
+            .setTitle("⚙️ Leveling — Choose level")
+            .setColor(0x5865F2)
+            .setDescription("Pick a level. You’ll then choose the specific rewards to remove.");
+
+          await interaction.update({
+            embeds: [embed],
+            components: [
+              new ActionRowBuilder().addComponents(levelSelect),
+              new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary))
+            ]
+          }).catch(() => {});
+          return startCollector();
+        }
+
+        // Other settings could be handled here...
       }
 
       // Reset collector timer after any button interaction
@@ -387,10 +603,14 @@ async function handleMessageCreate(client, message) {
     });
 
     collector.on("end", async (_, reason) => {
-      if (reason !== "reset") {
+      // Do not delete anything if we intentionally switched menus or reset
+      if (reason === "switch" || reason === "reset") return;
+
+      // Otherwise, old behavior: clean up stale menu
+      try {
         await mainMsg.delete().catch(() => {});
         await message.delete().catch(() => {});
-        // Remove from activeMenus.json
+      } finally {
         activeMenus = activeMenus.filter(
           m => m.messageId !== mainMsg.id && m.commandId !== message.id
         );
