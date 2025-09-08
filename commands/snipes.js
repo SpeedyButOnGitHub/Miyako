@@ -120,16 +120,26 @@ async function handleSnipeCommands(client, message, command, args) {
   }
 
   if (content === ".snipe" || content === ".s") {
+<<<<<<< HEAD
     // Respect mode: whitelist uses snipingWhitelist, blacklist uses snipingChannelList
+=======
+    // Use config.snipeMode and config.snipingChannelList for channel access
+    let allowed = false;
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
     if (config.snipeMode === "blacklist") {
-      if (config.snipingChannelList.includes(message.channel.id)) {
-        return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
-      }
+      allowed = !config.snipingChannelList.includes(message.channel.id);
     } else {
+<<<<<<< HEAD
       const list = Array.isArray(config.snipingWhitelist) ? config.snipingWhitelist : [];
       if (!list.includes(message.channel.id)) {
         return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
       }
+=======
+      allowed = config.snipingChannelList.includes(message.channel.id);
+    }
+    if (!allowed) {
+      return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
     }
 
     if (deletedSnipes.has(message.channel.id)) {

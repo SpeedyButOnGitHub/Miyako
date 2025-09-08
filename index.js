@@ -1,4 +1,5 @@
 require("dotenv/config");
+<<<<<<< HEAD
 const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
@@ -16,6 +17,14 @@ const BOT_STATUS_FILE = path.resolve(__dirname, "./config/botStatus.json");
 const STATUS_CHANNEL_ID = "1413966369296220233";
 const ACTIVE_MENUS_FILE = path.resolve(__dirname, "./config/activeMenus.json");
 
+=======
+const { Client, GatewayIntentBits, Partials } = require("discord.js");
+const { config, saveConfig } = require("./utils/storage");
+const { sendBotStatusMessage, setStatusChannelName } = require("./utils/botStatus");
+const { startScheduler } = require("./utils/scheduler");
+
+// Create Discord client
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -26,6 +35,7 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
+<<<<<<< HEAD
 async function sendBotStatusMessage() {
   let lastOnline = 0;
   if (fs.existsSync(BOT_STATUS_FILE)) {
@@ -105,9 +115,30 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
   });
 }
 
+=======
+// Handle shutdown signals and uncaught exceptions
+require("./utils/processHandlers")(client);
+
+// Register event handlers
+require("./events/messageEvents")(client);
+require("./events/guildEvents")(client);
+require("./events/interactionEvents")(client);
+
+// Cleanup active menus saved from previous runs
+require("./utils/activeMenus").cleanupActiveMenus(client);
+
+// Start the schedule system
+startScheduler(client);
+
+// Login
+client.login(process.env.DISCORD_TOKEN);
+
+// On ready
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
 client.once("ready", async () => {
   config.testingMode = false; saveConfig();
   console.log(`✅ Logged in as ${client.user.tag}`);
+<<<<<<< HEAD
   await sendBotStatusMessage();
   await setStatusChannelName(true);
   // Changelog now included inside the status embed above
@@ -135,5 +166,12 @@ client.once("ready", async () => {
 attachMessageEvents(client);
 attachGuildEvents(client);
 attachInteractionEvents(client);
+=======
+  await sendBotStatusMessage(client);
+  await setStatusChannelName(client, true);
+  // Any other startup logic...
+});
+
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
 
 client.login(process.env.DISCORD_TOKEN);

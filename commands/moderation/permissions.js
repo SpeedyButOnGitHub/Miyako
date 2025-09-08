@@ -21,7 +21,11 @@ const CHATBOX_BUTTON_ID = "staffteam_chatbox";
 
 function isModerator(member) {
   if (!member) return false;
-  return config.moderatorRoles.some(roleId => member.roles.cache.has(roleId)) || member.id === OWNER_ID;
+  return (
+    config.moderatorRoles.some(roleId => member.roles.cache.has(roleId)) ||
+    (config.escalation?.moderatorRoles || []).some(roleId => member.roles.cache.has(roleId)) ||
+    member.id === OWNER_ID
+  );
 }
 
 module.exports = {

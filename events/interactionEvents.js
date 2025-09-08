@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const { InteractionType, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require("discord.js");
 const { ALLOWED_ROLES, CHATBOX_BUTTON_ID } = require("../commands/moderation/permissions");
 const { handleWarningButtons } = require("../commands/moderation/index");
@@ -152,3 +153,46 @@ function attachInteractionEvents(client) {
 }
 
 module.exports = { attachInteractionEvents };
+=======
+const { handleWarningButtons } = require("../commands/moderation/warnings");
+const { handleScheduleModal } = require("../commands/schedule");
+
+module.exports = function(client) {
+  client.on("interactionCreate", async (interaction) => {
+    try {
+      // Handle warning buttons and modals
+      if (
+        interaction.isButton() &&
+        (interaction.customId.startsWith("addwarn_") || interaction.customId.startsWith("removewarn_"))
+      ) {
+        await handleWarningButtons(client, interaction);
+        return;
+      }
+
+      if (
+        interaction.type === interaction.constructor.InteractionType.ModalSubmit &&
+        (interaction.customId.startsWith("addwarn_") || interaction.customId.startsWith("removewarn_"))
+      ) {
+        await handleWarningButtons(client, interaction);
+        return;
+      }
+
+      if (
+        interaction.type === interaction.constructor.InteractionType.ModalSubmit &&
+        interaction.customId.startsWith("schedule_create_modal")
+      ) {
+        await handleScheduleModal(interaction);
+        return;
+      }
+
+      // Add other interaction handlers here as needed
+
+    } catch (err) {
+      console.error("Error handling interaction:", err);
+      if (interaction.isRepliable()) {
+        await interaction.reply({ content: "An error occurred while handling this interaction.", ephemeral: true });
+      }
+    }
+  });
+};
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92

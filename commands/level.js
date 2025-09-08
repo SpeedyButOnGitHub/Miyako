@@ -2,6 +2,7 @@ const { getXP, getLevel } = require("../utils/levels");
 const ActiveMenus = require("../utils/activeMenus");
 const { buildRows } = require("./profile");
 const { EmbedBuilder } = require("discord.js");
+<<<<<<< HEAD
 const { buildLeaderboardEmbed } = require("./profile"); // type-only context
 const { levels: levelsObj } = require("../utils/levels");
 const { buildLeaderboardEmbed: _ignore, buildRows: _ignore2 } = require("./profile");
@@ -9,6 +10,9 @@ const { buildRankEmbed } = (() => {
   // pull from profile module exports by require cache
   try { return require("./profile"); } catch { return {}; }
 })();
+=======
+const { getXP, getLevel, levels } = require("../utils/leveling");
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
 
 function getLevelXP(level) {
   const BASE_XP = 150; // keep in sync with utils/levels addXP
@@ -41,6 +45,7 @@ async function handleLevelCommand(client, message) {
     return i === -1 ? null : i + 1;
   })();
 
+<<<<<<< HEAD
   let embed;
   if (buildRankEmbed) {
     // Use shared builder for uniformity
@@ -56,6 +61,20 @@ async function handleLevelCommand(client, message) {
       )
       .setTimestamp();
   }
+=======
+  const embed = new EmbedBuilder()
+    .setTitle(`🌙 Level Info for ${message.member?.displayName || message.author.username}`)
+    .setColor(0x5865F2)
+    .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+    .addFields(
+      { name: "Level", value: `${level}`, inline: true },
+      { name: "XP", value: `${xp}`, inline: true },
+      { name: "XP to Next Level", value: `${xpForNextLevel - xp}`, inline: true },
+    )
+    .addFields({ name: "Progress", value: progressBar })
+    .setFooter({ text: `XP this level: ${xpIntoLevel} / ${xpNeeded}` })
+    .setTimestamp();
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
 
   const rows = buildRows("rank");
   const sent = await message.reply({ embeds: [embed], components: rows }).catch(() => null);

@@ -55,6 +55,18 @@
     "muteThreshold": 2,
     "muteDuration": 7200000,
     "kickThreshold": 3,
+<<<<<<< HEAD
+=======
+    "defaultMuteDuration": 3600000,
+    "modLogChannelId": "1232701768383729791",
+    "testingMode": false,
+    "roleLogBlacklist": [],
+    "snipeMode": "whitelist",
+    "snipingChannelList": [],
+    "snipingWhitelist": [],
+    "moderatorRoles": [],
+    "warnings": {},
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
     "escalation": {
       "muteThreshold": 2,
       "muteDuration": 7200000,

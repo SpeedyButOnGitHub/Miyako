@@ -63,6 +63,8 @@ async function handleModerationCommands(client, message, command, args) {
   const userObj = member ? member.user : user;
 
   const isTesting = !!config.testingMode;
+  // Ensure escalation config exists early (used in checks below)
+  const escalation = config.escalation || {};
 
   // Restriction checks only if NOT in testing mode
   if (!isTesting) {
@@ -71,18 +73,26 @@ async function handleModerationCommands(client, message, command, args) {
       if (member.id === OWNER_ID) return replyError(message, "You cannot moderate the owner.");
       if (member.roles.highest.comparePositionTo(message.member.roles.highest) >= 0 && message.author.id !== OWNER_ID)
         return replyError(message, "You cannot moderate this user due to role hierarchy.");
-      if (config.moderatorRoles.some(roleId => member.roles.cache.has(roleId)))
+      if (config.moderatorRoles.some(roleId => member.roles.cache.has(roleId)) ||
+          (escalation.moderatorRoles || []).some(roleId => member.roles.cache.has(roleId))) {
         return replyError(message, "Cannot moderate this user (they are a configured moderator).");
+      }
     } else {
       if (userObj.id === message.author.id) return replyError(message, "You cannot moderate yourself.");
       if (userObj.id === OWNER_ID) return replyError(message, "You cannot moderate the owner.");
     }
   }
 
+<<<<<<< HEAD
   // Ensure escalation config exists
   const escalation = config.escalation || {};
   const kickThreshold = 5;
   const muteThreshold = 3;
+=======
+  // Escalation thresholds
+  const kickThreshold = typeof escalation.kickThreshold === "number" ? escalation.kickThreshold : 3;
+  const muteThreshold = typeof escalation.muteThreshold === "number" ? escalation.muteThreshold : 2;
+>>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
   const muteDuration = typeof escalation.muteDuration === "number" ? escalation.muteDuration : 2 * 60 * 60 * 1000;
 
   // Parse duration and reason from args (after user mention/user id)
