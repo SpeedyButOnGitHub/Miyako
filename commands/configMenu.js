@@ -5,6 +5,7 @@ const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
 const { OWNER_ID } = require("./moderation/permissions");
 const theme = require("../utils/theme");
 const fs = require("fs");
+const { updateTestingStatus } = require("../utils/testingBanner");
 
 const ACTIVE_MENUS_FILE = "./config/activeMenus.json";
 let activeMenus = [];
@@ -161,6 +162,44 @@ const configCategories = {
           { id: "addReward", label: "Add Rewards", style: ButtonStyle.Success },
           { id: "removeReward", label: "Remove Rewards", style: ButtonStyle.Danger },
           { id: "removeLevel", label: "Remove Level", style: ButtonStyle.Danger }
+        ]
+      }
+    }
+  }
+  ,
+  Testing: {
+    description: "Owner-only testing utilities.",
+    settings: {
+      TestingMode: {
+        description: () => `Toggle testing mode. When enabled, certain logs route to a test channel and the warnings UI can use seeded data. Currently: **${config.testingMode ? "Enabled" : "Disabled"}**`,
+        getDisplay: () => (config.testingMode ? "Enabled" : "Disabled"),
+        getLabel: () => "Testing Mode",
+        getSummary: () => (config.testingMode ? "On" : "Off"),
+        buttons: [
+          { id: "enable", label: "Enable", style: ButtonStyle.Success },
+          { id: "disable", label: "Disable", style: ButtonStyle.Danger }
+        ]
+      },
+      TestingWarnings: {
+        description: () => {
+          const explicitUsers = Object.keys(config.testingWarnings || {}).length;
+          const seededUsers = Object.keys(config.testingSeed || {}).length;
+          return `Manage testing warnings used by the .warnings UI. Explicit: ${explicitUsers}, Seeded: ${seededUsers}.`;
+        },
+        getDisplay: () => {
+          const explicitUsers = Object.keys(config.testingWarnings || {}).length;
+          const seededUsers = Object.keys(config.testingSeed || {}).length;
+          return `Explicit users: ${explicitUsers}\nSeeded users: ${seededUsers}`;
+        },
+        getLabel: () => "Testing Warnings",
+        getSummary: () => {
+          const explicitUsers = Object.keys(config.testingWarnings || {}).length;
+          const seededUsers = Object.keys(config.testingSeed || {}).length;
+          return `${explicitUsers} explicit • ${seededUsers} seeded`;
+        },
+        buttons: [
+          { id: "reseed", label: "Reseed", style: ButtonStyle.Primary },
+          { id: "clear", label: "Clear", style: ButtonStyle.Secondary }
         ]
       }
     }
@@ -674,6 +713,11 @@ async function handleMessageCreate(client, message) {
           const modCount = Array.isArray(config.moderatorRoles) ? config.moderatorRoles.length : 0;
           const blkCount = Array.isArray(config.roleLogBlacklist) ? config.roleLogBlacklist.length : 0;
           description += `\n\n📊 Summary • Mod roles: ${modCount} • Role log blacklist: ${blkCount}`;
+        } else if (categoryName === "Testing") {
+          const tMode = config.testingMode ? 'Enabled' : 'Disabled';
+          const explicitUsers = Object.keys(config.testingWarnings || {}).length;
+          const seededUsers = Object.keys(config.testingSeed || {}).length;
+          description += `\n\n📊 Summary • Mode: ${tMode} • Explicit: ${explicitUsers} • Seeded: ${seededUsers}`;
         }
         description += `\n\n__Current settings:__\n` +
           Object.entries(category.settings)
@@ -742,6 +786,60 @@ async function handleMessageCreate(client, message) {
         if (!setting) {
           await interaction.reply({ content: `${EMOJI_ERROR} Setting not found.`, ephemeral: true }).catch(() => {});
           return;
+        }
+
+        // Testing: enable/disable testing mode
+        if (categoryName === "Testing" && settingKey === "TestingMode" && (action === "enable" || action === "disable")) {
+          const enable = action === "enable";
+          const before = !!config.testingMode;
+          config.testingMode = enable;
+          saveConfig();
+          try { await logConfigChange(client, { user: interaction.user, change: `Testing mode ${before === enable ? 'left as' : 'set to'} ${enable ? 'Enabled' : 'Disabled'}` }); } catch {}
+          try { await updateTestingStatus(interaction.client, enable, interaction.user); } catch {}
+          await interaction.reply({ content: `${EMOJI_SUCCESS} Testing mode ${enable ? 'enabled' : 'disabled'}.`, ephemeral: true }).catch(() => {});
+          const { embed, row } = renderSettingEmbed("Testing", "TestingMode");
+          await interaction.message.edit({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+          return startCollector();
+        }
+
+        // Testing: reseed / clear testing warnings
+        if (categoryName === "Testing" && settingKey === "TestingWarnings" && (action === "reseed" || action === "clear")) {
+          if (action === "clear") {
+            config.testingWarnings = {};
+            config.testingSeed = {};
+            saveConfig();
+            try { await logConfigChange(client, { user: interaction.user, change: `Cleared testing warnings and seed.` }); } catch {}
+            await interaction.reply({ content: `${EMOJI_SUCCESS} Cleared testing warnings.`, ephemeral: true }).catch(() => {});
+          } else {
+            // reseed: generate up to 50 non-bot members with 1–4 random warnings each
+            const members = [...interaction.guild.members.cache.values()].filter(m => !m.user.bot);
+            const limit = Math.min(50, members.length);
+            const pool = members.map(m => m.id);
+            const chosen = new Set();
+            while (chosen.size < limit && chosen.size < pool.length) {
+              const id = pool[Math.floor(Math.random() * pool.length)];
+              chosen.add(id);
+            }
+            const reasons = ["Spam", "Off-topic", "Rude language", "NSFW", "Disrespect", "Harassment", "Trolling"];
+            const seed = {};
+            for (const uid of chosen) {
+              const count = 1 + Math.floor(Math.random() * 4);
+              seed[uid] = Array.from({ length: count }).map(() => ({
+                moderator: uid, // synthetic seed mirrors display-only data
+                reason: reasons[Math.floor(Math.random() * reasons.length)],
+                date: Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)
+              }));
+            }
+            config.testingSeed = seed;
+            // Reset explicit testing warnings so seeded data is visible until edits happen
+            config.testingWarnings = {};
+            saveConfig();
+            try { await logConfigChange(client, { user: interaction.user, change: `Reseeded testing warnings for ${Object.keys(seed).length} users.` }); } catch {}
+            await interaction.reply({ content: `${EMOJI_SUCCESS} Reseeded testing warnings for ${Object.keys(seed).length} users.`, ephemeral: true }).catch(() => {});
+          }
+          const { embed, row } = renderSettingEmbed("Testing", "TestingWarnings");
+          await interaction.message.edit({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+          return startCollector();
         }
 
         // Sniping: toggle mode

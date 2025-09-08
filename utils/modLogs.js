@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const ms = require("ms");
 const { config } = require("./storage");
 const theme = require("./theme");
@@ -115,8 +115,19 @@ async function sendModLog(
   const avatarUrl = targetUser?.displayAvatarURL ? targetUser.displayAvatarURL({ dynamic: true, size: 256 }) : null;
   if (avatarUrl) embed.setThumbnail(avatarUrl);
 
+  // Staff-only quick-action buttons (compact: open submenus)
+  const userIdSafe = String(targetId);
+  const rows = [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`modact:menu:warnings:${userIdSafe}`).setLabel("Warnings").setStyle(ButtonStyle.Secondary).setEmoji("⚠️"),
+      new ButtonBuilder().setCustomId(`modact:menu:mute:${userIdSafe}`).setLabel("Mute").setStyle(ButtonStyle.Secondary).setEmoji("⏰"),
+      new ButtonBuilder().setCustomId(`modact:init:kick:${userIdSafe}`).setLabel("Kick").setStyle(ButtonStyle.Secondary).setEmoji("👢"),
+      new ButtonBuilder().setCustomId(`modact:init:ban:${userIdSafe}`).setLabel("Ban").setStyle(ButtonStyle.Danger).setEmoji("🔨")
+    )
+  ];
+
   try {
-  return await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
+  return await channel.send({ embeds: [embed], components: rows, allowedMentions: { parse: [] } });
   } catch {
     return null;
   }

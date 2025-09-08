@@ -31,7 +31,7 @@
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
-  "testingMode": false,
+  "testingMode": true,
   "roleLogBlacklist": [
     "1232701768329199666",
     "1232701768341655617",
@@ -82,63 +82,26 @@
   ],
   "globalXPMultiplier": 1,
   "testingWarnings": {
-    "349282473085239298": [
+    "432610292342587392": [
       {
         "moderator": "349282473085239298",
-        "reason": "NSFW",
-        "date": 1757194045209
-      },
-      {
-        "moderator": "349282473085239298",
-        "reason": "NSFW",
-        "date": 1757020986334
+        "reason": "No reason provided",
+        "date": 1757336786236,
+        "logMsgId": "1414597754466079004"
       }
-    ],
-    "432610292342587392": []
+    ]
   },
   "testingSeed": {
-    "748278274937061558": [
-      {
-        "moderator": "748278274937061558",
-        "reason": "NSFW",
-        "date": 1757210177885
-      },
-      {
-        "moderator": "748278274937061558",
-        "reason": "Spam",
-        "date": 1757149943646
-      },
-      {
-        "moderator": "748278274937061558",
-        "reason": "Rude language",
-        "date": 1756993614189
-      },
-      {
-        "moderator": "748278274937061558",
-        "reason": "Disrespect",
-        "date": 1757315282459
-      }
-    ],
     "349282473085239298": [
       {
         "moderator": "349282473085239298",
-        "reason": "NSFW",
-        "date": 1757194045209
+        "reason": "Rude language",
+        "date": 1756861900370
       },
       {
         "moderator": "349282473085239298",
-        "reason": "Off-topic",
-        "date": 1757022184122
-      },
-      {
-        "moderator": "349282473085239298",
-        "reason": "Spam",
-        "date": 1757302858199
-      },
-      {
-        "moderator": "349282473085239298",
-        "reason": "NSFW",
-        "date": 1757020986334
+        "reason": "Rude language",
+        "date": 1757260817382
       }
     ]
   }
