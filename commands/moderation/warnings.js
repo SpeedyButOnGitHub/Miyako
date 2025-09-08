@@ -4,6 +4,7 @@ const { sendUserDM } = require("./dm");
 const { sendModLog } = require("../../utils/modLogs");
 const { isModerator } = require("./permissions");
 const { config, saveConfig } = require("../../utils/storage");
+const theme = require("../../utils/theme");
 
 const PAGE_SIZE = 10; // users per page in dashboard
 const MAX_WARNING_LIST = 6; // entries shown inline in user view
@@ -57,20 +58,25 @@ function maybeSeedTestingData(guild) {
   if (hasAny) return;
 
   const members = [...guild.members.cache.values()].filter(m => !m.user.bot);
-  const totalPick = Math.min(12, members.length);
-  for (let i = 0; i < totalPick; i++) {
-    const m = members[Math.floor(Math.random() * members.length)];
-    if (!m) continue;
+  const totalPick = Math.min(50, members.length);
+  // Sample unique members up to totalPick
+  const pool = members.map(m => m.id);
+  const chosen = new Set();
+  while (chosen.size < totalPick && chosen.size < pool.length) {
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    chosen.add(id);
+  }
+  for (const id of chosen) {
     const warns = [];
     const n = 1 + Math.floor(Math.random() * 4);
     for (let j = 0; j < n; j++) {
       warns.push({
-        moderator: m.id,
+        moderator: id,
         reason: ["Spam", "Off-topic", "Rude language", "NSFW", "Disrespect"][Math.floor(Math.random() * 5)],
         date: Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)
       });
     }
-    seed[m.id] = warns;
+    seed[id] = warns;
   }
   config.testingSeed = seed;
   saveConfig();
@@ -140,7 +146,7 @@ function buildDashboardEmbed(guild, page) {
 
   const embed = new EmbedBuilder()
     .setTitle("⚠️Warning Dashboard")
-    .setColor(0x5865F2)
+    .setColor(theme.colors.primary)
     .setDescription(lines)
     .setFooter({ text: `Page ${curPage}/${totalPages}` });
 
@@ -190,7 +196,7 @@ function buildUserView(guild, userId, page = 1, opts = {}) {
   const disclaimer = nxt ? `${nxt.remaining} warning${nxt.remaining === 1 ? "" : "s"} remaining until ${nxt.label}` : null;
   const embed = new EmbedBuilder()
     .setTitle(`⚠️Warnings — ${memberName}`)
-    .setColor(0x5865F2)
+    .setColor(theme.colors.primary)
     .setDescription([baseDesc, disclaimer].filter(Boolean).join("\n\n"))
     .setFooter({ text: `Total: ${total} • Page ${Math.min(page, totalPages)}/${totalPages}` });
 

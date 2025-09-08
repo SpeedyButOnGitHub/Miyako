@@ -3,6 +3,7 @@ const { config } = require("../utils/storage");
 const { levels } = require("../utils/levels");
 const ActiveMenus = require("../utils/activeMenus");
 const { buildLeaderboardEmbed, buildRows } = require("./profile");
+const theme = require("../utils/theme");
 
 function createProgressBar(current, max, size = 14) {
   const safeMax = Math.max(1, max);

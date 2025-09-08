@@ -3,6 +3,7 @@ const { getXP, getLevel } = require("../utils/levels");
 const { getUserModifier } = require("../utils/leveling");
 const { config } = require("../utils/storage");
 const ActiveMenus = require("../utils/activeMenus");
+const theme = require("../utils/theme");
 
 // Map configured level reward roles to human-friendly labels
 const PERMISSION_ROLE_LABELS = {
@@ -92,7 +93,7 @@ function buildRows(view = "main", page = 1, totalPages = 1) {
 function buildRankEmbed(member, rank, level, progressBar) {
   return new EmbedBuilder()
     .setTitle("📊 Your Rank")
-    .setColor(0x5865F2)
+  .setColor(theme.colors.primary)
     .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
     .addFields(
@@ -128,7 +129,7 @@ function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 
     : "";
   return new EmbedBuilder()
     .setTitle("🏆 Leaderboard")
-    .setColor(0xF1C40F)
+  .setColor(theme.colors.warning)
     .setDescription(lines.length ? lines.join("\n") + extra : "No data yet.")
     .setFooter({ text: rank ? `Your rank: #${rank} • Page ${safePage}/${totalPages}` : `Page ${safePage}/${totalPages}` })
     .setTimestamp();
@@ -159,7 +160,7 @@ async function handleProfileCommand(client, message) {
   const permsDisplay = formatPermissionPhrases(userPerms);
 
   const embed = new EmbedBuilder()
-    .setColor(0x00B2FF)
+    .setColor(theme.colors.primary)
     .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
     .setTitle("Your profile")
@@ -249,7 +250,7 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
     .map(n => Number(n)).filter(n => Number.isFinite(n) && n > lvl)
     .sort((a,b) => a-b)[0];
   const pEmbed = new EmbedBuilder()
-    .setColor(0x00B2FF)
+    .setColor(theme.colors.primary)
     .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
     .setTitle("Your profile")

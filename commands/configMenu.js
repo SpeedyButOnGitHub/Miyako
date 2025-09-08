@@ -3,6 +3,7 @@ const { config, saveConfig } = require("../utils/storage");
 const { logConfigChange } = require("../utils/configLogs");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
 const { OWNER_ID } = require("./moderation/permissions");
+const theme = require("../utils/theme");
 const fs = require("fs");
 
 const ACTIVE_MENUS_FILE = "./config/activeMenus.json";
@@ -183,7 +184,7 @@ function renderSettingEmbed(categoryName, settingKey) {
     ? (settingKey.toLowerCase().includes('channel') ? '🗺️' : settingKey.toLowerCase().includes('multiplier') ? '💠' : settingKey.toLowerCase().includes('reward') ? '🎁' : '📈')
     : (categoryName === 'Sniping' ? (settingKey.toLowerCase().includes('channel') ? '🔭' : '🔧') : '🛡️');
   const prettyTitle = `${titleEmoji} ${categoryName} — ${keyLabel}`;
-  const color = categoryName === 'Leveling' ? 0x00B2FF : (categoryName === 'Sniping' ? 0x2b2d31 : 0x5865F2);
+  const color = categoryName === 'Leveling' ? theme.colors.primary : (categoryName === 'Sniping' ? theme.colors.neutral : theme.colors.primary);
   const itemEmbed = new EmbedBuilder()
     .setTitle(prettyTitle)
     .setColor(color)
@@ -251,7 +252,7 @@ async function handleMessageCreate(client, message) {
   // ===== Main Embed =====
   const mainEmbed = new EmbedBuilder()
     .setTitle("⚙️ Bot Configuration")
-    .setColor(0x5865F2)
+    .setColor(theme.colors.primary)
     .setDescription(
       "Welcome to the configuration menu!\n\n" +
       "Select a category below to configure settings.\n\n" +
@@ -311,7 +312,7 @@ async function handleMessageCreate(client, message) {
           const valid = roles.filter(id => interaction.guild.roles.cache.has(id));
           if (!valid.length) {
             await interaction.update({
-              embeds: [new EmbedBuilder().setTitle("⚙️ Leveling — LevelRewards").setColor(0x5865F2).setDescription(`No valid roles configured for level ${levelStr}.`)],
+              embeds: [new EmbedBuilder().setTitle("⚙️ Leveling — LevelRewards").setColor(theme.colors.primary).setDescription(`No valid roles configured for level ${levelStr}.`)],
               components: [
                 new ActionRowBuilder().addComponents(
                   new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary)
@@ -334,7 +335,7 @@ async function handleMessageCreate(client, message) {
 
           const embed = new EmbedBuilder()
             .setTitle(`⚙️ Leveling — Remove rewards for level ${levelStr}`)
-            .setColor(0x5865F2)
+            .setColor(theme.colors.primary)
             .setDescription(`Select one or more rewards to remove. Selecting all will clear the level.`);
 
           await interaction.update({
@@ -369,7 +370,7 @@ async function handleMessageCreate(client, message) {
           const selectedLevels = interaction.values || [];
           const embed = new EmbedBuilder()
             .setTitle("⚠️ Confirm removal")
-            .setColor(0xffaa00)
+            .setColor(theme.colors.warning)
             .setDescription(`Remove the following level${selectedLevels.length > 1 ? 's' : ''} permanently?\n\n${selectedLevels.map(l => `• Level ${l}`).join('\n')}`);
 
           const row = new ActionRowBuilder().addComponents(
@@ -386,7 +387,7 @@ async function handleMessageCreate(client, message) {
           const levelStr = interaction.values[0];
           const embed = new EmbedBuilder()
             .setTitle(`⚙️ Leveling — Add rewards for level ${levelStr}`)
-            .setColor(0x5865F2)
+            .setColor(theme.colors.primary)
             .setDescription("Type the role(s) to add: mention them or paste role IDs, separated by spaces.");
 
           await interaction.update({
@@ -532,7 +533,7 @@ async function handleMessageCreate(client, message) {
 
         const categoryEmbed = new EmbedBuilder()
           .setTitle(`⚙️ ${categoryName} Settings`)
-          .setColor(0x5865F2)
+          .setColor(theme.colors.primary)
           .setDescription(description);
 
         const settingButtons = Object.keys(category.settings).map(key => {
@@ -607,7 +608,7 @@ async function handleMessageCreate(client, message) {
 
         const categoryEmbed = new EmbedBuilder()
           .setTitle(`⚙️ ${categoryName}`)
-          .setColor(0x5865F2)
+          .setColor(theme.colors.primary)
           .setDescription(description);
 
         // Build setting buttons in rows of max 5, and put Back in its own row
@@ -684,7 +685,7 @@ async function handleMessageCreate(client, message) {
 
         const categoryEmbed = new EmbedBuilder()
           .setTitle(`⚙️ ${categoryName}`)
-          .setColor(0x5865F2)
+          .setColor(theme.colors.primary)
           .setDescription(description);
 
         // Build setting buttons in rows of max 5, and put Back in its own row
@@ -948,7 +949,7 @@ async function handleMessageCreate(client, message) {
 
           const embed = new EmbedBuilder()
             .setTitle("⚙️ Leveling — Choose level")
-            .setColor(0x5865F2)
+            .setColor(theme.colors.primary)
             .setDescription("Pick a level. You’ll then type the role(s) to add.");
 
           await interaction.update({
@@ -1012,7 +1013,7 @@ async function handleMessageCreate(client, message) {
 
           const embed = new EmbedBuilder()
             .setTitle("⚙️ Leveling — Choose level")
-            .setColor(0x5865F2)
+            .setColor(theme.colors.primary)
             .setDescription("Pick a level. You’ll then choose the specific rewards to remove.");
 
           await interaction.update({
@@ -1046,7 +1047,7 @@ async function handleMessageCreate(client, message) {
 
           const embed = new EmbedBuilder()
             .setTitle("⚙️ Leveling — Remove level(s)")
-            .setColor(0x5865F2)
+            .setColor(theme.colors.primary)
             .setDescription("Pick one or more levels to remove. This deletes the configured rewards for those levels.");
 
           await interaction.update({
