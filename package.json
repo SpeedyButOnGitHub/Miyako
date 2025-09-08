@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "smoke": "node ./scripts/smoke-load.js"
+  "smoke": "node ./scripts/smoke-load.js",
+  "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.22.1",

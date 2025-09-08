@@ -25,11 +25,21 @@ const categories = [
     ]
   },
   {
+    name: "Leveling",
+    emoji: "🧮",
+    commands: [
+      { name: "Level", value: "`level`\nShows your current level and XP progress." },
+      { name: "Profile", value: "`profile` or `p`\nOpens your profile with progress, bonuses, and rewards." },
+      { name: "Leaderboard", value: "`leaderboard` or `lb`\nShows the top users by level and XP." }
+    ]
+  },
+  {
     name: "Misc",
     emoji: "✨",
     commands: [
       { name: "Snipe", value: "`snipe` or `s`\nShows the last deleted message in this channel." },
       { name: "Delete Snipe", value: "`ds`\nDeletes the last snipe in this channel." },
+      { name: "Scripts Leaderboard", value: "`scripts`\nLists repo .js files by line count with pagination." },
       { name: "Help", value: "`help`\nShows this help menu." }
     ]
   }
@@ -53,8 +63,9 @@ async function handleHelpCommand(client, message) {
     .setTitle("🌙 Command Help Menu")
     .setColor(0x5865F2)
     .setDescription(
-      "Welcome to the help menu!\n\n" +
-      "Select a category below to view available commands.\n\n" +
+  "Welcome to the help menu!\n\n" +
+  "Tip: durations accept values like `30m`, `2h`, `1d`.\n\n" +
+  "Select a category below to view available commands.\n\n" +
       shownCategories.map(cat => `${cat.emoji} **${cat.name}**`).join("\n")
     );
 
@@ -97,13 +108,15 @@ async function handleHelpCommand(client, message) {
     );
   });
   // Config button (owner only)
-  row.addComponents(
-    new ButtonBuilder()
-      .setCustomId("help_config")
-      .setLabel("Config Menu")
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji("⚙️")
-  );
+  if (isOwner) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId("help_config")
+        .setLabel("Config Menu")
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji("⚙️")
+    );
+  }
 
   const replyMsg = await message.reply({ embeds: [embed], components: [row] });
 

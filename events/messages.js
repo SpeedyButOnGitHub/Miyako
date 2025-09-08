@@ -9,6 +9,7 @@ const { handleLeaderboardCommand } = require("../commands/leaderboard");
 const { handleProfileCommand } = require("../commands/profile");
 const { handleLeveling } = require("../utils/leveling");
 const { handleScheduleCommand } = require("../commands/schedule");
+const { handleScriptsCommand } = require("../commands/scripts");
 
 const LEVEL_ROLES = {
   5: "1232701768362754147",
@@ -60,6 +61,8 @@ function attachMessageEvents(client) {
         process.exit(0);
       } else if (command === "schedule") {
         await handleScheduleCommand(client, message);
+      } else if (command === "scripts") {
+        await handleScriptsCommand(client, message);
       }
     } catch (err) {
       console.error(`[Message Command Error]:`, err);

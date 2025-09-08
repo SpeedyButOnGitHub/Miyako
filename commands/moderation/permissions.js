@@ -1,4 +1,5 @@
 const { config } = require("../../utils/storage");
+const { PermissionFlagsBits } = require("discord.js");
 
 const OWNER_ID = process.env.OWNER_ID || "349282473085239298";
 
@@ -21,11 +22,20 @@ const CHATBOX_BUTTON_ID = "staffteam_chatbox";
 
 function isModerator(member) {
   if (!member) return false;
-  return (
-    config.moderatorRoles.some(roleId => member.roles.cache.has(roleId)) ||
-    (config.escalation?.moderatorRoles || []).some(roleId => member.roles.cache.has(roleId)) ||
-    member.id === OWNER_ID
-  );
+  if (String(member.id) === String(OWNER_ID)) return true;
+
+  const roleCache = member.roles?.cache || new Map();
+  const hasRole = (rid) => roleCache.has(rid);
+  const configured = Array.isArray(config.moderatorRoles) ? config.moderatorRoles : [];
+  if (configured.some(hasRole)) return true;
+  if (ALLOWED_ROLES.some(hasRole)) return true;
+
+  if (member.permissions && typeof member.permissions.has === "function") {
+    if (member.permissions.has(PermissionFlagsBits.Administrator) || member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 module.exports = {

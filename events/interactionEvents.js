@@ -556,7 +556,8 @@ function attachInteractionEvents(client) {
             const msg = await interaction.channel.messages.fetch(originMessageId).catch(() => null);
             if (msg) {
               const { embed, row } = renderSettingEmbed(originCategory, originSetting);
-              await msg.edit({ embeds: [embed], components: [row] }).catch(() => {});
+              const components = Array.isArray(row) ? row : [row];
+              await msg.edit({ embeds: [embed], components }).catch(() => {});
             }
           }
         } catch {}

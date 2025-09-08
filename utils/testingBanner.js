@@ -3,7 +3,7 @@ const { CONFIG_LOG_CHANNEL } = require("./logChannels");
 
 async function updateTestingStatus(client, enabled, actor) {
   try {
-  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
+    const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
     if (!channel) return;
 
     const embed = new EmbedBuilder()
@@ -17,7 +17,9 @@ async function updateTestingStatus(client, enabled, actor) {
       .setTimestamp();
 
     await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
-  } catch {}
+  } catch (err) {
+    // noop: avoid throwing on banner update
+  }
 }
 
 module.exports = { updateTestingStatus };
