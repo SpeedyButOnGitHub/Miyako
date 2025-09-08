@@ -116,12 +116,14 @@ async function handleSnipeCommands(client, message, command, args) {
   }
 
   if (content === ".snipe" || content === ".s") {
+    // Respect mode: whitelist uses snipingWhitelist, blacklist uses snipingChannelList
     if (config.snipeMode === "blacklist") {
       if (config.snipingChannelList.includes(message.channel.id)) {
         return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
       }
     } else {
-      if (!config.snipingChannelList.includes(message.channel.id)) {
+      const list = Array.isArray(config.snipingWhitelist) ? config.snipingWhitelist : [];
+      if (!list.includes(message.channel.id)) {
         return message.reply(`${EMOJI_ERROR} Cannot snipe in this channel!`);
       }
     }

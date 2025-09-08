@@ -16,15 +16,6 @@ const configCategories = {
   Sniping: {
     description: "Settings for sniping commands.",
     settings: {
-      SnipeMode: {
-        description: "Choose whether to use a whitelist or blacklist for sniping channels.",
-        getDisplay: () => config.snipeMode === "blacklist" ? "Blacklist" : "Whitelist",
-        buttons: [
-          // CHANGED: use unambiguous IDs
-          { id: "modeWhitelist", label: "Whitelist", style: ButtonStyle.Success },
-          { id: "modeBlacklist", label: "Blacklist", style: ButtonStyle.Danger }
-        ]
-      },
       ChannelList: {
         description: () =>
           config.snipeMode === "blacklist"
@@ -41,9 +32,16 @@ const configCategories = {
               : "*None*";
           }
         },
+  getLabel: () => 'Channels',
+        getSummary: () => {
+          const count = config.snipeMode === 'whitelist'
+            ? (config.snipingWhitelist?.length || 0)
+            : (config.snipingChannelList?.length || 0);
+          return `${count}`;
+        },
         buttons: [
-          { id: "addChannel", label: "Add channel", style: ButtonStyle.Success },
-          { id: "removeChannel", label: "Remove channel", style: ButtonStyle.Danger }
+          { id: "addChannel", label: "Add Channel", style: ButtonStyle.Success },
+          { id: "removeChannel", label: "Remove Channel", style: ButtonStyle.Danger }
         ]
       }
     }
@@ -57,9 +55,14 @@ const configCategories = {
           config.moderatorRoles.length
             ? config.moderatorRoles.map(id => `<@&${id}>`).join("\n")
             : "*None*",
+        getLabel: () => "Moderator Roles",
+        getSummary: () => {
+          const n = config.moderatorRoles?.length || 0;
+          return `${n}`;
+        },
         buttons: [
-          { id: "addRole", label: "Add role", style: ButtonStyle.Success },
-          { id: "removeRole", label: "Remove role", style: ButtonStyle.Danger }
+          { id: "addRole", label: "Add Role", style: ButtonStyle.Success },
+          { id: "removeRole", label: "Remove Role", style: ButtonStyle.Danger }
         ]
       },
       RoleLogBlacklist: {
@@ -68,9 +71,14 @@ const configCategories = {
           (config.roleLogBlacklist && config.roleLogBlacklist.length)
             ? config.roleLogBlacklist.map(id => `<@&${id}>`).join("\n")
             : "*None*",
+        getLabel: () => "Role Log Blacklist",
+        getSummary: () => {
+          const n = config.roleLogBlacklist?.length || 0;
+          return `${n}`;
+        },
         buttons: [
-          { id: "addBlacklistRole", label: "Add role", style: ButtonStyle.Success },
-          { id: "removeBlacklistRole", label: "Remove role", style: ButtonStyle.Danger }
+          { id: "addBlacklistRole", label: "Add Role", style: ButtonStyle.Success },
+          { id: "removeBlacklistRole", label: "Remove Role", style: ButtonStyle.Danger }
         ]
       }
     }
@@ -79,6 +87,57 @@ const configCategories = {
   Leveling: {
     description: "Settings for the leveling system.",
     settings: {
+      LevelingChannels: {
+        description: () =>
+          config.levelingMode === "blacklist"
+            ? "Channels where leveling XP is NOT awarded."
+            : "Channels where leveling XP is awarded.",
+        getDisplay: () => {
+          const list = config.levelingChannelList || [];
+          return list.length ? list.map(id => `<#${id}>`).join("\n") : "*None*";
+        },
+  getLabel: () => 'Channels',
+        getSummary: () => {
+          const n = config.levelingChannelList?.length || 0;
+          return `${n}`;
+        },
+        buttons: [
+          { id: "addChannel", label: "Add Channel", style: ButtonStyle.Success },
+          { id: "removeChannel", label: "Remove Channel", style: ButtonStyle.Danger }
+        ]
+      },
+      RoleXPBlacklist: {
+        description: "Members with these roles will not gain XP.",
+        getDisplay: () => (config.roleXPBlacklist && config.roleXPBlacklist.length)
+          ? config.roleXPBlacklist.map(id => `<@&${id}>`).join("\n")
+          : "*None*",
+        getLabel: () => "Blocked Roles",
+        getSummary: () => {
+          const n = config.roleXPBlacklist?.length || 0;
+          return `${n}`;
+        },
+        buttons: [
+          { id: "addRole", label: "Add Roles", style: ButtonStyle.Success },
+          { id: "removeRole", label: "Remove Roles", style: ButtonStyle.Danger }
+        ]
+      },
+      GlobalXPMultiplier: {
+        description: () => `Set a global XP multiplier applied to all XP gains. Current: **x${(config.globalXPMultiplier ?? 1).toFixed(2)}**`,
+        getDisplay: () => {
+          const mult = typeof config.globalXPMultiplier === 'number' ? config.globalXPMultiplier : 1;
+          const badge = mult > 1 ? "🔥 Boost Active" : (mult === 1 ? "➖ Normal" : "🧪 Custom");
+          return `Multiplier: **x${mult.toFixed(2)}**  •  ${badge}`;
+        },
+        getLabel: () => "XP Multiplier",
+        getSummary: () => {
+          const mult = typeof config.globalXPMultiplier === 'number' ? config.globalXPMultiplier : 1;
+          return `x${mult.toFixed(2)}`;
+        },
+        buttons: [
+          { id: "set", label: "Set Multiplier", style: ButtonStyle.Primary },
+          { id: "reset", label: "Reset to 1x", style: ButtonStyle.Secondary }
+        ]
+      },
       LevelRewards: {
         description: "Configure roles automatically granted at levels. Supports multiple roles per level.",
         getDisplay: () => {
@@ -90,26 +149,69 @@ const configCategories = {
             return `Lvl ${lvl} → ${list}`;
           }).join("\n");
         },
+        getLabel: () => "Level Rewards",
+        getSummary: () => {
+          const levels = Object.keys(config.levelRewards || {}).length;
+          return `${levels} tier${levels === 1 ? '' : 's'}`;
+        },
         buttons: [
-          { id: "addLevel", label: "Add level", style: ButtonStyle.Success },
-          { id: "addReward", label: "Add rewards", style: ButtonStyle.Success },
-          { id: "removeReward", label: "Remove rewards", style: ButtonStyle.Danger }
+          { id: "addLevel", label: "Add Level", style: ButtonStyle.Success },
+          { id: "addReward", label: "Add Rewards", style: ButtonStyle.Success },
+          { id: "removeReward", label: "Remove Rewards", style: ButtonStyle.Danger },
+          { id: "removeLevel", label: "Remove Level", style: ButtonStyle.Danger }
         ]
       }
     }
   }
 };
 
+// Utils: chunk an array into arrays of at most size n
+function chunk(arr, n) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
+}
+
 // Helper to format a setting embed with buttons
 function renderSettingEmbed(categoryName, settingKey) {
   const setting = configCategories[categoryName].settings[settingKey];
 
+  // Prettier titles with emojis per setting
+  const keyLabel = setting.getLabel ? setting.getLabel() : settingKey;
+  const titleEmoji = (categoryName === 'Leveling')
+    ? (settingKey.toLowerCase().includes('channel') ? '🗺️' : settingKey.toLowerCase().includes('multiplier') ? '💠' : settingKey.toLowerCase().includes('reward') ? '🎁' : '📈')
+    : (categoryName === 'Sniping' ? (settingKey.toLowerCase().includes('channel') ? '🔭' : '🔧') : '🛡️');
+  const prettyTitle = `${titleEmoji} ${categoryName} — ${keyLabel}`;
+  const color = categoryName === 'Leveling' ? 0x00B2FF : (categoryName === 'Sniping' ? 0x2b2d31 : 0x5865F2);
   const itemEmbed = new EmbedBuilder()
-    .setTitle(`⚙️ ${categoryName} — ${settingKey}`)
-    .setColor(0x5865F2)
-    .setDescription(
-      `**${typeof setting.description === "function" ? setting.description() : setting.description}**\n\n__Current value(s):__\n${setting.getDisplay()}`
-    );
+    .setTitle(prettyTitle)
+    .setColor(color)
+    .setDescription(`**${typeof setting.description === "function" ? setting.description() : setting.description}**`)
+    .addFields({ name: "Current", value: setting.getDisplay() });
+
+  // Build rows. Primary row holds action buttons with Back at end.
+  const rows = [];
+
+  // If this is a Channels setting, add a mode toggle row here
+  const isSnipingChannels = categoryName === 'Sniping' && settingKey === 'ChannelList';
+  const isLevelingChannels = categoryName === 'Leveling' && settingKey === 'LevelingChannels';
+  if (isSnipingChannels || isLevelingChannels) {
+    const mode = isSnipingChannels ? (config.snipeMode || 'whitelist') : (config.levelingMode || 'blacklist');
+    const wlActive = mode === 'whitelist';
+    const blActive = mode === 'blacklist';
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`settingMode_${categoryName}_${settingKey}_whitelist`)
+        .setLabel('Whitelist')
+        .setEmoji('✅')
+        .setStyle(wlActive ? ButtonStyle.Success : ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`settingMode_${categoryName}_${settingKey}_blacklist`)
+        .setLabel('Blacklist')
+        .setEmoji('🚫')
+        .setStyle(blActive ? ButtonStyle.Danger : ButtonStyle.Secondary)
+    ));
+  }
 
   const itemRow = new ActionRowBuilder();
   setting.buttons.forEach(btn => {
@@ -125,27 +227,12 @@ function renderSettingEmbed(categoryName, settingKey) {
       .setCustomId(`back_category_${categoryName}`)
       .setLabel("Back")
       .setStyle(ButtonStyle.Secondary)
+      .setEmoji('↩️')
   );
 
-  // SHOW Help only when not in Sniping SnipeMode/ChannelList (and not in the excluded Moderation settings)
-  const shouldShowHelp =
-    !(
-      (categoryName === "Sniping" && (settingKey === "SnipeMode" || settingKey === "ChannelList")) ||
-      (categoryName === "Moderation" && (settingKey === "ModeratorRoles" || settingKey === "RoleLogBlacklist")) ||
-      (categoryName === "Leveling" && (settingKey === "LevelRewards"))
-    );
+  rows.push(itemRow);
 
-  if (shouldShowHelp) {
-    itemRow.addComponents(
-      new ButtonBuilder()
-        .setCustomId("config_help")
-        .setLabel("Help Menu")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji("❓")
-    );
-  }
-
-  return { embed: itemEmbed, row: itemRow };
+  return { embed: itemEmbed, row: rows.length === 1 ? itemRow : rows };
 }
 
 // Main message handler
@@ -215,8 +302,8 @@ async function handleMessageCreate(client, message) {
 
       // Handle select menus for LevelRewards flow
   if (interaction.isStringSelectMenu()) {
-        // Pick level to remove from
-        if (interaction.customId === "lr_pickLevel") {
+  // Pick level to remove from (any page)
+  if (interaction.customId.startsWith("lr_pickLevel_")) {
           const levelStr = interaction.values[0];
           const roles = Array.isArray(config.levelRewards[levelStr]) ? config.levelRewards[levelStr] : (config.levelRewards[levelStr] ? [config.levelRewards[levelStr]] : []);
           const valid = roles.filter(id => interaction.guild.roles.cache.has(id));
@@ -232,12 +319,16 @@ async function handleMessageCreate(client, message) {
             return;
           }
 
-          const select = new StringSelectMenuBuilder()
-            .setCustomId(`lr_pickRoles_${levelStr}`)
-            .setPlaceholder(`Select reward roles to remove (level ${levelStr})`)
-            .setMinValues(1)
-            .setMaxValues(Math.min(25, valid.length))
-            .addOptions(valid.slice(0, 25).map(id => ({ label: interaction.guild.roles.cache.get(id)?.name || id, value: id })));
+          const options = valid.map(id => ({ label: interaction.guild.roles.cache.get(id)?.name?.slice(0, 100) || id, value: id }));
+          const chunks = chunk(options, 25);
+          const rows = chunks.map((opts, idx) => new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId(`lr_pickRoles_${levelStr}_${idx}`)
+              .setPlaceholder(`Select rewards to remove${chunks.length > 1 ? ` (page ${idx+1}/${chunks.length})` : ""}`)
+              .setMinValues(1)
+              .setMaxValues(Math.min(25, opts.length))
+              .addOptions(opts)
+          ));
 
           const embed = new EmbedBuilder()
             .setTitle(`⚙️ Leveling — Remove rewards for level ${levelStr}`)
@@ -247,7 +338,7 @@ async function handleMessageCreate(client, message) {
           await interaction.update({
             embeds: [embed],
             components: [
-              new ActionRowBuilder().addComponents(select),
+              ...rows,
               new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary)
               )
@@ -256,22 +347,40 @@ async function handleMessageCreate(client, message) {
           return;
         }
 
-        // Remove selected roles for given level
+        // Remove selected roles for given level (any page)
         if (interaction.customId.startsWith("lr_pickRoles_")) {
-          const levelStr = interaction.customId.substring("lr_pickRoles_".length);
-          const selected = interaction.values;
+          const parts = interaction.customId.split("_");
+          const levelStr = parts[2];
+          const selected = interaction.values || [];
           const current = Array.isArray(config.levelRewards[levelStr]) ? config.levelRewards[levelStr] : (config.levelRewards[levelStr] ? [config.levelRewards[levelStr]] : []);
           const filtered = current.filter(id => !selected.includes(id));
           if (filtered.length) config.levelRewards[levelStr] = Array.from(new Set(filtered)); else delete config.levelRewards[levelStr];
           saveConfig();
 
           const { embed, row } = renderSettingEmbed("Leveling", "LevelRewards");
-          await interaction.update({ embeds: [embed], components: [row] }).catch(() => {});
+          await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+          return;
+        }
+
+        // Remove levels: handle selection (any page)
+        if (interaction.customId.startsWith("lr_remove_levels_")) {
+          const selectedLevels = interaction.values || [];
+          const embed = new EmbedBuilder()
+            .setTitle("⚠️ Confirm removal")
+            .setColor(0xffaa00)
+            .setDescription(`Remove the following level${selectedLevels.length > 1 ? 's' : ''} permanently?\n\n${selectedLevels.map(l => `• Level ${l}`).join('\n')}`);
+
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`lr_confirm_remove_${selectedLevels.join('-')}`).setLabel("Confirm").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId("setting_Leveling_LevelRewards").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+          );
+
+          await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
           return;
         }
 
         // Add rewards: pick a level to add roles to
-        if (interaction.customId === "lr_add_pickLevel") {
+  if (interaction.customId.startsWith("lr_add_pickLevel_")) {
           const levelStr = interaction.values[0];
           const embed = new EmbedBuilder()
             .setTitle(`⚙️ Leveling — Add rewards for level ${levelStr}`)
@@ -316,14 +425,34 @@ async function handleMessageCreate(client, message) {
           saveConfig();
           await interaction.followUp({ content: `${EMOJI_SUCCESS} Added to level ${levelStr}: ${validIds.map(id => `<@&${id}>`).join(', ')}`, ephemeral: true }).catch(() => {});
           const { embed: backEmbed, row } = renderSettingEmbed("Leveling", "LevelRewards");
-          await interaction.message.edit({ embeds: [backEmbed], components: [row] }).catch(() => {});
+          await interaction.message.edit({ embeds: [backEmbed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
           await msg.delete().catch(() => {});
           return;
         }
       }
 
-      // Handle button interactions
+  // Handle button interactions
       if (!interaction.isButton()) return;
+      // Confirm remove levels
+      if (interaction.customId.startsWith("lr_confirm_remove_")) {
+        const levelStrs = interaction.customId.replace("lr_confirm_remove_", "").split("-").filter(Boolean);
+        let removed = [];
+        for (const lvl of levelStrs) {
+          if (config.levelRewards[lvl] !== undefined) {
+            delete config.levelRewards[lvl];
+            removed.push(lvl);
+          }
+        }
+        if (removed.length) saveConfig();
+  const { embed, row } = renderSettingEmbed("Leveling", "LevelRewards");
+  await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+        if (removed.length) {
+          await interaction.followUp({ content: `${EMOJI_SUCCESS} Removed level${removed.length > 1 ? 's' : ''}: ${removed.join(', ')}`, ephemeral: true }).catch(() => {});
+        } else {
+          await interaction.followUp({ content: `${EMOJI_ERROR} No levels removed.`, ephemeral: true }).catch(() => {});
+        }
+        return startCollector();
+      }
 
       // Help Menu button
       if (interaction.customId === "config_help") {
@@ -360,6 +489,86 @@ async function handleMessageCreate(client, message) {
         return startCollector();
       }
 
+      // Category-level mode switches (Sniping/Leveling)
+      if (interaction.customId.startsWith("catmode_")) {
+        const [, categoryName, mode] = interaction.customId.split("_");
+        if (categoryName === 'Sniping') {
+          const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
+          if (config.snipeMode !== newMode) { config.snipeMode = newMode; saveConfig(); }
+        } else if (categoryName === 'Leveling') {
+          const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
+          if (config.levelingMode !== newMode) { config.levelingMode = newMode; saveConfig(); }
+        }
+        // Re-render category
+        const category = configCategories[categoryName];
+        if (!category) return;
+
+        let description = `**${category.description}**`;
+        if (categoryName === "Leveling") {
+          const modeStr = config.levelingMode === "whitelist" ? "Allowlist" : "Blocklist";
+          const chCount = Array.isArray(config.levelingChannelList) ? config.levelingChannelList.length : 0;
+          const roleBlk = Array.isArray(config.roleXPBlacklist) ? config.roleXPBlacklist.length : 0;
+          const mult = (typeof config.globalXPMultiplier === 'number' && Number.isFinite(config.globalXPMultiplier)) ? config.globalXPMultiplier : 1;
+          description += `\n\n📊 Summary • Mode: ${modeStr} • Channels: ${chCount} • Blocked roles: ${roleBlk} • Multiplier: x${mult.toFixed(2)}`;
+        } else if (categoryName === "Sniping") {
+          const modeStr = config.snipeMode === 'whitelist' ? 'Allowlist' : 'Blocklist';
+          const chCount = (config.snipeMode === 'whitelist' ? (config.snipingWhitelist?.length || 0) : (config.snipingChannelList?.length || 0));
+          description += `\n\n📊 Summary • Mode: ${modeStr} • Channels: ${chCount}`;
+        } else if (categoryName === "Moderation") {
+          const modCount = Array.isArray(config.moderatorRoles) ? config.moderatorRoles.length : 0;
+          const blkCount = Array.isArray(config.roleLogBlacklist) ? config.roleLogBlacklist.length : 0;
+          description += `\n\n📊 Summary • Mod roles: ${modCount} • Role log blacklist: ${blkCount}`;
+        }
+        description += `\n\n__Current settings:__\n` +
+          Object.entries(category.settings)
+            .map(([key, setting]) => {
+              const label = setting.getLabel ? setting.getLabel() : key;
+              return `• **${label}** — ${setting.getSummary ? setting.getSummary() : setting.getDisplay()}`;
+            })
+            .join("\n");
+
+        const categoryEmbed = new EmbedBuilder()
+          .setTitle(`⚙️ ${categoryName} Settings`)
+          .setColor(0x5865F2)
+          .setDescription(description);
+
+        const settingButtons = Object.keys(category.settings).map(key => {
+          const labelSrc = category.settings[key];
+          const friendly = labelSrc.getLabel ? labelSrc.getLabel() : key;
+          const emoji = key.toLowerCase().includes('channel') ? '🗺️' : key.toLowerCase().includes('multiplier') ? '💠' : key.toLowerCase().includes('reward') ? '🎁' : key.toLowerCase().includes('role') ? '👥' : '⚙️';
+          return new ButtonBuilder()
+            .setCustomId(`setting_${categoryName}_${key}`)
+            .setLabel(`${emoji} ${friendly}`)
+            .setStyle(ButtonStyle.Primary);
+        });
+        const rows = [];
+        if (categoryName === 'Sniping' || categoryName === 'Leveling') {
+          const isSniping = categoryName === 'Sniping';
+          const modeVal = isSniping ? (config.snipeMode || 'whitelist') : (config.levelingMode || 'blacklist');
+          const wlActive = modeVal === 'whitelist';
+          const blActive = modeVal === 'blacklist';
+      rows.push(new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`catmode_${categoryName}_whitelist`)
+        .setLabel('Allowlist')
+              .setStyle(wlActive ? ButtonStyle.Success : ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId(`catmode_${categoryName}_blacklist`)
+        .setLabel('Blocklist')
+              .setStyle(blActive ? ButtonStyle.Danger : ButtonStyle.Secondary)
+          ));
+        }
+        for (let i = 0; i < settingButtons.length; i += 5) {
+          rows.push(new ActionRowBuilder().addComponents(...settingButtons.slice(i, i + 5)));
+        }
+        rows.push(new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("back_main").setLabel("Back").setStyle(ButtonStyle.Secondary)
+        ));
+
+        await interaction.update({ embeds: [categoryEmbed], components: rows }).catch(() => {});
+        return startCollector();
+      }
+
       // Back to category view
       if (interaction.customId.startsWith("back_category_")) {
         const categoryName = interaction.customId.replace("back_category_", "");
@@ -367,33 +576,72 @@ async function handleMessageCreate(client, message) {
         if (!category)
           return interaction.reply({ content: `${EMOJI_ERROR} Category not found.`, ephemeral: true });
 
+        // Build description with concise header summary and per-setting summaries
+        let description = `**${category.description}**`;
+        if (categoryName === "Leveling") {
+          const mode = config.levelingMode === "whitelist" ? "Allowlist" : "Blocklist";
+          const chCount = Array.isArray(config.levelingChannelList) ? config.levelingChannelList.length : 0;
+          const roleBlk = Array.isArray(config.roleXPBlacklist) ? config.roleXPBlacklist.length : 0;
+          const mult = (typeof config.globalXPMultiplier === 'number' && Number.isFinite(config.globalXPMultiplier)) ? config.globalXPMultiplier : 1;
+          description += `\n\n📊 Summary • Mode: ${mode} • Channels: ${chCount} • Blocked roles: ${roleBlk} • Multiplier: x${mult.toFixed(2)}`;
+        } else if (categoryName === "Sniping") {
+          const mode = config.snipeMode === 'whitelist' ? 'Allowlist' : 'Blocklist';
+          const chCount = (config.snipeMode === 'whitelist' ? (config.snipingWhitelist?.length || 0) : (config.snipingChannelList?.length || 0));
+          description += `\n\n📊 Summary • Mode: ${mode} • Channels: ${chCount}`;
+        } else if (categoryName === "Moderation") {
+          const modCount = Array.isArray(config.moderatorRoles) ? config.moderatorRoles.length : 0;
+          const blkCount = Array.isArray(config.roleLogBlacklist) ? config.roleLogBlacklist.length : 0;
+          description += `\n\n📊 Summary • Mod roles: ${modCount} • Role log blacklist: ${blkCount}`;
+        }
+        description += `\n\n__Current settings:__\n` +
+          Object.entries(category.settings)
+            .map(([key, setting]) => {
+              const label = setting.getLabel ? setting.getLabel() : key;
+              return `• **${label}** — ${setting.getSummary ? setting.getSummary() : setting.getDisplay()}`;
+            })
+            .join("\n");
+
         const categoryEmbed = new EmbedBuilder()
           .setTitle(`⚙️ ${categoryName} Settings`)
           .setColor(0x5865F2)
-          .setDescription(
-            `**${category.description}**\n\n__Current settings:__\n` +
-            Object.entries(category.settings)
-              .map(([key, setting]) => `**${key}:**\n${setting.getDisplay()}`)
-              .join("\n\n")
-          );
+          .setDescription(description);
 
-        const settingsRow = new ActionRowBuilder();
-        for (const key in category.settings) {
-          settingsRow.addComponents(
+        // Build setting buttons in rows of max 5, and put Back in its own row
+        const settingButtons = Object.keys(category.settings).map(key => {
+          const labelSrc = category.settings[key];
+          const friendly = labelSrc.getLabel ? labelSrc.getLabel() : key;
+          const emoji = key.toLowerCase().includes('channel') ? '🗺️' : key.toLowerCase().includes('multiplier') ? '💠' : key.toLowerCase().includes('reward') ? '🎁' : key.toLowerCase().includes('role') ? '👥' : '⚙️';
+          return new ButtonBuilder()
+            .setCustomId(`setting_${categoryName}_${key}`)
+            .setLabel(`${emoji} ${friendly}`)
+            .setStyle(ButtonStyle.Primary);
+        });
+        const rows = [];
+        // Add category-level mode toggle for Sniping/Leveling
+        if (categoryName === 'Sniping' || categoryName === 'Leveling') {
+          const isSniping = categoryName === 'Sniping';
+          const mode = isSniping ? (config.snipeMode || 'whitelist') : (config.levelingMode || 'blacklist');
+          const wlActive = mode === 'whitelist';
+          const blActive = mode === 'blacklist';
+      rows.push(new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-              .setCustomId(`setting_${categoryName}_${key}`)
-              .setLabel(`⚙️ ${key}`)
-              .setStyle(ButtonStyle.Primary)
-          );
+              .setCustomId(`catmode_${categoryName}_whitelist`)
+        .setLabel('Allowlist')
+              .setStyle(wlActive ? ButtonStyle.Success : ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId(`catmode_${categoryName}_blacklist`)
+        .setLabel('Blocklist')
+              .setStyle(blActive ? ButtonStyle.Danger : ButtonStyle.Secondary)
+          ));
         }
-        settingsRow.addComponents(
-          new ButtonBuilder()
-            .setCustomId("back_main")
-            .setLabel("Back")
-            .setStyle(ButtonStyle.Secondary)
-        );
+        for (let i = 0; i < settingButtons.length; i += 5) {
+          rows.push(new ActionRowBuilder().addComponents(...settingButtons.slice(i, i + 5)));
+        }
+        rows.push(new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("back_main").setLabel("Back").setStyle(ButtonStyle.Secondary)
+        ));
 
-        await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
+  await interaction.update({ embeds: [categoryEmbed], components: rows });
         return startCollector();
       }
 
@@ -403,40 +651,79 @@ async function handleMessageCreate(client, message) {
       // Open category
       if (type === "category") {
         const category = configCategories[categoryName];
+        // Build description with concise header summary and per-setting summaries
+        let description = `**${category.description}**`;
+        if (categoryName === "Leveling") {
+          const mode = config.levelingMode === "whitelist" ? "Allowlist" : "Blocklist";
+          const chCount = Array.isArray(config.levelingChannelList) ? config.levelingChannelList.length : 0;
+          const roleBlk = Array.isArray(config.roleXPBlacklist) ? config.roleXPBlacklist.length : 0;
+          const mult = (typeof config.globalXPMultiplier === 'number' && Number.isFinite(config.globalXPMultiplier)) ? config.globalXPMultiplier : 1;
+          description += `\n\n📊 Summary • Mode: ${mode} • Channels: ${chCount} • Blocked roles: ${roleBlk} • Multiplier: x${mult.toFixed(2)}`;
+        } else if (categoryName === "Sniping") {
+          const mode = config.snipeMode === 'whitelist' ? 'Allowlist' : 'Blocklist';
+          const chCount = (config.snipeMode === 'whitelist' ? (config.snipingWhitelist?.length || 0) : (config.snipingChannelList?.length || 0));
+          description += `\n\n📊 Summary • Mode: ${mode} • Channels: ${chCount}`;
+        } else if (categoryName === "Moderation") {
+          const modCount = Array.isArray(config.moderatorRoles) ? config.moderatorRoles.length : 0;
+          const blkCount = Array.isArray(config.roleLogBlacklist) ? config.roleLogBlacklist.length : 0;
+          description += `\n\n📊 Summary • Mod roles: ${modCount} • Role log blacklist: ${blkCount}`;
+        }
+        description += `\n\n__Current settings:__\n` +
+          Object.entries(category.settings)
+            .map(([key, setting]) => {
+              const label = setting.getLabel ? setting.getLabel() : key;
+              return `• **${label}** — ${setting.getSummary ? setting.getSummary() : setting.getDisplay()}`;
+            })
+            .join("\n");
+
         const categoryEmbed = new EmbedBuilder()
           .setTitle(`⚙️ ${categoryName} Settings`)
           .setColor(0x5865F2)
-          .setDescription(
-            `**${category.description}**\n\n__Current settings:__\n` +
-            Object.entries(category.settings)
-              .map(([key, setting]) => `**${key}:**\n${setting.getDisplay()}`)
-              .join("\n\n")
-          );
+          .setDescription(description);
 
-        const settingsRow = new ActionRowBuilder();
-        for (const key in category.settings) {
-          settingsRow.addComponents(
+        // Build setting buttons in rows of max 5, and put Back in its own row
+        const settingButtons = Object.keys(category.settings).map(key => {
+          const labelSrc = category.settings[key];
+          const friendly = labelSrc.getLabel ? labelSrc.getLabel() : key;
+          const emoji = key.toLowerCase().includes('channel') ? '🗺️' : key.toLowerCase().includes('multiplier') ? '💠' : key.toLowerCase().includes('reward') ? '🎁' : key.toLowerCase().includes('role') ? '👥' : '⚙️';
+          return new ButtonBuilder()
+            .setCustomId(`setting_${categoryName}_${key}`)
+            .setLabel(`${emoji} ${friendly}`)
+            .setStyle(ButtonStyle.Primary);
+        });
+        const rows = [];
+        // Add category-level mode toggle for Sniping/Leveling
+        if (categoryName === 'Sniping' || categoryName === 'Leveling') {
+          const isSniping = categoryName === 'Sniping';
+          const mode = isSniping ? (config.snipeMode || 'whitelist') : (config.levelingMode || 'blacklist');
+          const wlActive = mode === 'whitelist';
+          const blActive = mode === 'blacklist';
+      rows.push(new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-              .setCustomId(`setting_${categoryName}_${key}`)
-              .setLabel(`⚙️ ${key}`)
-              .setStyle(ButtonStyle.Primary)
-          );
+              .setCustomId(`catmode_${categoryName}_whitelist`)
+        .setLabel('Allowlist')
+              .setStyle(wlActive ? ButtonStyle.Success : ButtonStyle.Secondary),
+            new ButtonBuilder()
+              .setCustomId(`catmode_${categoryName}_blacklist`)
+        .setLabel('Blocklist')
+              .setStyle(blActive ? ButtonStyle.Danger : ButtonStyle.Secondary)
+          ));
         }
-        settingsRow.addComponents(
-          new ButtonBuilder()
-            .setCustomId("back_main")
-            .setLabel("Back")
-            .setStyle(ButtonStyle.Secondary)
-        );
+        for (let i = 0; i < settingButtons.length; i += 5) {
+          rows.push(new ActionRowBuilder().addComponents(...settingButtons.slice(i, i + 5)));
+        }
+        rows.push(new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("back_main").setLabel("Back").setStyle(ButtonStyle.Secondary)
+        ));
 
-        await interaction.update({ embeds: [categoryEmbed], components: [settingsRow] });
+  await interaction.update({ embeds: [categoryEmbed], components: rows });
         return startCollector();
       }
 
       // Open setting
       if (type === "setting") {
-        const { embed, row } = renderSettingEmbed(categoryName, settingKey);
-        await interaction.update({ embeds: [embed], components: [row] });
+  const { embed, row } = renderSettingEmbed(categoryName, settingKey);
+  await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] });
         return startCollector();
       }
 
@@ -456,13 +743,13 @@ async function handleMessageCreate(client, message) {
             saveConfig();
           }
           const { embed, row } = renderSettingEmbed("Sniping", "SnipeMode");
-          await interaction.update({ embeds: [embed], components: [row] }).catch(() => {});
+    await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
           return startCollector();
         }
 
-        // Sniping: channel list add/remove
+  // Sniping: channel list add/remove
         if (categoryName === "Sniping" && settingKey === "ChannelList" && (action === "addChannel" || action === "removeChannel")) {
-          await interaction.reply({ content: `Please mention or type the channel ID to ${action === "addChannel" ? "add" : "remove"}:`, ephemeral: true });
+          await interaction.reply({ content: `Mention or paste channel IDs to ${action === "addChannel" ? "add" : "remove"} (you can provide multiple, separated by spaces):`, ephemeral: true });
           const filter = m => m.author.id === OWNER_ID && m.channel.id === interaction.channel.id;
           const collected = await interaction.channel.awaitMessages({ filter, max: 1, time: 20000 });
           const msg = collected.first();
@@ -470,37 +757,164 @@ async function handleMessageCreate(client, message) {
             await interaction.followUp({ content: `${EMOJI_ERROR} No channel provided.`, ephemeral: true });
             return;
           }
-          const channelId = msg.mentions.channels.first()?.id || msg.content.replace(/[^0-9]/g, "");
-          const channel = interaction.guild.channels.cache.get(channelId);
-          if (!channel) {
-            await interaction.followUp({ content: `${EMOJI_ERROR} Invalid channel.`, ephemeral: true });
-            await msg.delete().catch(() => {});
-            return;
-          }
+          const mentionedIds = [...msg.mentions.channels.keys()];
+          const textIds = msg.content.split(/\s+/).map(p => p.replace(/[^0-9]/g, "")).filter(Boolean);
+          const ids = Array.from(new Set([...mentionedIds, ...textIds]));
+          const validIds = ids.filter(id => interaction.guild.channels.cache.has(id));
+          const invalidIds = ids.filter(id => !interaction.guild.channels.cache.has(id));
 
           const listKey = config.snipeMode === "whitelist" ? "snipingWhitelist" : "snipingChannelList";
           const list = config[listKey] || [];
+          let added = [];
+          let removed = [];
           if (action === "addChannel") {
-            if (!list.includes(channelId)) {
-              list.push(channelId);
-              config[listKey] = list;
-              saveConfig();
-              await interaction.followUp({ content: `${EMOJI_SUCCESS} Channel <#${channelId}> added.`, ephemeral: true });
-            } else {
-              await interaction.followUp({ content: `${EMOJI_ERROR} Channel already listed.`, ephemeral: true });
+            for (const id of validIds) {
+              if (!list.includes(id)) {
+                list.push(id);
+                added.push(id);
+              }
             }
+            config[listKey] = list;
+            if (added.length) saveConfig();
           } else {
-            if (list.includes(channelId)) {
-              config[listKey] = list.filter(id => id !== channelId);
-              saveConfig();
-              await interaction.followUp({ content: `${EMOJI_SUCCESS} Channel <#${channelId}> removed.`, ephemeral: true });
-            } else {
-              await interaction.followUp({ content: `${EMOJI_ERROR} Channel not in list.`, ephemeral: true });
-            }
+            const before = new Set(list);
+            config[listKey] = list.filter(id => !validIds.includes(id));
+            removed = [...before].filter(id => !config[listKey].includes(id));
+            if (removed.length) saveConfig();
           }
 
+          const parts = [];
+          if (added.length) parts.push(`${EMOJI_SUCCESS} Added: ${added.map(id => `<#${id}>`).join(", ")}`);
+          if (removed.length) parts.push(`${EMOJI_SUCCESS} Removed: ${removed.map(id => `<#${id}>`).join(", ")}`);
+          if (invalidIds.length) parts.push(`${EMOJI_ERROR} Invalid: ${invalidIds.join(", ")}`);
+          if (!parts.length) parts.push(`${EMOJI_ERROR} No changes.`);
+          await interaction.followUp({ content: parts.join("\n"), ephemeral: true });
+
           const { embed, row } = renderSettingEmbed("Sniping", "ChannelList");
-          await interaction.message.edit({ embeds: [embed], components: [row] }).catch(() => {});
+          await interaction.message.edit({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+          await msg.delete().catch(() => {});
+          return startCollector();
+        }
+
+        // Leveling: toggle leveling mode
+        if (categoryName === "Leveling" && settingKey === "LevelingMode" && (action === "modeWhitelist" || action === "modeBlacklist")) {
+          const newMode = action === "modeWhitelist" ? "whitelist" : "blacklist";
+          if (config.levelingMode !== newMode) {
+            config.levelingMode = newMode;
+            saveConfig();
+          }
+          const { embed, row } = renderSettingEmbed("Leveling", "LevelingMode");
+    await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+          return startCollector();
+        }
+
+        // Leveling: channel list add/remove
+        if (categoryName === "Leveling" && settingKey === "LevelingChannels" && (action === "addChannel" || action === "removeChannel")) {
+          await interaction.reply({ content: `Mention or paste channel IDs to ${action === "addChannel" ? "add" : "remove"} (you can provide multiple, separated by spaces):`, ephemeral: true });
+          const filter = m => m.author.id === OWNER_ID && m.channel.id === interaction.channel.id;
+          const collected = await interaction.channel.awaitMessages({ filter, max: 1, time: 20000 });
+          const msg = collected.first();
+          if (!msg) {
+            await interaction.followUp({ content: `${EMOJI_ERROR} No channel provided.`, ephemeral: true });
+            return;
+          }
+          const mentionedIds = [...msg.mentions.channels.keys()];
+          const textIds = msg.content.split(/\s+/).map(p => p.replace(/[^0-9]/g, "")).filter(Boolean);
+          const ids = Array.from(new Set([...mentionedIds, ...textIds]));
+          const validIds = ids.filter(id => interaction.guild.channels.cache.has(id));
+          const invalidIds = ids.filter(id => !interaction.guild.channels.cache.has(id));
+
+          const list = Array.isArray(config.levelingChannelList) ? config.levelingChannelList : [];
+          let added = [];
+          let removed = [];
+          if (action === "addChannel") {
+            for (const id of validIds) {
+              if (!list.includes(id)) {
+                list.push(id);
+                added.push(id);
+              }
+            }
+            config.levelingChannelList = list;
+            if (added.length) saveConfig();
+          } else {
+            const before = new Set(list);
+            config.levelingChannelList = list.filter(id => !validIds.includes(id));
+            removed = [...before].filter(id => !config.levelingChannelList.includes(id));
+            if (removed.length) saveConfig();
+          }
+
+          const parts = [];
+          if (added.length) parts.push(`${EMOJI_SUCCESS} Added: ${added.map(id => `<#${id}>`).join(", ")}`);
+          if (removed.length) parts.push(`${EMOJI_SUCCESS} Removed: ${removed.map(id => `<#${id}>`).join(", ")}`);
+          if (invalidIds.length) parts.push(`${EMOJI_ERROR} Invalid: ${invalidIds.join(", ")}`);
+          if (!parts.length) parts.push(`${EMOJI_ERROR} No changes.`);
+          await interaction.followUp({ content: parts.join("\n"), ephemeral: true });
+
+          const { embed, row } = renderSettingEmbed("Leveling", "LevelingChannels");
+          await interaction.message.edit({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+          await msg.delete().catch(() => {});
+          return startCollector();
+        }
+
+        // Leveling: role XP blacklist add/remove (multi-role input)
+        if (categoryName === "Leveling" && settingKey === "RoleXPBlacklist" && (action === "addRole" || action === "removeRole")) {
+          await interaction.reply({ content: `Mention or paste role IDs to ${action === "addRole" ? "add" : "remove"} (multiple allowed, space-separated):`, ephemeral: true });
+          const filter = m => m.author.id === OWNER_ID && m.channel.id === interaction.channel.id;
+          const collected = await interaction.channel.awaitMessages({ filter, max: 1, time: 20000 });
+          const msg = collected.first();
+          if (!msg) { await interaction.followUp({ content: `${EMOJI_ERROR} No roles provided.`, ephemeral: true }); return; }
+          const mentioned = [...msg.mentions.roles.keys()];
+          const idsFromText = msg.content.split(/\s+/).map(p => p.replace(/[^0-9]/g, "")).filter(Boolean);
+          const ids = Array.from(new Set([...mentioned, ...idsFromText]));
+          const validIds = ids.filter(id => interaction.guild.roles.cache.has(id));
+          const invalidIds = ids.filter(id => !interaction.guild.roles.cache.has(id));
+          const list = Array.isArray(config.roleXPBlacklist) ? config.roleXPBlacklist : [];
+          let added = [], removed = [];
+          if (action === "addRole") {
+            for (const id of validIds) if (!list.includes(id)) { list.push(id); added.push(id); }
+            config.roleXPBlacklist = list;
+            if (added.length) saveConfig();
+          } else {
+            const before = new Set(list);
+            config.roleXPBlacklist = list.filter(id => !validIds.includes(id));
+            removed = [...before].filter(id => !config.roleXPBlacklist.includes(id));
+            if (removed.length) saveConfig();
+          }
+          const parts = [];
+          if (added.length) parts.push(`${EMOJI_SUCCESS} Added: ${added.map(id => `<@&${id}>`).join(', ')}`);
+          if (removed.length) parts.push(`${EMOJI_SUCCESS} Removed: ${removed.map(id => `<@&${id}>`).join(', ')}`);
+          if (invalidIds.length) parts.push(`${EMOJI_ERROR} Invalid: ${invalidIds.join(', ')}`);
+          if (!parts.length) parts.push(`${EMOJI_ERROR} No changes.`);
+          await interaction.followUp({ content: parts.join('\n'), ephemeral: true });
+          const { embed, row } = renderSettingEmbed("Leveling", "RoleXPBlacklist");
+          await interaction.message.edit({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+          await msg.delete().catch(() => {});
+          return startCollector();
+        }
+
+        // Leveling: Global XP Multiplier set/reset
+        if (categoryName === "Leveling" && settingKey === "GlobalXPMultiplier" && (action === "set" || action === "reset")) {
+          if (action === "reset") {
+            config.globalXPMultiplier = 1.0; saveConfig();
+            const { embed, row } = renderSettingEmbed("Leveling", "GlobalXPMultiplier");
+            await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+            return startCollector();
+          }
+          await interaction.reply({ content: `Enter a multiplier (e.g. 1, 1.5, 2):`, ephemeral: true });
+          const filter = m => m.author.id === OWNER_ID && m.channel.id === interaction.channel.id;
+          const collected = await interaction.channel.awaitMessages({ filter, max: 1, time: 20000 });
+          const msg = collected.first();
+          if (!msg) { await interaction.followUp({ content: `${EMOJI_ERROR} No value provided.`, ephemeral: true }); return; }
+          const val = Number(msg.content.trim());
+          if (!Number.isFinite(val) || val < 0 || val > 10) { // simple safety bounds
+            await interaction.followUp({ content: `${EMOJI_ERROR} Invalid multiplier. Provide a number between 0 and 10.`, ephemeral: true });
+            await msg.delete().catch(() => {});
+            return;
+          }
+          config.globalXPMultiplier = val; saveConfig();
+          await interaction.followUp({ content: `${EMOJI_SUCCESS} Global XP multiplier set to x${val.toFixed(2)}.`, ephemeral: true });
+          const { embed, row } = renderSettingEmbed("Leveling", "GlobalXPMultiplier");
+          await interaction.message.edit({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
           await msg.delete().catch(() => {});
           return startCollector();
         }
@@ -513,12 +927,16 @@ async function handleMessageCreate(client, message) {
             return;
           }
 
-          const levelSelect = new StringSelectMenuBuilder()
-            .setCustomId("lr_add_pickLevel")
-            .setPlaceholder("Select a level to add rewards to")
-            .setMinValues(1)
-            .setMaxValues(1)
-            .addOptions(levelKeys.slice(0,25).map(lvl => ({ label: `Level ${lvl}`, value: String(lvl) })));
+          const levelOptions = levelKeys.map(lvl => ({ label: `Level ${lvl}`, value: String(lvl) }));
+          const pages = chunk(levelOptions, 25);
+          const rows = pages.map((opts, idx) => new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId(`lr_add_pickLevel_${idx}`)
+              .setPlaceholder(`Select a level to add rewards${pages.length > 1 ? ` (page ${idx+1}/${pages.length})` : ""}`)
+              .setMinValues(1)
+              .setMaxValues(1)
+              .addOptions(opts)
+          ));
 
           const embed = new EmbedBuilder()
             .setTitle("⚙️ Leveling — Choose level")
@@ -528,7 +946,7 @@ async function handleMessageCreate(client, message) {
           await interaction.update({
             embeds: [embed],
             components: [
-              new ActionRowBuilder().addComponents(levelSelect),
+              ...rows,
               new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary))
             ]
           }).catch(() => {});
@@ -560,7 +978,7 @@ async function handleMessageCreate(client, message) {
             await interaction.followUp({ content: `${EMOJI_ERROR} Level ${levelNum} already exists.`, ephemeral: true }).catch(() => {});
           }
           const { embed, row } = renderSettingEmbed("Leveling", "LevelRewards");
-          await interaction.message.edit({ embeds: [embed], components: [row] }).catch(() => {});
+          await interaction.message.edit({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
           await msg.delete().catch(() => {});
           return startCollector();
         }
@@ -573,12 +991,16 @@ async function handleMessageCreate(client, message) {
             return;
           }
 
-          const levelSelect = new StringSelectMenuBuilder()
-            .setCustomId("lr_pickLevel")
-            .setPlaceholder("Select a level to remove rewards from")
-            .setMinValues(1)
-            .setMaxValues(1)
-            .addOptions(levelKeys.slice(0,25).map(lvl => ({ label: `Level ${lvl}`, value: String(lvl) })));
+          const levelOptions = levelKeys.map(lvl => ({ label: `Level ${lvl}`, value: String(lvl) }));
+          const pages = chunk(levelOptions, 25);
+          const rows = pages.map((opts, idx) => new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId(`lr_pickLevel_${idx}`)
+              .setPlaceholder(`Select a level to remove rewards${pages.length > 1 ? ` (page ${idx+1}/${pages.length})` : ""}`)
+              .setMinValues(1)
+              .setMaxValues(1)
+              .addOptions(opts)
+          ));
 
           const embed = new EmbedBuilder()
             .setTitle("⚙️ Leveling — Choose level")
@@ -588,7 +1010,41 @@ async function handleMessageCreate(client, message) {
           await interaction.update({
             embeds: [embed],
             components: [
-              new ActionRowBuilder().addComponents(levelSelect),
+              ...rows,
+              new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary))
+            ]
+          }).catch(() => {});
+          return startCollector();
+        }
+
+        // Leveling: remove level -> open select flow (multi-select allowed)
+        if (categoryName === "Leveling" && settingKey === "LevelRewards" && action === "removeLevel") {
+          const levelKeys = Object.keys(config.levelRewards || {}).sort((a,b) => Number(a) - Number(b));
+          if (!levelKeys.length) {
+            await interaction.reply({ content: `${EMOJI_ERROR} There are no levels to remove.`, ephemeral: true });
+            return;
+          }
+
+          const levelOptions = levelKeys.map(lvl => ({ label: `Level ${lvl}`, value: String(lvl) }));
+          const pages = chunk(levelOptions, 25);
+          const rows = pages.map((opts, idx) => new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId(`lr_remove_levels_${idx}`)
+              .setPlaceholder(`Select level(s) to remove${pages.length > 1 ? ` (page ${idx+1}/${pages.length})` : ""}`)
+              .setMinValues(1)
+              .setMaxValues(Math.min(25, opts.length))
+              .addOptions(opts)
+          ));
+
+          const embed = new EmbedBuilder()
+            .setTitle("⚙️ Leveling — Remove level(s)")
+            .setColor(0x5865F2)
+            .setDescription("Pick one or more levels to remove. This deletes the configured rewards for those levels.");
+
+          await interaction.update({
+            embeds: [embed],
+            components: [
+              ...rows,
               new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`setting_Leveling_LevelRewards`).setLabel("Back").setStyle(ButtonStyle.Secondary))
             ]
           }).catch(() => {});
@@ -596,6 +1052,25 @@ async function handleMessageCreate(client, message) {
         }
 
         // Other settings could be handled here...
+      }
+
+      // Handle per-setting mode toggles for Channels
+      if (interaction.customId.startsWith('settingMode_')) {
+        const [, cat, key, mode] = interaction.customId.split('_');
+        if (cat === 'Sniping' && key === 'ChannelList') {
+          const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
+          if (config.snipeMode !== newMode) { config.snipeMode = newMode; saveConfig(); }
+          const { embed, row } = renderSettingEmbed('Sniping', 'ChannelList');
+          await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+          return startCollector();
+        }
+        if (cat === 'Leveling' && key === 'LevelingChannels') {
+          const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
+          if (config.levelingMode !== newMode) { config.levelingMode = newMode; saveConfig(); }
+          const { embed, row } = renderSettingEmbed('Leveling', 'LevelingChannels');
+          await interaction.update({ embeds: [embed], components: Array.isArray(row) ? row : [row] }).catch(() => {});
+          return startCollector();
+        }
       }
 
       // Reset collector timer after any button interaction

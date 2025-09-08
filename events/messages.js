@@ -22,7 +22,9 @@ const LEVEL_ROLES = {
 function attachMessageEvents(client) {
   client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
-    if (!message.content.startsWith(".")) return;
+  // Award leveling XP for all non-bot messages (gated in handleLeveling by channel rules)
+  await handleLeveling(message, LEVEL_ROLES);
+  if (!message.content.startsWith(".")) return;
 
     const args = message.content.slice(1).trim().split(/\s+/);
     const command = args.shift().toLowerCase();
@@ -58,7 +60,7 @@ function attachMessageEvents(client) {
       message.reply(`<:VRLSad:1413770577080094802> An error occurred while executing \`${command}\`.\nDetails: \`${err.message || err}\``);
     }
 
-    await handleLeveling(message, LEVEL_ROLES);
+  // Already handled above for all messages
   });
 }
 

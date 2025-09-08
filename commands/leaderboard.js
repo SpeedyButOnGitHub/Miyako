@@ -57,7 +57,28 @@ async function handleLeaderboardCommand(client, message) {
 
   // Sort by level desc, then xp desc
   entries.sort((a, b) => (b.level - a.level) || (b.xp - a.xp));
-  const top = entries.slice(0, 10);
+
+  // args: page number or "me"
+  const pageSize = 10;
+  let page = 1;
+  let focusUserId = null;
+  const args = (message.content || "").slice(1).trim().split(/\s+/).slice(1);
+  if (args[0]) {
+    if (args[0].toLowerCase() === "me") {
+      focusUserId = message.author.id;
+    } else {
+      const p = Number(args[0]);
+      if (Number.isFinite(p) && p > 0) page = Math.floor(p);
+    }
+  }
+  if (focusUserId) {
+    const idx = entries.findIndex(e => e.userId === focusUserId);
+    if (idx !== -1) page = Math.floor(idx / pageSize) + 1;
+  }
+  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
+  if (page > totalPages) page = totalPages;
+  const start = (page - 1) * pageSize;
+  const top = entries.slice(start, start + pageSize);
 
   if (top.length === 0) {
     await message.reply("No leaderboard data yet.");
@@ -73,14 +94,14 @@ async function handleLeaderboardCommand(client, message) {
     const into = Math.max(0, e.xp - curLevelXP);
     const need = Math.max(1, nextLevelXP - curLevelXP);
     const bar = createProgressBar(into, need, 14);
-    return `**${idx + 1}.** ${member ? `<@${e.userId}>` : name} — Lvl ${e.level} • ${bar}`;
+    return `**${start + idx + 1}.** ${member ? `<@${e.userId}>` : name} — Lvl ${e.level} • ${bar}`;
   }));
 
   const embed = new EmbedBuilder()
     .setTitle("🏆 Server Leaderboard")
     .setColor(0x5865F2)
     .setDescription(lines.join("\n"))
-    .setFooter({ text: `Requested by ${message.author.tag}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
+    .setFooter({ text: `Page ${page}/${totalPages} • Requested by ${message.author.tag}` , iconURL: message.author.displayAvatarURL({ dynamic: true }) })
     .setTimestamp();
 
   await message.reply({ embeds: [embed] });

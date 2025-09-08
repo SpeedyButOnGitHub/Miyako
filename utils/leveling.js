@@ -15,6 +15,17 @@ function getRandomXP() {
 
 async function handleLeveling(message, LEVEL_ROLES = {}) {
   try {
+  if (!message.guild) return; // guild-only leveling
+    // Channel gating for leveling
+    const chId = message.channel?.id;
+    if (!chId) return;
+    const mode = config.levelingMode || "blacklist";
+    const list = Array.isArray(config.levelingChannelList) ? config.levelingChannelList : [];
+    const inList = list.includes(chId);
+    if (mode === "blacklist" ? inList : !inList) {
+      return; // do not award XP here
+    }
+
     const userId = message.author.id;
     const now = Date.now();
     const lastXP = userCooldowns.get(userId) || 0;
@@ -32,8 +43,17 @@ async function handleLeveling(message, LEVEL_ROLES = {}) {
     modData.lastMinute = now;
     userModifiers.set(userId, modData);
 
+    // Skip XP if member has a blacklisted role
+    const member = await message.guild.members.fetch(userId).catch(() => null);
+    if (!member) return;
+    const roleBlacklist = Array.isArray(config.roleXPBlacklist) ? config.roleXPBlacklist : [];
+    if (roleBlacklist.length && member.roles.cache.some(r => roleBlacklist.includes(r.id))) {
+      return;
+    }
+
     const baseXP = getRandomXP();
-    const totalXP = Math.floor(baseXP * modData.modifier);
+    const globalMult = typeof config.globalXPMultiplier === 'number' && Number.isFinite(config.globalXPMultiplier) ? Math.max(0, config.globalXPMultiplier) : 1.0;
+    const totalXP = Math.floor(baseXP * modData.modifier * globalMult);
     const leveledUp = addXP(userId, totalXP);
     saveLevels();
 
@@ -45,13 +65,10 @@ async function handleLeveling(message, LEVEL_ROLES = {}) {
       const rewards = Array.isArray(configured)
         ? configured
         : (configured ? [configured] : (LEVEL_ROLES[leveledUp] ? [LEVEL_ROLES[leveledUp]] : []));
-      if (rewards.length) {
-        const member = await message.guild.members.fetch(userId).catch(() => null);
-        if (member) {
-          for (const roleId of rewards) {
-            if (!member.roles.cache.has(roleId)) {
-              await member.roles.add(roleId).catch(() => {});
-            }
+      if (rewards.length && member) {
+        for (const roleId of rewards) {
+          if (!member.roles.cache.has(roleId)) {
+            await member.roles.add(roleId).catch(() => {});
           }
         }
       }

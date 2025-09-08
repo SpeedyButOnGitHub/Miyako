@@ -18,7 +18,13 @@ const defaultConfig = {
   snipeMode: "whitelist",
   snipingChannelList: [],
   // Map of level -> roleId
-  levelRewards: {}
+  levelRewards: {},
+  // Leveling message gating
+  levelingMode: "blacklist", // 'whitelist' or 'blacklist'
+  levelingChannelList: [],
+  // Leveling role gating and multiplier
+  roleXPBlacklist: [],
+  globalXPMultiplier: 1.0
 };
 
 function validateConfig(cfg) {
@@ -33,6 +39,12 @@ function validateConfig(cfg) {
   if (!["whitelist", "blacklist"].includes(cfg.snipeMode)) cfg.snipeMode = "whitelist";
   if (!Array.isArray(cfg.snipingChannelList)) cfg.snipingChannelList = [];
   if (typeof cfg.levelRewards !== "object" || cfg.levelRewards === null) cfg.levelRewards = {};
+  // Leveling gating
+  if (!["whitelist", "blacklist"].includes(cfg.levelingMode)) cfg.levelingMode = "blacklist";
+  if (!Array.isArray(cfg.levelingChannelList)) cfg.levelingChannelList = [];
+  // Leveling role blacklist and multiplier
+  if (!Array.isArray(cfg.roleXPBlacklist)) cfg.roleXPBlacklist = [];
+  if (typeof cfg.globalXPMultiplier !== "number" || !Number.isFinite(cfg.globalXPMultiplier)) cfg.globalXPMultiplier = 1.0;
   // Sanitize levelRewards: ensure string numeric keys mapping to arrays of role IDs (strings)
   const cleanedRewards = {};
   for (const [lvl, val] of Object.entries(cfg.levelRewards)) {
