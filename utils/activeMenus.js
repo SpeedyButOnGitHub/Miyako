@@ -62,23 +62,15 @@ async function expireSession(messageId) {
     const channel = await clientRef.channels.fetch(sess.channelId).catch(() => null);
     const msg = channel ? await channel.messages.fetch(messageId).catch(() => null) : null;
     if (msg) {
-      const disabledRows = (msg.components || []).map(row => {
-        const newRow = new ActionRowBuilder();
-        // @ts-ignore - access components
-        const comps = row.components || [];
-        comps.forEach(c => {
-          if (c?.data?.type === 2 || c?.type === 2 || c?.customId) {
-            const bb = new ButtonBuilder()
-              .setCustomId(c.customId || "expired")
-              .setLabel("Timed out — use command again")
-              .setStyle(ButtonStyle.Secondary)
-              .setDisabled(true);
-            newRow.addComponents(bb);
-          }
-        });
-        return newRow;
-      });
-      await msg.edit({ components: disabledRows });
+      // Replace ALL rows with a single disabled "Timed out" button for clarity
+      const timeoutRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId("expired")
+          .setLabel("Timed out — use the command again")
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(true)
+      );
+      await msg.edit({ components: [timeoutRow] });
     }
   } catch {}
   clearExpiryTimer(messageId);

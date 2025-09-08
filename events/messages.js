@@ -1,5 +1,6 @@
 const { handleHelpCommand } = require("../commands/help");
 const { handleModerationCommands } = require("../commands/moderation/moderationCommands");
+const { handleWarningsCommand } = require("../commands/moderation/warnings");
 const { handleSnipeCommands } = require("../commands/snipes");
 const { handleMessageCreate } = require("../commands/configMenu");
 const { handleLevelCommand } = require("../commands/level");
@@ -37,6 +38,8 @@ function attachMessageEvents(client) {
         await handleModerationCommands(client, message, command, args);
       } else if (["snipe", "s", "ds"].includes(command)) {
         await handleSnipeCommands(client, message, command, args);
+      } else if (command === "warnings" || command === "warns") {
+        await handleWarningsCommand(client, message);
       } else if (command === "config") {
         await handleMessageCreate(client, message);
       } else if (command === "level") {

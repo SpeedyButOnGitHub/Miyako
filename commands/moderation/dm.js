@@ -34,8 +34,10 @@ async function sendUserDM(target, action, duration = null, reason = null, extra 
       break;
   }
 
+  const user = target?.user || target; // support GuildMember or User
+  const avatar = user?.displayAvatarURL ? user.displayAvatarURL({ dynamic: true }) : undefined;
   const embed = new EmbedBuilder()
-    .setAuthor({ name: target.user.tag, iconURL: target.displayAvatarURL({ dynamic: true }) })
+    .setAuthor({ name: user?.tag || user?.username || "User", iconURL: avatar })
     .setColor(color)
     .setDescription(description);
 
@@ -45,9 +47,14 @@ async function sendUserDM(target, action, duration = null, reason = null, extra 
   embed.setTimestamp();
 
   try {
-    await target.send({ embeds: [embed] });
+    if (typeof target.send === "function") {
+      await target.send({ embeds: [embed] });
+    } else if (typeof user?.send === "function") {
+      await user.send({ embeds: [embed] });
+    }
   } catch (err) {
-    console.error(`[DM Error] Could not DM ${target.user.tag}:`, err);
+    const tag = user?.tag || user?.username || user?.id || "unknown";
+    console.error(`[DM Error] Could not DM ${tag}:`, err);
   }
 }
 

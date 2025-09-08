@@ -128,35 +128,47 @@ async function handleModerationCommands(client, message, command, args) {
         const warnId = userObj.id;
         if (!Array.isArray(config.warnings[warnId])) config.warnings[warnId] = [];
         let warnings = config.warnings[warnId];
-        warnings.push({ moderator: message.author.id, reason: finalReason, date: Date.now() });
+        const entry = { moderator: message.author.id, reason: finalReason, date: Date.now(), logMsgId: null };
+        warnings.push(entry);
         saveConfig();
 
-        let escalationMessage = null;
-        // Only escalate if member is present in guild
-        if (member && warnings.length >= kickThreshold) {
-          await member.kick("Auto-kicked for reaching warning threshold");
-          escalationMessage = `You have been kicked for reaching ${kickThreshold} warnings.`;
-          await sendModLog(client, member, message.author, "kicked", "Reached warning threshold", true, null, warnings.length);
-        } else if (member && warnings.length >= muteThreshold) {
-          await member.timeout(muteDuration, "Auto-muted for reaching warning threshold");
-          if (!member.roles.cache.has(MUTE_ROLE_ID)) await member.roles.add(MUTE_ROLE_ID).catch(() => {});
-          escalationMessage = `You have been muted for ${formatDuration(muteDuration)} for reaching ${muteThreshold} warnings.`;
-          await sendModLog(client, member, message.author, "muted", "Reached warning threshold", true, formatDuration(muteDuration), warnings.length);
+        // Determine thresholds using the new count
+        const newCount = warnings.length;
+        let escalationNote = null;
+        let escalationDurationText = null;
+        if (member) {
+          if (newCount >= kickThreshold) {
+            if (!isTesting) await member.kick("Auto-kicked for reaching warning threshold");
+            escalationNote = `Auto-kicked for reaching ${kickThreshold} warnings`;
+          } else if (newCount >= muteThreshold) {
+            if (!isTesting) {
+              await member.timeout(muteDuration, "Auto-muted for reaching warning threshold");
+              if (!member.roles.cache.has(MUTE_ROLE_ID)) await member.roles.add(MUTE_ROLE_ID).catch(() => {});
+            }
+            escalationDurationText = formatDuration(muteDuration);
+            escalationNote = `Auto-muted for ${escalationDurationText} (threshold ${muteThreshold})`;
+          }
         }
 
-        // Send DM using member if present, else user object
-        if (member) {
-          await sendUserDM(member, "warned", null, finalReason, `Current warnings: ${warnings.length}${escalationMessage ? `\n${escalationMessage}` : ""}`);
-        } else if (userObj) {
-          await sendUserDM(userObj, "warned", null, finalReason, `Current warnings: ${warnings.length}${escalationMessage ? `\n${escalationMessage}` : ""}`);
-        }
-        let logMsg = await sendModLog(client, member || userObj, message.author, "warned", finalReason, true, null, warnings.length);
+        // DM the user (no public escalation text in channel)
+        await sendUserDM(member || userObj, "warned", null, finalReason, `Current warnings: ${newCount}${escalationNote ? `\n${escalationNote}` : ""}`);
+
+        // Single consolidated log for the warning (and any escalation)
+        const combinedReason = escalationNote ? `${finalReason} • ${escalationNote}` : finalReason;
+        let logMsg = await sendModLog(
+          client,
+          member || userObj,
+          message.author,
+          "warned",
+          combinedReason,
+          true,
+          escalationDurationText,
+          newCount
+        );
+        if (logMsg && entry) { entry.logMsgId = logMsg.id; saveConfig(); }
         if (isTesting && logMsg && logMsg.id) testLogMessageIds.push(logMsg.id);
 
-        await replySuccess(
-          message,
-          `Warned <@${warnId}> for: **${finalReason}**${escalationMessage ? `\n${escalationMessage}` : ""}`
-        );
+        await replySuccess(message, `Warned <@${warnId}> for: **${finalReason}**`);
         // If testing, remove the warning after a short delay
         if (isTesting) {
           setTimeout(() => {

@@ -59,19 +59,19 @@ function buildWarningsEmbed(userOrMember, guild) {
 }
 
 function buildWarningsRow(userOrMember) {
-  return new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId(`addwarn_${userOrMember.id}`)
-        .setLabel("Add Warning")
-        .setStyle(ButtonStyle.Success)
-        .setEmoji("⚠️"),
-      new ButtonBuilder()
-        .setCustomId(`removewarn_${userOrMember.id}`)
-        .setLabel("Remove Warning")
-        .setStyle(ButtonStyle.Danger)
-        .setEmoji("🗑️")
-    );
+  // Only show Add/Remove; no Back button for direct .warnings @user view
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`addwarn_${userOrMember.id}`)
+      .setLabel("Add Warning")
+      .setStyle(ButtonStyle.Success)
+      .setEmoji("⚠️"),
+    new ButtonBuilder()
+      .setCustomId(`removewarn_${userOrMember.id}`)
+      .setLabel("Remove Warning")
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji("🗑️")
+  );
 }
 
 async function showWarnings(context, userOrMember) {
@@ -119,7 +119,7 @@ async function showWarnings(context, userOrMember) {
       .addFields(fields)
       .setTimestamp();
 
-    await context.reply({ embeds: [embed] });
+  await context.reply({ embeds: [embed] });
     return;
   }
 
@@ -181,18 +181,74 @@ async function handleWarningButtons(client, interaction) {
   } else if (isModal) {
     if (action === "addwarn") {
       const reason = interaction.fields.getTextInputValue("warnReason") || "No reason";
+      const isTesting = !!config.testingMode;
       let warnings = cleanWarnings(targetId);
 
-      // Send mod log and get the message object
-      const logMsg = await sendModLog(client, userOrMember, interaction.user, "warned", reason, true, null, warnings.length + 1);
+      // Determine thresholds
+      const escalation = config.escalation || {};
+      const kickThreshold = typeof escalation.kickThreshold === "number" ? escalation.kickThreshold : 3;
+      const muteThreshold = typeof escalation.muteThreshold === "number" ? escalation.muteThreshold : 2;
+      const muteDuration = typeof escalation.muteDuration === "number" ? escalation.muteDuration : 2 * 60 * 60 * 1000;
 
-      // Store log message ID for linking
-      warnings.push({ moderator: interaction.user.id, reason, date: Date.now(), logMsgId: logMsg?.id });
-      config.warnings[targetId] = warnings;
-      saveConfig();
+      // Calculate the new count (without mutating yet in testing mode)
+      const newCount = (warnings?.length || 0) + 1;
 
-      await sendUserDM(userOrMember, "warned", null, reason, `Current warnings: ${warnings.length}`);
-      // No need to sendModLog again, already sent above
+      // Apply persistence only if not testing
+      let savedWarningEntry = null;
+      if (!isTesting) {
+        savedWarningEntry = { moderator: interaction.user.id, reason, date: Date.now(), logMsgId: null };
+        warnings.push(savedWarningEntry);
+        config.warnings[targetId] = warnings;
+        saveConfig();
+      }
+
+      // Check and perform escalation (mute/kick) if thresholds reached and member exists
+      let escalationNote = null;
+      if (member) {
+        try {
+          if (newCount >= kickThreshold) {
+            if (!isTesting) await member.kick("Auto-kicked for reaching warning threshold");
+            escalationNote = `Auto-kicked for reaching ${kickThreshold} warnings`;
+          } else if (newCount >= muteThreshold) {
+            if (!isTesting) {
+              await member.timeout(muteDuration, "Auto-muted for reaching warning threshold");
+              // Attempt to add mute role if configured elsewhere; best-effort
+            }
+            const ms = require("ms");
+            escalationNote = `Auto-muted for ${ms(muteDuration, { long: true })} (threshold ${muteThreshold})`;
+          }
+        } catch (e) {
+          console.error("[Warnings] Escalation error:", e);
+        }
+      }
+
+      // Send a single consolidated mod log entry (warn + possible escalation note)
+      const combinedReason = escalationNote ? `${reason} • ${escalationNote}` : reason;
+      const logMsg = await sendModLog(
+        client,
+        userOrMember,
+        interaction.user,
+        "warned",
+        combinedReason,
+        true,
+        escalationNote && escalationNote.includes("muted") ? escalationNote.split("for ")[1]?.split(" (")?.[0] || null : null,
+        newCount
+      );
+
+      // Store log msg id on the saved entry
+      if (!isTesting && savedWarningEntry) {
+        savedWarningEntry.logMsgId = logMsg?.id || null;
+        saveConfig();
+      }
+
+      // DM the user; include escalation note in DM extra
+      await sendUserDM(
+        userOrMember,
+        "warned",
+        null,
+        reason,
+        `Current warnings: ${newCount}${escalationNote ? `\n${escalationNote}` : ""}`
+      );
 
       // Update the original warnings message if possible
       if (interaction.message && interaction.message.edit) {
@@ -202,7 +258,7 @@ async function handleWarningButtons(client, interaction) {
       }
 
       await interaction.reply({
-        content: `${EMOJI_SUCCESS} Warning added: **${reason}**`,
+        content: `${EMOJI_SUCCESS} Warning ${isTesting ? "(TEST) would be " : ""}added: **${reason}**`,
         ephemeral: true
       });
       return;
@@ -216,10 +272,12 @@ async function handleWarningButtons(client, interaction) {
       const index = parseInt(indexStr, 10);
       if (isNaN(index) || index < 1 || index > warnings.length)
         return replyError(interaction, `Invalid warning number. Please enter a number between 1 and ${warnings.length}.`);
-
-      const removed = warnings.splice(index - 1, 1)[0];
-      config.warnings[targetId] = warnings;
-      saveConfig();
+      const isTesting = !!config.testingMode;
+      const removed = isTesting ? warnings[index - 1] : warnings.splice(index - 1, 1)[0];
+      if (!isTesting) {
+        config.warnings[targetId] = warnings;
+        saveConfig();
+      }
 
       await sendUserDM(userOrMember, "warning removed", null, removed.reason, `Current warnings: ${warnings.length}`);
       await sendModLog(client, userOrMember, interaction.user, "warning removed", removed.reason, true, null, warnings.length);
@@ -232,7 +290,7 @@ async function handleWarningButtons(client, interaction) {
       }
 
       await interaction.reply({
-        content: `${EMOJI_SUCCESS} Warning #${index} removed.`,
+        content: `${EMOJI_SUCCESS} Warning #${index} ${isTesting ? "(TEST) would be " : ""}removed.`,
         ephemeral: true
       });
       return;
@@ -240,8 +298,23 @@ async function handleWarningButtons(client, interaction) {
   }
 }
 
+async function handleWarningsCommand(client, message) {
+  const mention = message.mentions.members.first() || message.mentions.users.first();
+  if (mention) {
+    return showWarnings(message, mention);
+  }
+  const arg = message.content.trim().split(/\s+/)[1];
+  if (arg && /^\d{5,}$/.test(arg)) {
+    const member = await message.guild.members.fetch(arg).catch(() => null);
+    const user = member ? member.user : await client.users.fetch(arg).catch(() => null);
+    return showWarnings(message, member || user || null);
+  }
+  return showWarnings(message, null);
+}
+
 module.exports = {
   showWarnings,
   handleWarningButtons,
-  cleanWarnings
+  cleanWarnings,
+  handleWarningsCommand
 };

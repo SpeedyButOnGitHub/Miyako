@@ -2,8 +2,11 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentTyp
 const { isModerator } = require("./moderation/index");
 const { handleMessageCreate } = require("./configMenu");
 const { OWNER_ID } = require("./moderation/permissions");
+const ActiveMenus = require("../utils/activeMenus");
 
 const EMOJI_ERROR = "❌";
+
+// If this file defines interactive help menus elsewhere, consider routing through ActiveMenus
 
 const categories = [
   {

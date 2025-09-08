@@ -261,10 +261,11 @@ async function handleMessageCreate(client, message) {
 
   const mainRow = new ActionRowBuilder();
   for (const category in configCategories) {
+    const emoji = category === 'Leveling' ? '📈' : category === 'Sniping' ? '🔎' : '🛡️';
     mainRow.addComponents(
       new ButtonBuilder()
         .setCustomId(`category_${category}`)
-        .setLabel(`⚙️ ${category}`)
+        .setLabel(`${emoji} ${category}`)
         .setStyle(ButtonStyle.Primary)
     );
   }
@@ -272,9 +273,8 @@ async function handleMessageCreate(client, message) {
   mainRow.addComponents(
     new ButtonBuilder()
       .setCustomId("config_help")
-      .setLabel("Help Menu")
+      .setLabel("❓ Help")
       .setStyle(ButtonStyle.Secondary)
-      .setEmoji("❓")
   );
 
   const mainMsg = await message.reply({
@@ -505,13 +505,13 @@ async function handleMessageCreate(client, message) {
 
         let description = `**${category.description}**`;
         if (categoryName === "Leveling") {
-          const modeStr = config.levelingMode === "whitelist" ? "Allowlist" : "Blocklist";
+          const modeStr = config.levelingMode === "whitelist" ? "Whitelist" : "Blacklist";
           const chCount = Array.isArray(config.levelingChannelList) ? config.levelingChannelList.length : 0;
           const roleBlk = Array.isArray(config.roleXPBlacklist) ? config.roleXPBlacklist.length : 0;
           const mult = (typeof config.globalXPMultiplier === 'number' && Number.isFinite(config.globalXPMultiplier)) ? config.globalXPMultiplier : 1;
           description += `\n\n📊 Summary • Mode: ${modeStr} • Channels: ${chCount} • Blocked roles: ${roleBlk} • Multiplier: x${mult.toFixed(2)}`;
         } else if (categoryName === "Sniping") {
-          const modeStr = config.snipeMode === 'whitelist' ? 'Allowlist' : 'Blocklist';
+          const modeStr = config.snipeMode === 'whitelist' ? 'Whitelist' : 'Blacklist';
           const chCount = (config.snipeMode === 'whitelist' ? (config.snipingWhitelist?.length || 0) : (config.snipingChannelList?.length || 0));
           description += `\n\n📊 Summary • Mode: ${modeStr} • Channels: ${chCount}`;
         } else if (categoryName === "Moderation") {
@@ -542,7 +542,7 @@ async function handleMessageCreate(client, message) {
             .setStyle(ButtonStyle.Primary);
         });
         const rows = [];
-        if (categoryName === 'Sniping' || categoryName === 'Leveling') {
+    if (categoryName === 'Sniping' || categoryName === 'Leveling') {
           const isSniping = categoryName === 'Sniping';
           const modeVal = isSniping ? (config.snipeMode || 'whitelist') : (config.levelingMode || 'blacklist');
           const wlActive = modeVal === 'whitelist';
@@ -550,11 +550,13 @@ async function handleMessageCreate(client, message) {
       rows.push(new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId(`catmode_${categoryName}_whitelist`)
-        .setLabel('Allowlist')
+    .setLabel('Whitelist')
+      .setEmoji('✅')
               .setStyle(wlActive ? ButtonStyle.Success : ButtonStyle.Secondary),
             new ButtonBuilder()
               .setCustomId(`catmode_${categoryName}_blacklist`)
-        .setLabel('Blocklist')
+    .setLabel('Blacklist')
+      .setEmoji('🚫')
               .setStyle(blActive ? ButtonStyle.Danger : ButtonStyle.Secondary)
           ));
         }
@@ -579,13 +581,13 @@ async function handleMessageCreate(client, message) {
         // Build description with concise header summary and per-setting summaries
         let description = `**${category.description}**`;
         if (categoryName === "Leveling") {
-          const mode = config.levelingMode === "whitelist" ? "Allowlist" : "Blocklist";
+          const mode = config.levelingMode === "whitelist" ? "Whitelist" : "Blacklist";
           const chCount = Array.isArray(config.levelingChannelList) ? config.levelingChannelList.length : 0;
           const roleBlk = Array.isArray(config.roleXPBlacklist) ? config.roleXPBlacklist.length : 0;
           const mult = (typeof config.globalXPMultiplier === 'number' && Number.isFinite(config.globalXPMultiplier)) ? config.globalXPMultiplier : 1;
           description += `\n\n📊 Summary • Mode: ${mode} • Channels: ${chCount} • Blocked roles: ${roleBlk} • Multiplier: x${mult.toFixed(2)}`;
         } else if (categoryName === "Sniping") {
-          const mode = config.snipeMode === 'whitelist' ? 'Allowlist' : 'Blocklist';
+          const mode = config.snipeMode === 'whitelist' ? 'Whitelist' : 'Blacklist';
           const chCount = (config.snipeMode === 'whitelist' ? (config.snipingWhitelist?.length || 0) : (config.snipingChannelList?.length || 0));
           description += `\n\n📊 Summary • Mode: ${mode} • Channels: ${chCount}`;
         } else if (categoryName === "Moderation") {
@@ -618,7 +620,7 @@ async function handleMessageCreate(client, message) {
         });
         const rows = [];
         // Add category-level mode toggle for Sniping/Leveling
-        if (categoryName === 'Sniping' || categoryName === 'Leveling') {
+    if (categoryName === 'Sniping' || categoryName === 'Leveling') {
           const isSniping = categoryName === 'Sniping';
           const mode = isSniping ? (config.snipeMode || 'whitelist') : (config.levelingMode || 'blacklist');
           const wlActive = mode === 'whitelist';
@@ -626,11 +628,13 @@ async function handleMessageCreate(client, message) {
       rows.push(new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId(`catmode_${categoryName}_whitelist`)
-        .setLabel('Allowlist')
+    .setLabel('Whitelist')
+      .setEmoji('✅')
               .setStyle(wlActive ? ButtonStyle.Success : ButtonStyle.Secondary),
             new ButtonBuilder()
               .setCustomId(`catmode_${categoryName}_blacklist`)
-        .setLabel('Blocklist')
+    .setLabel('Blacklist')
+      .setEmoji('🚫')
               .setStyle(blActive ? ButtonStyle.Danger : ButtonStyle.Secondary)
           ));
         }
@@ -654,13 +658,13 @@ async function handleMessageCreate(client, message) {
         // Build description with concise header summary and per-setting summaries
         let description = `**${category.description}**`;
         if (categoryName === "Leveling") {
-          const mode = config.levelingMode === "whitelist" ? "Allowlist" : "Blocklist";
+          const mode = config.levelingMode === "whitelist" ? "Whitelist" : "Blacklist";
           const chCount = Array.isArray(config.levelingChannelList) ? config.levelingChannelList.length : 0;
           const roleBlk = Array.isArray(config.roleXPBlacklist) ? config.roleXPBlacklist.length : 0;
           const mult = (typeof config.globalXPMultiplier === 'number' && Number.isFinite(config.globalXPMultiplier)) ? config.globalXPMultiplier : 1;
           description += `\n\n📊 Summary • Mode: ${mode} • Channels: ${chCount} • Blocked roles: ${roleBlk} • Multiplier: x${mult.toFixed(2)}`;
         } else if (categoryName === "Sniping") {
-          const mode = config.snipeMode === 'whitelist' ? 'Allowlist' : 'Blocklist';
+          const mode = config.snipeMode === 'whitelist' ? 'Whitelist' : 'Blacklist';
           const chCount = (config.snipeMode === 'whitelist' ? (config.snipingWhitelist?.length || 0) : (config.snipingChannelList?.length || 0));
           description += `\n\n📊 Summary • Mode: ${mode} • Channels: ${chCount}`;
         } else if (categoryName === "Moderation") {
@@ -693,7 +697,7 @@ async function handleMessageCreate(client, message) {
         });
         const rows = [];
         // Add category-level mode toggle for Sniping/Leveling
-        if (categoryName === 'Sniping' || categoryName === 'Leveling') {
+    if (categoryName === 'Sniping' || categoryName === 'Leveling') {
           const isSniping = categoryName === 'Sniping';
           const mode = isSniping ? (config.snipeMode || 'whitelist') : (config.levelingMode || 'blacklist');
           const wlActive = mode === 'whitelist';
@@ -701,11 +705,13 @@ async function handleMessageCreate(client, message) {
       rows.push(new ActionRowBuilder().addComponents(
             new ButtonBuilder()
               .setCustomId(`catmode_${categoryName}_whitelist`)
-        .setLabel('Allowlist')
+    .setLabel('Whitelist')
+      .setEmoji('✅')
               .setStyle(wlActive ? ButtonStyle.Success : ButtonStyle.Secondary),
             new ButtonBuilder()
               .setCustomId(`catmode_${categoryName}_blacklist`)
-        .setLabel('Blocklist')
+    .setLabel('Blacklist')
+      .setEmoji('🚫')
               .setStyle(blActive ? ButtonStyle.Danger : ButtonStyle.Secondary)
           ));
         }
@@ -1078,14 +1084,20 @@ async function handleMessageCreate(client, message) {
     });
 
     collector.on("end", async (_, reason) => {
-      // Do not delete anything if we intentionally switched menus or reset
+      // If we intentionally switched/reset, don't touch UI
       if (reason === "switch" || reason === "reset") return;
-
-      // Otherwise, old behavior: clean up stale menu
+      // Replace all rows with a single disabled timeout button
       try {
-        await mainMsg.delete().catch(() => {});
-        await message.delete().catch(() => {});
+        const timeoutRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId("expired")
+            .setLabel("Timed out — use the command again")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true)
+        );
+        await mainMsg.edit({ components: [timeoutRow] }).catch(() => {});
       } finally {
+        // Remove from legacy active menus tracker
         activeMenus = activeMenus.filter(
           m => m.messageId !== mainMsg.id && m.commandId !== message.id
         );

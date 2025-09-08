@@ -1,6 +1,8 @@
 const { EmbedBuilder } = require("discord.js");
 const { config } = require("../utils/storage");
 const { levels } = require("../utils/levels");
+const ActiveMenus = require("../utils/activeMenus");
+const { buildLeaderboardEmbed, buildRows } = require("./profile");
 
 function createProgressBar(current, max, size = 14) {
   const safeMax = Math.max(1, max);
@@ -59,53 +61,25 @@ async function handleLeaderboardCommand(client, message) {
   // Sort by level desc, then xp desc
   entries.sort((a, b) => (b.level - a.level) || (b.xp - a.xp));
 
-  // args: page number or "me"
-  const pageSize = 10;
+  const viewerId = message.author.id;
+  const dataset = config.testingMode
+    ? entries.reduce((acc, e) => { acc[e.userId] = { level: e.level, xp: e.xp }; return acc; }, {})
+    : require("../utils/levels").levels; // ensure fresh reference
+  const totalPages = Math.max(1, Math.ceil(Object.keys(dataset || {}).length / 10));
   let page = 1;
-  let focusUserId = null;
   const args = (message.content || "").slice(1).trim().split(/\s+/).slice(1);
   if (args[0]) {
-    if (args[0].toLowerCase() === "me") {
-      focusUserId = message.author.id;
-    } else {
-      const p = Number(args[0]);
-      if (Number.isFinite(p) && p > 0) page = Math.floor(p);
-    }
+    const p = Number(args[0]);
+    if (Number.isFinite(p) && p > 0) page = Math.floor(p);
   }
-  if (focusUserId) {
-    const idx = entries.findIndex(e => e.userId === focusUserId);
-    if (idx !== -1) page = Math.floor(idx / pageSize) + 1;
-  }
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
   if (page > totalPages) page = totalPages;
-  const start = (page - 1) * pageSize;
-  const top = entries.slice(start, start + pageSize);
 
-  if (top.length === 0) {
-    await message.reply("No leaderboard data yet.");
-    return;
+  const embed = buildLeaderboardEmbed(guild, dataset, viewerId, page, 10);
+  const rows = buildRows("leaderboard", page, totalPages);
+  const sent = await message.reply({ embeds: [embed], components: rows }).catch(() => null);
+  if (sent) {
+    ActiveMenus.registerMessage(sent, { type: "profile", userId: message.author.id, data: { view: "leaderboard", page, levelsOverride: config.testingMode ? dataset : undefined } });
   }
-
-  // Build lines
-  const lines = await Promise.all(top.map(async (e, idx) => {
-    const member = await guild.members.fetch(e.userId).catch(() => null);
-    const name = member ? member.user.tag : `User ${e.userId}`;
-    const curLevelXP = getLevelXP(e.level);
-    const nextLevelXP = getLevelXP(e.level + 1);
-    const into = Math.max(0, e.xp - curLevelXP);
-    const need = Math.max(1, nextLevelXP - curLevelXP);
-    const bar = createProgressBar(into, need, 14);
-    return `**${start + idx + 1}.** ${member ? `<@${e.userId}>` : name} — Lvl ${e.level} • ${bar}`;
-  }));
-
-  const embed = new EmbedBuilder()
-    .setTitle("🏆 Server Leaderboard")
-    .setColor(0x5865F2)
-    .setDescription(lines.join("\n"))
-    .setFooter({ text: `Page ${page}/${totalPages} • Requested by ${message.author.tag}` , iconURL: message.author.displayAvatarURL({ dynamic: true }) })
-    .setTimestamp();
-
-  await message.reply({ embeds: [embed] });
 }
 
 module.exports = { handleLeaderboardCommand };

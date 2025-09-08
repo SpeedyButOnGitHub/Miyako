@@ -72,32 +72,21 @@ function formatPermissionPhrases(perms) {
   return phrases.map(ph => `${emojiMap[ph] || "🏅"} ${ph}`).join("\n");
 }
 
-function buildRows(view = "main") {
-  // Main profile: only View Rank + Leaderboard (no Back)
-  if (view === "main") {
-    return [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("prof_rank").setLabel("📊 View Rank").setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId("prof_lb").setLabel("🏆 Leaderboard").setStyle(ButtonStyle.Secondary)
-      )
-    ];
-  }
-  // Rank view: Profile + Leaderboard
-  if (view === "rank") {
-    return [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("prof_home").setLabel("👤 Profile").setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId("prof_lb").setLabel("🏆 Leaderboard").setStyle(ButtonStyle.Primary)
-      )
-    ];
-  }
-  // Leaderboard view: Profile + View Rank
-  return [
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("prof_home").setLabel("👤 Profile").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("prof_rank").setLabel("📊 View Rank").setStyle(ButtonStyle.Primary)
-    )
-  ];
+function buildRows(view = "main", page = 1, totalPages = 1) {
+  const isProfile = view === "main" || view === "profile";
+  const isRank = view === "rank";
+  const isLB = view === "leaderboard";
+  const top = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("prof_home").setLabel("👤 Profile").setStyle(isProfile ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("prof_rank").setLabel("📊 Rank").setStyle(isRank ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("prof_lb").setLabel("🏆 Leaderboard").setStyle(isLB ? ButtonStyle.Primary : ButtonStyle.Secondary)
+  );
+  if (!isLB) return [top];
+  const prev = new ButtonBuilder().setCustomId("lb_prev").setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(page <= 1);
+  const pageBtn = new ButtonBuilder().setCustomId("lb_page").setLabel(`Page ${page}/${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true);
+  const next = new ButtonBuilder().setCustomId("lb_next").setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages);
+  const bottom = new ActionRowBuilder().addComponents(prev, pageBtn, next);
+  return [top, bottom];
 }
 
 function buildRankEmbed(member, rank, level, progressBar) {
@@ -114,24 +103,34 @@ function buildRankEmbed(member, rank, level, progressBar) {
     .setTimestamp();
 }
 
-function buildLeaderboardEmbed(guild, levelsObj, viewerId) {
+function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 10) {
   const entries = Object.entries(levelsObj || {}).map(([uid, data]) => ({
     userId: uid,
     xp: data?.xp || 0,
     level: data?.level || 0,
   }));
   entries.sort((a, b) => (b.level - a.level) || (b.xp - a.xp));
-  const top = entries.slice(0, 10);
-  const lines = top.map((e, i) => {
-    const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`;
-    return `${medal} <@${e.userId}> — Lv. ${e.level}`;
+  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
+  const safePage = Math.min(totalPages, Math.max(1, Math.floor(page)));
+  const start = (safePage - 1) * pageSize;
+  const pageEntries = entries.slice(start, start + pageSize);
+  const lines = pageEntries.map((e, i) => {
+    const rankNum = start + i + 1;
+    const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : `#${rankNum}`;
+    const isYou = String(e.userId) === String(viewerId);
+    const line = `${medal} <@${e.userId}> — Lv. ${e.level}`;
+    return isYou ? `**${line} ← You**` : line;
   });
   const rank = getRankFromLeaderboard(levelsObj, viewerId);
+  const viewerOnPage = pageEntries.some(e => String(e.userId) === String(viewerId));
+  const extra = !viewerOnPage && rank
+    ? `\n— —\nYou: **#${rank}** <@${viewerId}>`
+    : "";
   return new EmbedBuilder()
     .setTitle("🏆 Leaderboard")
     .setColor(0xF1C40F)
-    .setDescription(lines.length ? lines.join("\n") : "No data yet.")
-    .setFooter({ text: rank ? `Your rank: #${rank}` : "" })
+    .setDescription(lines.length ? lines.join("\n") + extra : "No data yet.")
+    .setFooter({ text: rank ? `Your rank: #${rank} • Page ${safePage}/${totalPages}` : `Page ${safePage}/${totalPages}` })
     .setTimestamp();
 }
 
@@ -211,12 +210,29 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
   const into = Math.max(0, xp - xpCurr);
   const need = Math.max(1, xpNext - xpCurr);
   const bar = createProgressBar(into, need, 20);
-  const rank = getRankFromLeaderboard(levelsObj, uid);
+  const levelsSource = session?.data?.levelsOverride || levelsObj;
+  const rank = getRankFromLeaderboard(levelsSource, uid);
 
   if (interaction.customId === "prof_lb") {
-    const lbEmbed = buildLeaderboardEmbed(interaction.guild, levelsObj, uid);
+    const page = 1;
+    const src = session?.data?.levelsOverride || levelsObj;
+    const lbEmbed = buildLeaderboardEmbed(interaction.guild, src, uid, page);
     session.data.view = "leaderboard";
-    await interaction.update({ embeds: [lbEmbed], components: buildRows("leaderboard") });
+    session.data.page = page;
+    const totalPages = Math.max(1, Math.ceil(Object.keys(src || {}).length / 10));
+    await interaction.update({ embeds: [lbEmbed], components: buildRows("leaderboard", page, totalPages) });
+    return;
+  }
+  if (interaction.customId === "lb_prev" || interaction.customId === "lb_next") {
+    const src = session?.data?.levelsOverride || levelsObj;
+    const totalPages = Math.max(1, Math.ceil(Object.keys(src || {}).length / 10));
+    let page = Number(session.data.page) || 1;
+    page += interaction.customId === "lb_next" ? 1 : -1;
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    session.data.page = page;
+    const lbEmbed = buildLeaderboardEmbed(interaction.guild, src, uid, page);
+    await interaction.update({ embeds: [lbEmbed], components: buildRows("leaderboard", page, totalPages) });
     return;
   }
   if (interaction.customId === "prof_rank") {
@@ -260,4 +276,4 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
   await interaction.update({ embeds: [pEmbed], components: buildRows("main") });
 });
 
-module.exports = { handleProfileCommand };
+module.exports = { handleProfileCommand, buildLeaderboardEmbed, buildRows };

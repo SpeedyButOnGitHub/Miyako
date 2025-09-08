@@ -396,10 +396,13 @@ async function handleTestCommand(client, message) {
     });
 
     collector.on("end", async (_, reason) => {
-      if (reason !== "reset") {
-        await replyMsg.delete().catch(() => {});
-        await message.delete().catch(() => {});
-      }
+      if (reason === "reset") return;
+      try {
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("expired").setLabel("Timed out — use the command again").setStyle(ButtonStyle.Secondary).setDisabled(true)
+        );
+        await replyMsg.edit({ components: [row] }).catch(() => {});
+      } catch {}
     });
   }
 
