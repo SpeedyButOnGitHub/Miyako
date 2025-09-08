@@ -5,7 +5,6 @@ const { isModerator } = require("./permissions");
 const { config, saveConfig } = require("../../utils/storage");
 const ms = require("ms");
 const { parseDurationAndReason } = require("../../utils/time");
-const { testLogMessageIds } = require("../test");
 
 const OWNER_ID = process.env.OWNER_ID || "349282473085239298";
 const MUTE_ROLE_ID = "1391535514901020744";
@@ -19,17 +18,13 @@ async function findTarget(message, args) {
   let target = null;
   let reasonArgs = args;
 
-  // 1. Mention
   if (message.mentions.members.size > 0) {
     target = message.mentions.members.first();
     reasonArgs = args.slice(1);
-  }
-  // 2. User ID
-  else if (args[0]) {
+  } else if (args[0]) {
     target = await message.guild.members.fetch(args[0]).catch(() => null);
     if (target) reasonArgs = args.slice(1);
   }
-  // 3. Username or nickname (case-insensitive)
   if (!target && args[0]) {
     const search = args[0].toLowerCase();
     target = message.guild.members.cache.find(
@@ -40,7 +35,6 @@ async function findTarget(message, args) {
     if (target) reasonArgs = args.slice(1);
   }
 
-  // 4. Fallback: Try to fetch as a User if not found as a member
   let user = null;
   if (!target && args[0]) {
     user = await message.client.users.fetch(args[0]).catch(() => null);
@@ -50,31 +44,55 @@ async function findTarget(message, args) {
   return { target, user, reasonArgs };
 }
 
+async function tryTimeoutOrRoleMute(member, durationMs, reason) {
+  // Prefer Discord timeout
+  if (member && typeof member.timeout === "function") {
+    try {
+      await member.timeout(Math.min(durationMs, 14 * 24 * 60 * 60 * 1000), reason || "Muted");
+      return true;
+    } catch {}
+  }
+  // Fallback to mute role if present
+  try {
+    if (MUTE_ROLE_ID && member.guild.roles.cache.has(MUTE_ROLE_ID)) {
+      if (!member.roles.cache.has(MUTE_ROLE_ID)) {
+        await member.roles.add(MUTE_ROLE_ID, reason || "Muted");
+      }
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+async function clearTimeoutAndRole(member, reason) {
+  try { if (typeof member.timeout === "function") await member.timeout(null, reason || "Unmuted"); } catch {}
+  try { if (MUTE_ROLE_ID && member.roles.cache.has(MUTE_ROLE_ID)) await member.roles.remove(MUTE_ROLE_ID, reason || "Unmuted"); } catch {}
+}
+
 async function handleModerationCommands(client, message, command, args) {
   if (!isModerator(message.member)) return replyError(message, "You are not allowed to use this command.");
 
   const { target, user, reasonArgs } = await findTarget(message, args);
-
-  // If neither member nor user found, error
   if (!target && !user) return replyError(message, "You must mention a user, provide a valid user ID, or type their username/nickname.");
 
-  // Use member if available, else fallback to user
   const member = target;
   const userObj = member ? member.user : user;
 
   const isTesting = !!config.testingMode;
-  // Ensure escalation config exists early (used in checks below)
   const escalation = config.escalation || {};
+  // Enforce requested thresholds (mute=3, kick=5) with config override if provided
+  const muteThreshold = Number.isFinite(escalation.muteThreshold) ? escalation.muteThreshold : 3;
+  const kickThreshold = Number.isFinite(escalation.kickThreshold) ? escalation.kickThreshold : 5;
+  const muteDurationMs = Number.isFinite(escalation.muteDuration) ? escalation.muteDuration : 2 * 60 * 60 * 1000;
 
-  // Restriction checks only if NOT in testing mode
+  // Restriction checks (skip in testing to avoid noise)
   if (!isTesting) {
     if (member) {
       if (member.id === message.author.id) return replyError(message, "You cannot moderate yourself.");
       if (member.id === OWNER_ID) return replyError(message, "You cannot moderate the owner.");
       if (member.roles.highest.comparePositionTo(message.member.roles.highest) >= 0 && message.author.id !== OWNER_ID)
         return replyError(message, "You cannot moderate this user due to role hierarchy.");
-      if (config.moderatorRoles.some(roleId => member.roles.cache.has(roleId)) ||
-          (escalation.moderatorRoles || []).some(roleId => member.roles.cache.has(roleId))) {
+      if ((config.moderatorRoles || []).some(r => member.roles.cache.has(r))) {
         return replyError(message, "Cannot moderate this user (they are a configured moderator).");
       }
     } else {
@@ -83,89 +101,80 @@ async function handleModerationCommands(client, message, command, args) {
     }
   }
 
-  // Ensure escalation config exists
-  const escalation = config.escalation || {};
-  const kickThreshold = 5;
-  const muteThreshold = 3;
-  const muteDuration = typeof escalation.muteDuration === "number" ? escalation.muteDuration : 2 * 60 * 60 * 1000;
-
-  // Parse duration and reason from args (after user mention/user id)
-  const argStart = message.mentions.members.size > 0 ? 1 : (args[0] && /^\d+$/.test(args[0]) ? 1 : 0);
-  const { duration, reason } = parseDurationAndReason(args.slice(argStart));
-
-  // Use default duration if not provided
+  // Parse duration and reason after target
+  const argOffset = message.mentions.members.size > 0 ? 1 : (args[0] && /^\d{5,}$/.test(args[0]) ? 1 : 0);
+  const { duration, reason } = parseDurationAndReason(args.slice(argOffset));
   const finalDuration = duration || DEFAULT_MUTE;
   const finalReason = reason || "No reason provided";
 
   try {
-    switch(command) {
-      case "mute":
-        if (!isTesting && (!member || !member.moderatable)) throw new Error("Cannot mute this person.");
+    switch (command) {
+      case "mute": {
+        if (!member) return replyError(message, "User is not in this server.");
         if (!isTesting) {
-          await member.timeout(finalDuration, finalReason);
-          if (!member.roles.cache.has(MUTE_ROLE_ID)) await member.roles.add(MUTE_ROLE_ID).catch(() => {});
+          const ok = await tryTimeoutOrRoleMute(member, finalDuration, `${finalReason} • by ${message.author.tag}`);
+          if (!ok) return replyError(message, "Failed to mute this user. Do I have permissions?");
         }
-        let muteLogMsg = await sendModLog(client, member, message.author, "muted", finalReason, true, formatDuration(finalDuration));
-        if (isTesting && muteLogMsg && muteLogMsg.id) testLogMessageIds.push(muteLogMsg.id);
         await sendUserDM(member, "muted", formatDuration(finalDuration), finalReason);
-        await replySuccess(message, `Muted ${member} for ${formatDuration(finalDuration)}${isTesting ? " (testing mode, will revert)" : ""}`);
-        // If testing, schedule revert
-        if (isTesting) {
-          setTimeout(async () => {
-            await member.timeout(null, "Testing mode revert").catch(() => {});
-            await member.roles.remove(MUTE_ROLE_ID).catch(() => {});
-          }, 5000); // Revert after 5 seconds (adjust as needed)
-        }
+        await sendModLog(client, member, message.author, "muted", finalReason, true, formatDuration(finalDuration), null);
+        await replySuccess(message, `Muted ${member} for ${formatDuration(finalDuration)}${isTesting ? " (testing mode, not applied)" : ""}`);
         return;
+      }
 
-      case "unmute":
-        if (!member) throw new Error("Cannot unmute this person.");
-        await member.timeout(null, `Unmuted by ${message.author.tag}`);
-        if (member.roles.cache.has(MUTE_ROLE_ID)) await member.roles.remove(MUTE_ROLE_ID).catch(() => {});
-        await sendModLog(client, member, message.author, "unmuted", null, false);
+      case "unmute": {
+        if (!member) return replyError(message, "User is not in this server.");
+        if (!isTesting) await clearTimeoutAndRole(member, `Unmuted by ${message.author.tag}`);
         await sendUserDM(member, "unmuted");
+        await sendModLog(client, member, message.author, "unmuted", null, false, null, null);
         await replySuccess(message, `Unmuted ${member}`);
         return;
+      }
 
-      case "warn":
-        // Always use user ID for warnings
+      case "warn": {
         const warnId = userObj.id;
         if (!Array.isArray(config.warnings[warnId])) config.warnings[warnId] = [];
-        let warnings = config.warnings[warnId];
+        const warnings = config.warnings[warnId];
+
         const entry = { moderator: message.author.id, reason: finalReason, date: Date.now(), logMsgId: null };
         warnings.push(entry);
         saveConfig();
 
-        // Determine thresholds using the new count
         const newCount = warnings.length;
-    let escalationNote = null;
-    let escalationDurationText = null;
-        if (member) {
-          if (newCount >= kickThreshold) {
-            if (!isTesting) await member.kick("Auto-kicked for reaching warning threshold");
-            escalationNote = `Auto-kicked for reaching ${kickThreshold} warnings`;
-          } else if (newCount >= muteThreshold) {
-            if (!isTesting) {
-              await member.timeout(muteDuration, "Auto-muted for reaching warning threshold");
-              if (!member.roles.cache.has(MUTE_ROLE_ID)) await member.roles.add(MUTE_ROLE_ID).catch(() => {});
-            }
-      escalationDurationText = formatDuration(muteDuration);
-      const endTs = `<t:${Math.floor((Date.now() + muteDuration) / 1000)}:R>`;
-      escalationNote = `Auto-muted for ${escalationDurationText} (threshold ${muteThreshold}) (ends ${endTs})`;
+
+        // Determine escalation (single combined flow; no public escalation message)
+        let escalationNote = null;
+        let escalationDurationText = null;
+
+        if (newCount >= kickThreshold) {
+          escalationNote = `Auto-kick threshold reached (${newCount}/${kickThreshold}).`;
+          if (!isTesting && member && member.kickable) {
+            try { await member.kick(finalReason); } catch {}
           }
+          // DM only (no public)
+          await sendUserDM(member || userObj, "kicked", null, finalReason, `You reached ${newCount} warnings.`);
+        } else if (newCount >= muteThreshold) {
+          escalationNote = `Auto-mute threshold reached (${newCount}/${muteThreshold}).`;
+          escalationDurationText = formatDuration(muteDurationMs);
+          if (!isTesting && member) {
+            await tryTimeoutOrRoleMute(member, muteDurationMs, `${finalReason} • Auto-mute`);
+          }
+          await sendUserDM(member || userObj, "muted", escalationDurationText, finalReason, `You reached ${newCount} warnings.`);
         }
 
-    // Remaining-to-threshold info
-    const remainingToMute = Math.max(0, muteThreshold - newCount);
-    const remainingToKick = Math.max(0, kickThreshold - newCount);
-    const remainingLine = `Warnings until actions: ${remainingToMute} to auto-mute, ${remainingToKick} to auto-kick.`;
+        const remainingToMute = Math.max(0, muteThreshold - newCount);
+        const remainingToKick = Math.max(0, kickThreshold - newCount);
+        const remainingLine = `Warnings until actions: ${remainingToMute} to auto-mute, ${remainingToKick} to auto-kick.`;
 
-    // DM the user (no public escalation text in channel)
-    await sendUserDM(member || userObj, "warned", escalationDurationText, finalReason, `Current warnings: ${newCount}\n${remainingLine}${escalationNote ? `\n${escalationNote}` : ""}`);
+        await sendUserDM(
+          member || userObj,
+          "warned",
+          escalationDurationText,
+          finalReason,
+          `Current warnings: ${newCount}\n${remainingLine}${escalationNote ? `\n${escalationNote}` : ""}`
+        );
 
-        // Single consolidated log for the warning (and any escalation)
-    const combinedReason = `${finalReason} • ${remainingLine}${escalationNote ? ` • ${escalationNote}` : ""}`;
-        let logMsg = await sendModLog(
+        const combinedReason = `${finalReason} • ${remainingLine}${escalationNote ? ` • ${escalationNote}` : ""}`;
+        const logMsg = await sendModLog(
           client,
           member || userObj,
           message.author,
@@ -175,83 +184,64 @@ async function handleModerationCommands(client, message, command, args) {
           escalationDurationText,
           newCount
         );
-        if (logMsg && entry) { entry.logMsgId = logMsg.id; saveConfig(); }
-        if (isTesting && logMsg && logMsg.id) testLogMessageIds.push(logMsg.id);
+        if (logMsg) {
+          entry.logMsgId = logMsg.id;
+          saveConfig();
+        }
 
         await replySuccess(message, `Warned <@${warnId}> for: **${finalReason}**`);
-        // If testing, remove the warning after a short delay
-        if (isTesting) {
-          setTimeout(() => {
-            config.warnings[warnId].pop();
-            saveConfig();
-          }, 5000); // Revert after 5 seconds
-        }
-        return;
-        
-      case "removewarn": {
-        // Always use user ID for warnings
-        const warnId = userObj.id;
-        if (!Array.isArray(config.warnings[warnId]) || config.warnings[warnId].length === 0) {
-          return replyError(message, "This user has no warnings to remove.");
-        }
-
-        // Parse index argument (1-based), default to last warning
-        let index = parseInt(reasonArgs[0], 10);
-        if (isNaN(index) || index < 1 || index > config.warnings[warnId].length) {
-          index = config.warnings[warnId].length; // Remove latest warning
-        }
-
-        const removed = config.warnings[warnId].splice(index - 1, 1)[0];
-        saveConfig();
-
-  const remainingToMute2 = Math.max(0, muteThreshold - config.warnings[warnId].length);
-  const remainingToKick2 = Math.max(0, kickThreshold - config.warnings[warnId].length);
-  const remainingLine2 = `Warnings until actions: ${remainingToMute2} to auto-mute, ${remainingToKick2} to auto-kick.`;
-
-  await sendUserDM(member || userObj, "warning removed", null, removed.reason, `Current warnings: ${config.warnings[warnId].length}\n${remainingLine2}`);
-  let logMsg = await sendModLog(client, member || userObj, message.author, "warning removed", `${removed.reason} • ${remainingLine2}`, true, null, config.warnings[warnId].length);
-        if (isTesting && logMsg && logMsg.id) testLogMessageIds.push(logMsg.id);
-
-        await replySuccess(message, `Removed warning #${index} from <@${warnId}>${removed.reason ? `: **${removed.reason}**` : ""}`);
         return;
       }
 
-      case "kick":
-        // Only check kickable if NOT in testing mode
-        if (!isTesting && (!member || !member.kickable)) throw new Error("Cannot kick this person.");
-        // Do NOT actually kick in testing mode
-        if (!isTesting) {
-          await member.kick(finalReason || `Kicked by ${message.author.tag}`);
+      case "removewarn": {
+        const warnId = userObj.id;
+        if (!Array.isArray(config.warnings[warnId]) || config.warnings[warnId].length === 0) {
+          return replyError(message, "This user has no warnings.");
         }
-        let kickLogMsg = await sendModLog(client, member, message.author, "kicked", finalReason, true);
-        if (isTesting && kickLogMsg && kickLogMsg.id) testLogMessageIds.push(kickLogMsg.id);
+        let index = parseInt(reasonArgs[0], 10);
+        if (isNaN(index) || index < 1 || index > config.warnings[warnId].length) {
+          index = config.warnings[warnId].length; // default last
+        }
+        const removed = config.warnings[warnId].splice(index - 1, 1)[0];
+        saveConfig();
+
+        const count = config.warnings[warnId].length;
+        const remainingToMute2 = Math.max(0, muteThreshold - count);
+        const remainingToKick2 = Math.max(0, kickThreshold - count);
+        const remainingLine2 = `Warnings until actions: ${remainingToMute2} to auto-mute, ${remainingToKick2} to auto-kick.`;
+
+        await sendUserDM(member || userObj, "warning removed", null, removed?.reason || "No reason", `Current warnings: ${count}\n${remainingLine2}`);
+        await sendModLog(client, member || userObj, message.author, "warning removed", `${removed?.reason || "No reason"} • ${remainingLine2}`, true, null, count);
+        await replySuccess(message, `Removed warning #${index} from <@${warnId}>${removed?.reason ? `: **${removed.reason}**` : ""}`);
+        return;
+      }
+
+      case "kick": {
+        if (!member) return replyError(message, "User is not in this server.");
+        if (!isTesting && !member.kickable) return replyError(message, "I cannot kick this user.");
+        if (!isTesting) {
+          try { await member.kick(finalReason); } catch { return replyError(message, "Failed to kick this user."); }
+        }
         await sendUserDM(member, "kicked", null, finalReason);
+        await sendModLog(client, member, message.author, "kicked", finalReason, true, null, null);
         await replySuccess(message, `Kicked ${member}${isTesting ? " (testing mode, not actually kicked)" : ""}`);
         return;
+      }
 
-      case "ban":
-        // Only check bannable if NOT in testing mode
-        if (!isTesting && (!member || !member.bannable)) throw new Error("Cannot ban this person.");
-
-        // Ban duration logic
-        let banDuration = finalDuration;
-        let banReason = finalReason;
-
-        // Do NOT actually ban in testing mode
+      case "ban": {
+        if (!member) return replyError(message, "User is not in this server.");
+        if (!isTesting && !member.bannable) return replyError(message, "I cannot ban this user.");
         if (!isTesting) {
-          await member.ban({ reason: banReason });
-          // If a duration is provided, schedule unban
-          if (banDuration && banDuration > 0) {
-            setTimeout(async () => {
-              await message.guild.members.unban(member.id, "Temporary ban expired").catch(() => {});
-            }, banDuration);
-          }
+          try { await member.ban({ reason: finalReason }); } catch { return replyError(message, "Failed to ban this user."); }
         }
-        let banLogMsg = await sendModLog(client, member, message.author, "banned", banReason, true, banDuration ? formatDuration(banDuration) : null);
-        if (isTesting && banLogMsg && banLogMsg.id) testLogMessageIds.push(banLogMsg.id);
-        await sendUserDM(member, "banned", banDuration ? formatDuration(banDuration) : null, banReason);
-        await replySuccess(message, `Banned ${member}${banDuration ? ` for ${formatDuration(banDuration)}` : ""}${isTesting ? " (testing mode, not actually banned)" : ""}`);
+        await sendUserDM(member, "banned", null, finalReason);
+        await sendModLog(client, member, message.author, "banned", finalReason, true, null, null);
+        await replySuccess(message, `Banned ${member}${isTesting ? " (testing mode, not actually banned)" : ""}`);
         return;
+      }
+
+      default:
+        return replyError(message, "Unknown moderation command.");
     }
   } catch (err) {
     console.error(`[Moderation Command Error] ${command}:`, err);

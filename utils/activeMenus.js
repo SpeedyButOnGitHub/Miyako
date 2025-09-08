@@ -1,228 +1,163 @@
 const fs = require("fs");
 const path = require("path");
-<<<<<<< HEAD
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 
-const ACTIVE_FILE = path.resolve(__dirname, "../config/buttonSessions.json");
+const SESSIONS_FILE = path.resolve(__dirname, "../config/buttonSessions.json");
 
-// In-memory state
-const sessions = new Map(); // messageId -> { channelId, guildId, type, userId?, data, expiresAt }
-const timers = new Map(); // messageId -> timeout
-const handlers = new Map(); // type -> async (interaction, session) => void
-let clientRef = null;
+// Handlers by session.type
+const handlers = new Map();
+// Sessions in memory keyed by messageId
+const sessions = new Map();
+// Timers by messageId
+const timers = new Map();
 
-function loadFile() {
-  try {
-    if (!fs.existsSync(ACTIVE_FILE)) return [];
-    const raw = fs.readFileSync(ACTIVE_FILE, "utf8");
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
+// Build a single disabled "Timed out — use command again" row
+function timeoutRow() {
+  return [{
+    type: 1,
+    components: [{
+      type: 2,
+      custom_id: "timeout",
+      label: "Timed out — use command again",
+      style: 2,
+      disabled: true
+    }]
+  }];
 }
 
-function saveFile() {
-  const arr = Array.from(sessions.values());
+function loadSessions() {
   try {
-    fs.writeFileSync(ACTIVE_FILE, JSON.stringify(arr, null, 2));
-  } catch (e) {
-    console.error("[ActiveMenus] save error", e);
-  }
+    if (!fs.existsSync(SESSIONS_FILE)) return {};
+    return JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf8")) || {};
+  } catch { return {}; }
 }
 
-function setExpiryTimer(messageId) {
-  clearExpiryTimer(messageId);
-  const sess = sessions.get(messageId);
-  if (!sess || !clientRef) return;
-  const delay = Math.max(0, sess.expiresAt - Date.now());
+function saveSessions() {
+  try {
+    const obj = {};
+    for (const [messageId, s] of sessions.entries()) {
+      obj[messageId] = { ...s, // strip functions/timers
+        // keep only serializable data
+        client: undefined
+      };
+    }
+    const dir = path.dirname(SESSIONS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(obj, null, 2));
+  } catch {}
+}
+
+function scheduleTimer(client, messageId) {
+  const existing = timers.get(messageId);
+  if (existing) clearTimeout(existing);
+  const s = sessions.get(messageId);
+  if (!s) return;
+
+  const delay = Math.max(0, s.expiresAt - Date.now());
   const t = setTimeout(async () => {
+    timers.delete(messageId);
+    // If still present and expired, disable the UI
+    const sess = sessions.get(messageId);
+    if (!sess || Date.now() < sess.expiresAt) return;
+
     try {
-      await expireSession(messageId);
-    } catch (e) {
-      // ignore
+      const channel = await client.channels.fetch(sess.channelId).catch(() => null);
+      const msg = channel ? await channel.messages.fetch(messageId).catch(() => null) : null;
+      if (msg) await msg.edit({ components: timeoutRow() }).catch(() => {});
+    } finally {
+      sessions.delete(messageId);
+      saveSessions();
     }
   }, delay);
   if (typeof t.unref === "function") t.unref();
   timers.set(messageId, t);
 }
 
-function clearExpiryTimer(messageId) {
-  const t = timers.get(messageId);
-  if (t) {
-    try { clearTimeout(t); } catch {}
-    timers.delete(messageId);
-  }
-}
-
-async function expireSession(messageId) {
-  const sess = sessions.get(messageId);
-  if (!sess) return;
-  // Edit message components to disabled "Timed out" buttons
-  try {
-    const channel = await clientRef.channels.fetch(sess.channelId).catch(() => null);
-    const msg = channel ? await channel.messages.fetch(messageId).catch(() => null) : null;
-    if (msg) {
-      // Replace ALL rows with a single disabled "Timed out" button for clarity
-      const timeoutRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("expired")
-          .setLabel("Timed out — use the command again")
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(true)
-      );
-      await msg.edit({ components: [timeoutRow] });
+async function init(client) {
+  // Load persisted sessions and disable any already-expired UIs
+  const raw = loadSessions();
+  for (const [messageId, s] of Object.entries(raw)) {
+    const expired = !s.expiresAt || s.expiresAt <= Date.now();
+    sessions.set(messageId, { ...s });
+    if (expired) {
+      // Best-effort disable
+      try {
+        const channel = await client.channels.fetch(s.channelId).catch(() => null);
+        const msg = channel ? await channel.messages.fetch(messageId).catch(() => null) : null;
+        if (msg) await msg.edit({ components: timeoutRow() }).catch(() => {});
+      } catch {}
+      sessions.delete(messageId);
+    } else {
+      scheduleTimer(client, messageId);
     }
-  } catch {}
-  clearExpiryTimer(messageId);
-  sessions.delete(messageId);
-  saveFile();
+  }
+  saveSessions();
 }
 
 function registerHandler(type, fn) {
   handlers.set(type, fn);
 }
 
-function registerMessage(message, { type, userId = null, data = {} } = {}) {
-  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
-  const sess = {
-    messageId: message.id,
-    channelId: message.channel.id,
-    guildId: message.guildId,
-    type,
-    userId,
-    data,
+function registerMessage(message, session) {
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+  sessions.set(message.id, {
+    type: session.type,
+    userId: session.userId || null,
+    guildId: message.guildId || null,
+    channelId: message.channelId,
     expiresAt,
-  };
-  sessions.set(message.id, sess);
-  saveFile();
-  setExpiryTimer(message.id);
-  return sess;
-}
-
-function touchMessage(messageId) {
-  const sess = sessions.get(messageId);
-  if (!sess) return null;
-  sess.expiresAt = Date.now() + 5 * 60 * 1000;
-  sessions.set(messageId, sess);
-  saveFile();
-  setExpiryTimer(messageId);
-  return sess;
+    data: session.data || {}
+  });
+  saveSessions();
+  // schedule when client attached via processInteraction
 }
 
 async function processInteraction(interaction) {
-  if (!interaction.isButton()) return { handled: false };
-  const message = interaction.message;
-  const mid = message?.id;
-  if (!mid) return { handled: false };
-  let sess = sessions.get(mid);
-  // Auto-register generic sessions for any message with buttons
+  const messageId = interaction.message?.id;
+  if (!messageId) return { handled: false };
+
+  const sess = sessions.get(messageId);
   if (!sess) {
-    const created = message.createdTimestamp || Date.now();
-    const expired = Date.now() - created > 5 * 60 * 1000;
-    if (expired) {
-      // Expire immediately and inform user
-      await expireSession(mid).catch(() => {});
-      try { await interaction.reply({ content: "This menu has timed out. Please use the command again.", ephemeral: true }); } catch {}
-      return { handled: true, expired: true };
+    // If message is older than 5 minutes, disable it on-demand
+    const createdAt = interaction.message.createdTimestamp || 0;
+    if (createdAt && Date.now() - createdAt > 5 * 60 * 1000) {
+      try { await interaction.update({ components: timeoutRow() }); } catch {}
+      return { handled: true };
     }
-    // Create a new generic session and then allow original handler to continue
-    sess = {
-      messageId: mid,
-      channelId: message.channel.id,
-      guildId: message.guildId,
-      type: "generic",
-      userId: null,
-      data: {},
-      expiresAt: Date.now() + 5 * 60 * 1000,
-    };
-    sessions.set(mid, sess);
-    saveFile();
-    setExpiryTimer(mid);
-    // Do not handle; let the original command's code continue
-    return { handled: false, session: sess };
+    return { handled: false };
   }
-  // Expired?
+
+  // Expired? disable and stop
   if (Date.now() > sess.expiresAt) {
-    await expireSession(mid);
-    try { await interaction.reply({ content: "This menu has timed out. Please use the command again.", ephemeral: true }); } catch {}
-    return { handled: true, expired: true };
-  }
-  // Refresh expiry
-  touchMessage(mid);
-  const handler = handlers.get(sess.type);
-  if (!handler) return { handled: false, session: sess };
-  try {
-    await handler(interaction, sess);
-    return { handled: true, session: sess };
-  } catch (e) {
-    console.error("[ActiveMenus] handler error", e);
-    return { handled: true, session: sess, error: e };
-  }
-}
-
-async function init(client) {
-  clientRef = client;
-  const arr = loadFile();
-  const now = Date.now();
-  for (const it of arr) {
-    const sess = { ...it };
-    sessions.set(it.messageId || it.message?.id || it.id, sess);
-    if (sess.expiresAt <= now) {
-      // Expire shortly to update UI
-      setTimeout(() => expireSession(sess.messageId), 200);
-    } else {
-      setExpiryTimer(sess.messageId);
-    }
-=======
-const ACTIVE_MENUS_FILE = path.resolve("./config/activeMenus.json");
-
-async function cleanupActiveMenus(client) {
-  if (!fs.existsSync(ACTIVE_MENUS_FILE)) return;
-  let data;
-  try {
-    data = JSON.parse(fs.readFileSync(ACTIVE_MENUS_FILE, "utf8"));
-  } catch (err) {
-    console.error("Failed to parse activeMenus.json:", err);
-    try { fs.writeFileSync(ACTIVE_MENUS_FILE, "[]"); } catch {}
-    return;
-  }
-
-  if (!Array.isArray(data) || data.length === 0) {
-    try { fs.writeFileSync(ACTIVE_MENUS_FILE, "[]"); } catch {}
-    return;
-  }
-
-  for (const entry of data) {
     try {
-      if (!entry || !entry.channelId || !entry.messageId) continue;
-      const channel = await client.channels.fetch(entry.channelId).catch(() => null);
-      if (!channel || !channel.messages) continue;
-      const msg = await channel.messages.fetch(entry.messageId).catch(() => null);
-      if (msg) await msg.delete().catch(() => {});
-    } catch (err) {
-      // non-fatal: continue cleaning others
-      console.error("Failed to delete active menu message:", err);
-    }
+      if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+        await interaction.update({ components: timeoutRow() });
+      } else {
+        const channel = await interaction.client.channels.fetch(sess.channelId).catch(() => null);
+        const msg = channel ? await channel.messages.fetch(messageId).catch(() => null) : null;
+        if (msg) await msg.edit({ components: timeoutRow() }).catch(() => {});
+      }
+    } catch {}
+    sessions.delete(messageId);
+    saveSessions();
+    return { handled: true };
   }
 
-  try {
-    fs.writeFileSync(ACTIVE_MENUS_FILE, "[]");
-  } catch (err) {
-    console.error("Failed to reset activeMenus.json:", err);
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
-  }
+  // Renew window on every press
+  sess.expiresAt = Date.now() + 5 * 60 * 1000;
+  sessions.set(messageId, sess);
+  saveSessions();
+  scheduleTimer(interaction.client, messageId);
+
+  // Route to handler
+  const fn = handlers.get(sess.type);
+  if (!fn) return { handled: false };
+  await fn(interaction, { ...sess, id: messageId });
+  return { handled: true };
 }
 
 module.exports = {
-<<<<<<< HEAD
   init,
-  registerMessage,
   registerHandler,
-  processInteraction,
-  touchMessage,
+  registerMessage,
+  processInteraction
 };
-=======
-  cleanupActiveMenus
-};
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92

@@ -19,15 +19,20 @@ const defaultConfig = {
   roleLogBlacklist: [],
   snipeMode: "whitelist",
   snipingChannelList: [],
-  // Map of level -> roleId
+  // Level rewards: { [level]: string[] }
   levelRewards: {},
-  // Leveling message gating
-  levelingMode: "blacklist", // 'whitelist' or 'blacklist'
+  // Leveling gating
+  levelingMode: "blacklist",
   levelingChannelList: [],
-  // Leveling role gating and multiplier
+  // Leveling role blacklist and multiplier
   roleXPBlacklist: [],
   globalXPMultiplier: 1.0
 };
+
+function ensureDir() {
+  const dir = path.dirname(CONFIG_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
 
 function validateConfig(cfg) {
   if (!Array.isArray(cfg.snipingWhitelist)) cfg.snipingWhitelist = [];
@@ -41,13 +46,12 @@ function validateConfig(cfg) {
   if (!["whitelist", "blacklist"].includes(cfg.snipeMode)) cfg.snipeMode = "whitelist";
   if (!Array.isArray(cfg.snipingChannelList)) cfg.snipingChannelList = [];
   if (typeof cfg.levelRewards !== "object" || cfg.levelRewards === null) cfg.levelRewards = {};
-  // Leveling gating
   if (!["whitelist", "blacklist"].includes(cfg.levelingMode)) cfg.levelingMode = "blacklist";
   if (!Array.isArray(cfg.levelingChannelList)) cfg.levelingChannelList = [];
-  // Leveling role blacklist and multiplier
   if (!Array.isArray(cfg.roleXPBlacklist)) cfg.roleXPBlacklist = [];
   if (typeof cfg.globalXPMultiplier !== "number" || !Number.isFinite(cfg.globalXPMultiplier)) cfg.globalXPMultiplier = 1.0;
-  // Sanitize levelRewards: ensure string numeric keys mapping to arrays of role IDs (strings)
+
+  // Sanitize levelRewards to { "level": [roleIds] }
   const cleanedRewards = {};
   for (const [lvl, val] of Object.entries(cfg.levelRewards)) {
     const n = Number(lvl);
@@ -56,46 +60,62 @@ function validateConfig(cfg) {
     const roleIds = arr
       .map(v => (typeof v === "string" ? v : String(v || "")))
       .map(s => s.replace(/[^0-9]/g, ""))
-      .filter(s => s.length > 0);
+      .filter(Boolean);
     if (roleIds.length) cleanedRewards[String(n)] = Array.from(new Set(roleIds));
   }
   cfg.levelRewards = cleanedRewards;
-  // escalation sub-keys
+
+  // Ensure escalation sub-keys
   if (typeof cfg.escalation.muteThreshold !== "number") cfg.escalation.muteThreshold = defaultConfig.escalation.muteThreshold;
   if (typeof cfg.escalation.muteDuration !== "number") cfg.escalation.muteDuration = defaultConfig.escalation.muteDuration;
   if (typeof cfg.escalation.kickThreshold !== "number") cfg.escalation.kickThreshold = defaultConfig.escalation.kickThreshold;
+
   return cfg;
 }
 
 let config = { ...defaultConfig };
-if (fs.existsSync(CONFIG_FILE)) {
-  try {
+
+try {
+  if (fs.existsSync(CONFIG_FILE)) {
     const loaded = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+
     // Some past corruption placed defaults inside escalation; flatten if necessary
     const cleaned = { ...loaded };
     if (cleaned.escalation && typeof cleaned.escalation === "object") {
-      // Remove accidental nested defaults from escalation
-      for (const k of ["snipingWhitelist","moderatorRoles","warnings","defaultMuteDuration","modLogChannelId","testingMode","roleLogBlacklist","snipeMode","snipingChannelList"]) {
+      for (const k of [
+        "snipingWhitelist","moderatorRoles","warnings","defaultMuteDuration",
+        "modLogChannelId","testingMode","roleLogBlacklist","snipeMode","snipingChannelList"
+      ]) {
         if (k in cleaned.escalation) delete cleaned.escalation[k];
       }
     }
-    config = validateConfig({ ...defaultConfig, ...cleaned, escalation: { ...defaultConfig.escalation, ...(cleaned.escalation || {}) } });
-  } catch (e) {
-    // rewrite with defaults if corrupted
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+
+    config = validateConfig({
+      ...defaultConfig,
+      ...cleaned,
+      escalation: { ...defaultConfig.escalation, ...(cleaned.escalation || {}) }
+    });
+  } else {
+    ensureDir();
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
+    config = { ...defaultConfig };
   }
 } catch (err) {
-  console.error("[Config] Failed to read config, using defaults:", err);
+  console.error("[Config] Failed to read/parse config, rewriting defaults:", err?.message || err);
+  try {
+    ensureDir();
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
+  } catch {}
   config = { ...defaultConfig };
 }
 
-const saveConfig = () => {
+function saveConfig() {
   try {
     ensureDir();
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(validateAndFix(config), null, 2));
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(validateConfig({ ...config }), null, 2));
   } catch (err) {
-    console.error("[Config] Failed to save config:", err);
+    console.error("[Config] Failed to save config:", err?.message || err);
   }
-};
+}
 
 module.exports = { config, saveConfig };

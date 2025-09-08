@@ -1,128 +1,21 @@
 {
-  "snipingWhitelist": [
-    "1232701768383729790",
-    "1232701768987578460",
-    "1382889736103792740",
-    "1232701768987578463",
-    "1376087369794719774",
-    "1376496427068297276"
-  ],
-  "moderatorRoles": [
-    "1375958357730525387",
-    "1375957787800113182",
-    "1375957925356638228"
-  ],
-  "warnings": {
-    "432610292342587392": [
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757322479580,
-        "logMsgId": "1414537744696348693"
-      },
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757322482862,
-        "logMsgId": "1414537759418351796"
-      },
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757323103546,
-        "logMsgId": "1414540365096030222"
-      }
-    ],
-    "1413738051779428362": [],
-    "349282473085239298": [],
-    "1165431695953121372": [],
-    "475744554910351370": [
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757323130846,
-        "logMsgId": "1414540476245344338"
-      },
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757323134972,
-        "logMsgId": "1414540495534821510"
-      }
-    ]
-  },
+  "snipingWhitelist": [],
+  "moderatorRoles": [],
+  "warnings": {},
   "escalation": {
     "muteThreshold": 2,
     "muteDuration": 7200000,
-    "kickThreshold": 3,
-<<<<<<< HEAD
-=======
-    "defaultMuteDuration": 3600000,
-    "modLogChannelId": "1232701768383729791",
-    "testingMode": false,
-    "roleLogBlacklist": [],
-    "snipeMode": "whitelist",
-    "snipingChannelList": [],
-    "snipingWhitelist": [],
-    "moderatorRoles": [],
-    "warnings": {},
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
-    "escalation": {
-      "muteThreshold": 2,
-      "muteDuration": 7200000,
-      "kickThreshold": 3
-    }
+    "kickThreshold": 3
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
   "testingMode": false,
-  "roleLogBlacklist": [
-    "1232701768329199666",
-    "1232701768341655617",
-    "1232701768354369554",
-    "1232701768362754145",
-    "1232701768375210151"
-  ],
+  "roleLogBlacklist": [],
   "snipeMode": "whitelist",
   "snipingChannelList": [],
-  "levelRewards": {
-    "5": [
-      "1232701768362754147",
-      "1232701768354369551"
-    ],
-    "10": [
-      "1232701768362754148",
-      "1403501108151975966"
-    ],
-    "15": [
-      "1232701768375210145",
-      "1232701768354369552"
-    ],
-    "20": [
-      "1232701768375210146"
-    ],
-    "25": [
-      "1232701768375210147"
-    ],
-    "40": [
-      "1232701768375210148"
-    ],
-    "75": [
-      "1232701768375210149"
-    ],
-    "100": [
-      "1382911184058978454"
-    ]
-  },
+  "levelRewards": {},
   "levelingMode": "blacklist",
-  "levelingChannelList": [
-    "1404040754233610250",
-    "1232701768987578465",
-    "1232701768383729789",
-    "1232701768383729790"
-  ],
-  "roleXPBlacklist": [
-    "1232701768341655619"
-  ],
+  "levelingChannelList": [],
+  "roleXPBlacklist": [],
   "globalXPMultiplier": 1
 }

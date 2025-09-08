@@ -162,188 +162,78 @@ async function showWarnings(context, userOrMember) {
 }
 
 async function handleWarningButtons(client, interaction) {
-  const isButton = interaction.isButton();
-  const isModal = interaction.type === InteractionType.ModalSubmit;
-  const [action, targetId] = interaction.customId.split("_");
-
-  let member = await interaction.guild.members.fetch(targetId).catch(() => null);
-  let user = member ? member.user : await interaction.client.users.fetch(targetId).catch(() => null);
-  if (!user) return replyError(interaction, "User not found.");
-  if (!isModerator(interaction.member)) return replyError(interaction, "You are not allowed.");
-
-  const userOrMember = member || user;
-
-  if (isButton) {
-    if (action === "addwarn") {
+  // Always acknowledge buttons quickly by showing a modal
+  if (interaction.isButton()) {
+    const [id, userId] = interaction.customId.split("_"); // addwarn_<id> | removewarn_<id>
+    if (id === "addwarn" && userId) {
       const modal = new ModalBuilder()
-        .setCustomId(`addwarn_${targetId}`)
-        .setTitle(`Add Warning for ${userOrMember.displayName || userOrMember.username}`)
+        .setCustomId(`addwarn_${userId}`)
+        .setTitle("Add Warning")
         .addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
-              .setCustomId("warnReason")
+              .setCustomId("reason")
               .setLabel("Reason")
               .setStyle(TextInputStyle.Paragraph)
-              .setRequired(true)
+              .setRequired(false)
           )
         );
-      return interaction.showModal(modal);
+      await interaction.showModal(modal).catch(() => {});
+      return;
     }
-    if (action === "removewarn") {
-      const warnings = cleanWarnings(targetId);
-      if (warnings.length === 0) return replyError(interaction, "No warnings to remove.");
-
+    if (id === "removewarn" && userId) {
       const modal = new ModalBuilder()
-        .setCustomId(`removewarn_${targetId}`)
-        .setTitle(`Remove Warning for ${userOrMember.displayName || userOrMember.username}`)
+        .setCustomId(`removewarn_${userId}`)
+        .setTitle("Remove Warning")
         .addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
-              .setCustomId("warnIndex")
-              .setLabel(`Enter warning number (1-${warnings.length})`)
+              .setCustomId("index")
+              .setLabel("Warning index (1 = oldest, empty = latest)")
               .setStyle(TextInputStyle.Short)
-              .setRequired(true)
+              .setRequired(false)
           )
         );
-      return interaction.showModal(modal);
+      await interaction.showModal(modal).catch(() => {});
+      return;
     }
-  } else if (isModal) {
+    return;
+  }
+
+  // Modal submits
+  if (interaction.type === InteractionType.ModalSubmit) {
+    const [action, userId] = interaction.customId.split("_"); // addwarn_<id> | removewarn_<id>
+    const guild = interaction.guild;
+    const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
+    const user = member ? member.user : await interaction.client.users.fetch(userId).catch(() => null);
+    if (!user) {
+      await interaction.reply({ content: "User not found.", ephemeral: true }).catch(() => {});
+      return;
+    }
+
     if (action === "addwarn") {
-      const reason = interaction.fields.getTextInputValue("warnReason") || "No reason";
-      const isTesting = !!config.testingMode;
-      let warnings = cleanWarnings(targetId);
-
-  // Determine thresholds (updated: mute at 3, kick at 5)
-  const escalation = config.escalation || {};
-  const kickThreshold = 5;
-  const muteThreshold = 3;
-  const muteDuration = typeof escalation.muteDuration === "number" ? escalation.muteDuration : 2 * 60 * 60 * 1000;
-
-      // Calculate the new count (without mutating yet in testing mode)
-      const newCount = (warnings?.length || 0) + 1;
-
-      // Apply persistence only if not testing
-      let savedWarningEntry = null;
-      if (!isTesting) {
-        savedWarningEntry = { moderator: interaction.user.id, reason, date: Date.now(), logMsgId: null };
-        warnings.push(savedWarningEntry);
-        config.warnings[targetId] = warnings;
-        saveConfig();
-      }
-
-  // Check and perform escalation (mute/kick) if thresholds reached and member exists
-  let escalationNote = null;
-  let muteDurationText = null;
-      if (member) {
-        try {
-          if (newCount >= kickThreshold) {
-            if (!isTesting) await member.kick("Auto-kicked for reaching warning threshold");
-            escalationNote = `Auto-kicked for reaching ${kickThreshold} warnings`;
-          } else if (newCount >= muteThreshold) {
-            if (!isTesting) {
-              await member.timeout(muteDuration, "Auto-muted for reaching warning threshold");
-              // Attempt to add mute role if configured elsewhere; best-effort
-            }
-    const ms = require("ms");
-    muteDurationText = ms(muteDuration, { long: true });
-    const endTs = `<t:${Math.floor((Date.now() + muteDuration) / 1000)}:R>`;
-    escalationNote = `Auto-muted for ${muteDurationText} (threshold ${muteThreshold}) (ends ${endTs})`;
-          }
-        } catch (e) {
-          console.error("[Warnings] Escalation error:", e);
-        }
-      }
-
-      // Remaining-to-threshold info
-      const remainingToMute = Math.max(0, muteThreshold - newCount);
-      const remainingToKick = Math.max(0, kickThreshold - newCount);
-      const remainingLine = `Warnings until actions: ${remainingToMute} to auto-mute, ${remainingToKick} to auto-kick.`;
-
-      // Send a single consolidated mod log entry (warn + thresholds + possible escalation note)
-      const combinedReason = `${reason} • ${remainingLine}${escalationNote ? ` • ${escalationNote}` : ""}`;
-      const logMsg = await sendModLog(
-        client,
-        userOrMember,
-        interaction.user,
-        "warned",
-        combinedReason,
-        true,
-        muteDurationText || null,
-        newCount
-      );
-
-      // Store log msg id on the saved entry
-      if (!isTesting && savedWarningEntry) {
-        savedWarningEntry.logMsgId = logMsg?.id || null;
-        saveConfig();
-      }
-
-      // DM the user; include escalation note in DM extra
-      await sendUserDM(
-        userOrMember,
-        "warned",
-        muteDurationText || null,
-        reason,
-        `Current warnings: ${newCount}\n${remainingLine}${escalationNote ? `\n${escalationNote}` : ""}`
-      );
-
-      // Update the original warnings message if possible
-      if (interaction.message && interaction.message.edit) {
-        const { embed: updatedEmbed, page: p, totalPages: tp } = buildWarningsEmbed(userOrMember, interaction.guild);
-        const row = buildWarningsRow(userOrMember);
-        const nav = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`warn_user_prev_${userOrMember.id}`).setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(p <= 1),
-          new ButtonBuilder().setCustomId(`warn_user_page_${userOrMember.id}`).setLabel(`Page ${p}/${tp}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-          new ButtonBuilder().setCustomId(`warn_user_next_${userOrMember.id}`).setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(p >= tp),
-        );
-        await interaction.message.edit({ content: `<@${userOrMember.id}>`, embeds: [updatedEmbed], components: [row, nav], allowedMentions: { users: [userOrMember.id] } }).catch(() => {});
-      }
-
-      await interaction.reply({
-        content: `${EMOJI_SUCCESS} Warning ${isTesting ? "(TEST) would be " : ""}added: **${reason}**`,
-        ephemeral: true
-      });
+      const reason = interaction.fields.getTextInputValue("reason") || "No reason provided";
+      // Delegate to moderation command logic via config store
+      if (!Array.isArray(config.warnings[user.id])) config.warnings[user.id] = [];
+      config.warnings[user.id].push({ moderator: interaction.user.id, reason, date: Date.now(), logMsgId: null });
+      saveConfig();
+      await interaction.reply({ content: "Warning added.", ephemeral: true }).catch(() => {});
       return;
     }
 
     if (action === "removewarn") {
-      let warnings = cleanWarnings(targetId);
-      if (warnings.length === 0) return replyError(interaction, "No warnings to remove.");
-
-      const indexStr = interaction.fields.getTextInputValue("warnIndex");
-      const index = parseInt(indexStr, 10);
-      if (isNaN(index) || index < 1 || index > warnings.length)
-        return replyError(interaction, `Invalid warning number. Please enter a number between 1 and ${warnings.length}.`);
-      const isTesting = !!config.testingMode;
-      const removed = isTesting ? warnings[index - 1] : warnings.splice(index - 1, 1)[0];
-      if (!isTesting) {
-        config.warnings[targetId] = warnings;
-        saveConfig();
+      const raw = interaction.fields.getTextInputValue("index");
+      const list = config.warnings[user.id] || [];
+      if (!list.length) {
+        await interaction.reply({ content: "This user has no warnings.", ephemeral: true }).catch(() => {});
+        return;
       }
-
-  const remainingToMute2 = Math.max(0, 3 - warnings.length);
-  const remainingToKick2 = Math.max(0, 5 - warnings.length);
-  const remainingLine2 = `Warnings until actions: ${remainingToMute2} to auto-mute, ${remainingToKick2} to auto-kick.`;
-
-  await sendUserDM(userOrMember, "warning removed", null, removed.reason, `Current warnings: ${warnings.length}\n${remainingLine2}`);
-  await sendModLog(client, userOrMember, interaction.user, "warning removed", `${removed.reason} • ${remainingLine2}`, true, null, warnings.length);
-
-      // Update the original warnings message if possible
-      if (interaction.message && interaction.message.edit) {
-        const { embed: updatedEmbed, page: p, totalPages: tp } = buildWarningsEmbed(userOrMember, interaction.guild);
-        const row = buildWarningsRow(userOrMember);
-        const nav = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`warn_user_prev_${userOrMember.id}`).setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(p <= 1),
-          new ButtonBuilder().setCustomId(`warn_user_page_${userOrMember.id}`).setLabel(`Page ${p}/${tp}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-          new ButtonBuilder().setCustomId(`warn_user_next_${userOrMember.id}`).setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(p >= tp),
-        );
-        await interaction.message.edit({ content: `<@${userOrMember.id}>`, embeds: [updatedEmbed], components: [row, nav], allowedMentions: { users: [userOrMember.id] } }).catch(() => {});
-      }
-
-      await interaction.reply({
-        content: `${EMOJI_SUCCESS} Warning #${index} ${isTesting ? "(TEST) would be " : ""}removed.`,
-        ephemeral: true
-      });
+      let index = parseInt(raw, 10);
+      if (isNaN(index) || index < 1 || index > list.length) index = list.length;
+      list.splice(index - 1, 1);
+      config.warnings[user.id] = list;
+      saveConfig();
+      await interaction.reply({ content: `Removed warning #${index}.`, ephemeral: true }).catch(() => {});
       return;
     }
   }
