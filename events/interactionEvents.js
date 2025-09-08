@@ -4,16 +4,28 @@ const { handleWarningButtons } = require("../commands/moderation/index");
 const { config, saveConfig } = require("../utils/storage");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("../commands/moderation/replies");
 const { renderSettingEmbed } = require("../commands/configMenu");
+const { handleScheduleModal } = require("../commands/schedule");
 const ActiveMenus = require("../utils/activeMenus");
 
 function attachInteractionEvents(client) {
   client.on("interactionCreate", async (interaction) => {
     try {
-      // Global session router for buttons (persistent, renewable 5-minute windows)
+      // Route persistent session UIs first
       if (interaction.isButton()) {
         const res = await ActiveMenus.processInteraction(interaction);
         if (res && res.handled) return;
       }
+
+      // Warnings dashboard/buttons/selects/modals (only routes warns:*)
+      if (
+        (interaction.isButton() && interaction.customId?.startsWith("warns:")) ||
+        (interaction.isStringSelectMenu() && interaction.customId?.startsWith("warns:")) ||
+        (interaction.type === InteractionType.ModalSubmit && interaction.customId?.startsWith("warns:"))
+      ) {
+        await handleWarningButtons(client, interaction);
+        return;
+      }
+
       // StaffTeam Chatbox Button
       if (interaction.isButton() && interaction.customId === CHATBOX_BUTTON_ID) {
         const member = interaction.member;
@@ -133,13 +145,9 @@ function attachInteractionEvents(client) {
         return;
       }
 
-      // Moderation warning buttons and modals
-      if (interaction.isButton() && (interaction.customId.startsWith("addwarn_") || interaction.customId.startsWith("removewarn_"))) {
-        await handleWarningButtons(client, interaction);
-        return;
-      }
-      if (interaction.type === InteractionType.ModalSubmit && (interaction.customId.startsWith("addwarn_") || interaction.customId.startsWith("removewarn_"))) {
-        await handleWarningButtons(client, interaction);
+      // Schedule creation modal submit
+      if (interaction.type === InteractionType.ModalSubmit && interaction.customId.startsWith("schedule_create_modal")) {
+        await handleScheduleModal(interaction);
         return;
       }
     } catch (err) {

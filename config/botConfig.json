@@ -13,43 +13,11 @@
     "1375957925356638228"
   ],
   "warnings": {
-    "432610292342587392": [
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757322479580,
-        "logMsgId": "1414537744696348693"
-      },
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757322482862,
-        "logMsgId": "1414537759418351796"
-      },
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757323103546,
-        "logMsgId": "1414540365096030222"
-      }
-    ],
+    "432610292342587392": [],
     "1413738051779428362": [],
     "349282473085239298": [],
     "1165431695953121372": [],
-    "475744554910351370": [
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757323130846,
-        "logMsgId": "1414540476245344338"
-      },
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757323134972,
-        "logMsgId": "1414540495534821510"
-      }
-    ]
+    "475744554910351370": []
   },
   "escalation": {
     "muteThreshold": 2,
@@ -63,7 +31,7 @@
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
-  "testingMode": false,
+  "testingMode": true,
   "roleLogBlacklist": [
     "1232701768329199666",
     "1232701768341655617",
@@ -112,5 +80,71 @@
   "roleXPBlacklist": [
     "1232701768341655619"
   ],
-  "globalXPMultiplier": 1
+  "globalXPMultiplier": 1,
+  "testingWarnings": {
+    "349282473085239298": [
+      {
+        "moderator": "349282473085239298",
+        "reason": "Off-topic",
+        "date": 1757022184122
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "Spam",
+        "date": 1757302858199
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "NSFW",
+        "date": 1757020986334
+      }
+    ],
+    "432610292342587392": []
+  },
+  "testingSeed": {
+    "748278274937061558": [
+      {
+        "moderator": "748278274937061558",
+        "reason": "NSFW",
+        "date": 1757210177885
+      },
+      {
+        "moderator": "748278274937061558",
+        "reason": "Spam",
+        "date": 1757149943646
+      },
+      {
+        "moderator": "748278274937061558",
+        "reason": "Rude language",
+        "date": 1756993614189
+      },
+      {
+        "moderator": "748278274937061558",
+        "reason": "Disrespect",
+        "date": 1757315282459
+      }
+    ],
+    "349282473085239298": [
+      {
+        "moderator": "349282473085239298",
+        "reason": "NSFW",
+        "date": 1757194045209
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "Off-topic",
+        "date": 1757022184122
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "Spam",
+        "date": 1757302858199
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "NSFW",
+        "date": 1757020986334
+      }
+    ]
+  }
 }

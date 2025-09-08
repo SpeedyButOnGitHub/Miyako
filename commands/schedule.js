@@ -1,34 +1,3 @@
-<<<<<<< HEAD
-const { addSchedule, getSchedules, removeSchedule } = require("../utils/scheduleStorage");
-
-async function handleScheduleCommand(client, message) {
-  const args = message.content.trim().split(/\s+/).slice(1);
-  const sub = (args[0] || "").toLowerCase();
-
-  if (!sub || sub === "list") {
-    const all = getSchedules();
-    if (all.length === 0) return message.reply("No schedules yet.");
-    const lines = all.map(s => `• ${s.id} — <#${s.channelId}> — ${s.cron || s.when || "manual"} — ${s.content?.slice(0,60) || "(no content)"}`);
-    return message.reply(lines.join("\n"));
-  }
-
-  if (sub === "add") {
-    const content = args.slice(1).join(" ");
-    if (!content) return message.reply("Usage: .schedule add <message to send>");
-    const sched = addSchedule({ channelId: message.channel.id, content, createdBy: message.author.id, createdAt: Date.now() });
-    return message.reply(`Added schedule ${sched.id}.`);
-  }
-
-  if (sub === "remove" && args[1]) {
-    const ok = removeSchedule(args[1]);
-    return message.reply(ok ? `Removed ${args[1]}.` : `No schedule with id ${args[1]}.`);
-  }
-
-  return message.reply("Usage: .schedule [list|add <content>|remove <id>]");
-}
-
-module.exports = { handleScheduleCommand };
-=======
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ComponentType } = require("discord.js");
 const { addSchedule, getSchedules, removeSchedule, getSchedule, updateSchedule } = require("../utils/scheduleStorage");
 const { computeNextRun } = require("../utils/scheduler");
@@ -168,7 +137,7 @@ async function handleScheduleCommand(client, message) {
   });
 }
 
-// handle modal submit (from interactionEvents.js you must forward ModalSubmit to this function)
+// handle modal submit (forwarded from interactionEvents.js)
 async function handleScheduleModal(interaction) {
   if (!interaction.isModalSubmit()) return;
   if (!interaction.customId.startsWith("schedule_create_modal")) return;
@@ -222,4 +191,3 @@ module.exports = {
   handleScheduleCommand,
   handleScheduleModal
 };
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92

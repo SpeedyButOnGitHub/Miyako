@@ -7,6 +7,7 @@ const { postStartupChangelog } = require("./utils/changelog");
 const { attachMessageEvents } = require("./events/messages");
 const { attachGuildEvents } = require("./events/guildEvents");
 const { attachInteractionEvents } = require("./events/interactionEvents");
+const { startScheduler } = require("./utils/scheduler");
 const ActiveMenus = require("./utils/activeMenus");
 // debug: ensure functions are imported correctly
 // console.log('attachMessageEvents typeof =', typeof attachMessageEvents);
@@ -67,7 +68,7 @@ async function sendBotStatusMessage() {
         for (const it of cap(result.removed, 4)) lines.push(`✖️ ${it.path}`);
         for (const it of cap(result.modified, 6)) {
           const ld = it.linesDelta === 0 ? "±0" : (it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`);
-          lines.push(`� ${it.path} (${ld} lines)`);
+          lines.push(`🔧 ${it.path} (${ld} lines)`);
         }
         // Simple "smart" grouping summary
         const summary = `Files changed: ${total} (➕ ${result.added.length}, ✖️ ${result.removed.length}, 🔧 ${result.modified.length})`;
@@ -114,6 +115,9 @@ client.once("ready", async () => {
 
   // Initialize global button/session manager (restores timers and disables expired UIs)
   try { await ActiveMenus.init(client); } catch (e) { console.error("[ActiveMenus init]", e); }
+
+  // Start the scheduler loop
+  try { startScheduler(client); } catch (e) { console.error("[Scheduler] start error:", e); }
 
   // Cleanup lingering menus on restart
   if (fs.existsSync(ACTIVE_MENUS_FILE)) {

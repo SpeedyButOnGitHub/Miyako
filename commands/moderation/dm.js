@@ -41,8 +41,8 @@ async function sendUserDM(target, action, duration = null, reason = null, extra 
     .setColor(color)
     .setDescription(description);
 
-  if (duration) embed.addFields({ name: "⏰ Duration", value: duration, inline: true });
   if (reason) embed.addFields({ name: "📝 Reason", value: reason, inline: true });
+  if (duration) embed.addFields({ name: "⏰ Duration", value: duration, inline: true });
   if (extra) embed.addFields({ name: "ℹ️ Info", value: extra, inline: false });
   embed.setTimestamp();
 

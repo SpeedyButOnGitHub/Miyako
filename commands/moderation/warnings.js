@@ -1,330 +1,443 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType, Message } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require("discord.js");
 const { replyError, EMOJI_SUCCESS } = require("./replies");
 const { sendUserDM } = require("./dm");
 const { sendModLog } = require("../../utils/modLogs");
 const { isModerator } = require("./permissions");
 const { config, saveConfig } = require("../../utils/storage");
 
-const WARNING_EXPIRY = 1000 * 60 * 60 * 24 * 60;
+const PAGE_SIZE = 10; // users per page in dashboard
+const MAX_WARNING_LIST = 6; // entries shown inline in user view
 
-function cleanWarnings(targetId) {
-  if (!config.warnings[targetId]) return [];
-  const now = Date.now();
-  config.warnings[targetId] = config.warnings[targetId].filter(w => now - w.date < WARNING_EXPIRY);
+function ensureWarningsMap() {
+  if (typeof config.warnings !== "object" || !config.warnings) config.warnings = {};
+  if (typeof config.testingWarnings !== "object" || !config.testingWarnings) config.testingWarnings = {};
+  if (typeof config.testingSeed !== "object" || !config.testingSeed) config.testingSeed = {};
+}
+
+function getStoreKey() {
+  return config.testingMode ? "testingWarnings" : "warnings";
+}
+
+function getUserWarnings(userId) {
+  ensureWarningsMap();
+  const key = getStoreKey();
+  const store = config[key];
+  return Array.isArray(store[userId]) ? store[userId] : [];
+}
+
+function setUserWarnings(userId, arr) {
+  ensureWarningsMap();
+  const key = getStoreKey();
+  const store = config[key];
+  store[userId] = Array.isArray(arr) ? arr : [];
   saveConfig();
-  return config.warnings[targetId];
 }
 
-// Helper to format "in x days/hours" for Discord timestamp
-function formatExpiresTimestamp(date) {
-  const expiresAt = date + WARNING_EXPIRY;
-  return `<t:${Math.floor(expiresAt / 1000)}:R>`; // "in x days"
+function getThresholds() {
+  const esc = config.escalation || {};
+  const muteT = Math.max(1, Number(esc.muteThreshold || 3));
+  const kickT = Math.max(muteT + 1, Number(esc.kickThreshold || 5));
+  return { muteT, kickT };
 }
 
-// Helper to get message link for warn log (if available)
-function getWarnLogLink(guildId, messageId) {
-  if (!guildId || !messageId) return "*Unable to provide message link*";
-  const channelId = config.testingMode ? "1413966369296220233" : (config.modLogChannelId || "1232701768383729791");
-  return `[Jump to message](https://discord.com/channels/${guildId}/${channelId}/${messageId})`;
+// Determine next punishment label and how many warnings remain to reach it
+function getNextPunishmentInfo(total) {
+  const { muteT, kickT } = getThresholds();
+  if (total < muteT) return { label: "mute", remaining: Math.max(0, muteT - total) };
+  if (total < kickT) return { label: "kick", remaining: Math.max(0, kickT - total) };
+  return null;
 }
 
-function buildWarningsEmbed(userOrMember, guild, page = 1, pageSize = 6, override = null) {
-  // Show synthetic warnings in testing mode for any user
-  let warnings = override ?? cleanWarnings(userOrMember.id);
-  if (config.testingMode && !override) {
-    const count = 6 + Math.floor(Math.random() * 9); // 6-14 warnings for readability test
-    warnings = Array.from({ length: count }).map((_, i) => ({
-      moderator: guild.ownerId || userOrMember.id,
-      reason: `Test warning #${i + 1}`,
-      date: Date.now() - Math.floor(Math.random() * (WARNING_EXPIRY / 2)),
-      logMsgId: null,
-    }));
+// Seed random warnings for testing mode display; persists until explicit edits occur
+function maybeSeedTestingData(guild) {
+  if (!config.testingMode) return;
+  ensureWarningsMap();
+  const seed = config.testingSeed || {};
+  const hasAny = Object.values(seed).some(arr => Array.isArray(arr) && arr.length);
+  if (hasAny) return;
+
+  const members = [...guild.members.cache.values()].filter(m => !m.user.bot);
+  const totalPick = Math.min(12, members.length);
+  for (let i = 0; i < totalPick; i++) {
+    const m = members[Math.floor(Math.random() * members.length)];
+    if (!m) continue;
+    const warns = [];
+    const n = 1 + Math.floor(Math.random() * 4);
+    for (let j = 0; j < n; j++) {
+      warns.push({
+        moderator: m.id,
+        reason: ["Spam", "Off-topic", "Rude language", "NSFW", "Disrespect"][Math.floor(Math.random() * 5)],
+        date: Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)
+      });
+    }
+    seed[m.id] = warns;
   }
+  config.testingSeed = seed;
+  saveConfig();
+}
 
-  const total = warnings.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const safePage = Math.min(Math.max(1, page), totalPages);
-  const start = (safePage - 1) * pageSize;
-  const slice = warnings.slice(start, start + pageSize);
+// Visible warnings in UI: in testing mode prefer explicit testingWarnings, else seeded; otherwise real store
+function getVisibleWarnings(userId) {
+  ensureWarningsMap();
+  if (config.testingMode) {
+    const real = config.testingWarnings[userId];
+    if (Array.isArray(real) && real.length) return real;
+    const seeded = config.testingSeed[userId];
+    if (Array.isArray(seeded) && seeded.length) return seeded;
+    return [];
+  }
+  return getUserWarnings(userId);
+}
 
-  const fields = slice.map((w, i) => {
-    const idx = start + i + 1;
-    const jumpLink = w.logMsgId ? getWarnLogLink(guild.id, w.logMsgId) : "*No log link*";
-    return {
-      name: `#${idx} • ${w.reason || "No reason"}`,
-      value: `👮 By: <@${w.moderator}>  •  ⏰ Expires: ${formatExpiresTimestamp(w.date)}\n${jumpLink}`,
-      inline: false
-    };
-  });
+function memberLabel(guild, userId) {
+  const member = guild.members.cache.get(userId);
+  if (member) return member.displayName || member.user.username || userId;
+  const user = guild.client.users.cache.get(userId);
+  return user?.username || userId;
+}
 
-  const displayName = userOrMember.displayName || userOrMember.username || userOrMember.tag || userOrMember.id;
-  const avatar = userOrMember.displayAvatarURL ? userOrMember.displayAvatarURL({ dynamic: true }) : undefined;
+function formatWarnLine(guild, entry, idx) {
+  const ordinal = (n) => {
+    const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+  const by = entry.moderator ? `<@${entry.moderator}>` : "Unknown";
+  const when = entry.date ? `<t:${Math.floor(entry.date / 1000)}:R>` : "Unknown";
+  const reason = (entry.reason || "No reason").slice(0, 140);
+  const label = `${ordinal(idx)} Warning`;
+  const gId = guild?.id;
+  const chId = entry.logChannelId || null;
+  const msgId = entry.logMsgId || null;
+  const link = (gId && chId && msgId) ? `https://discord.com/channels/${gId}/${chId}/${msgId}` : null;
+  const title = link ? `[${label}](${link})` : label;
+  return `${title} • by ${by} • ${when}\n${reason}`;
+}
+
+function buildDashboardEmbed(guild, page) {
+  ensureWarningsMap();
+  maybeSeedTestingData(guild);
+  const usersSet = new Set();
+  if (config.testingMode) {
+    Object.keys(config.testingSeed || {}).forEach(k => usersSet.add(k));
+    Object.keys(config.testingWarnings || {}).forEach(k => usersSet.add(k));
+  } else {
+    Object.keys(config.warnings || {}).forEach(k => usersSet.add(k));
+  }
+  const all = [...usersSet].map(userId => ({ userId, count: getVisibleWarnings(userId).length }))
+    .filter(x => x.count > 0)
+    .sort((a, b) => b.count - a.count || a.userId.localeCompare(b.userId));
+
+  const totalPages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+  const curPage = Math.min(Math.max(1, page || 1), totalPages);
+  const slice = all.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
+
+  const lines = slice.length
+    ? slice.map((x, i) => {
+        const idx = (i + 1) + (curPage - 1) * PAGE_SIZE;
+        // Use mentions for uniformity with the rest; allowedMentions are disabled when replying
+        return `${idx}. <@${x.userId}> • ${x.count} warning${x.count === 1 ? "" : "s"}`;
+      }).join("\n")
+    : "No users currently have warnings.";
 
   const embed = new EmbedBuilder()
-    .setAuthor({ name: displayName, iconURL: avatar })
-    // Avoid mention in title; use description to show the mention safely
-    .setTitle("⚠️ Warnings")
-    .setDescription(userOrMember.id ? `User: <@${userOrMember.id}>` : displayName)
-    .setColor(0xffd700)
-    .addFields(fields.length ? fields : [{ name: "No warnings", value: "—", inline: false }])
-    .setFooter({ text: `Page ${safePage}/${totalPages} • ${total} total warnings` })
-    .setTimestamp();
+    .setTitle("⚠️Warning Dashboard")
+    .setColor(0x5865F2)
+    .setDescription(lines)
+    .setFooter({ text: `Page ${curPage}/${totalPages}` });
 
-  return { embed, page: safePage, totalPages, total };
+  // Per-user select for simpler navigation
+  const userOptions = slice.map(x => ({
+    label: memberLabel(guild, x.userId).slice(0, 100),
+    description: `${x.count} warning${x.count === 1 ? "" : "s"}`,
+    value: x.userId
+  }));
+
+  const rows = [];
+  rows.push(new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`warns:selectuser:${curPage}`)
+      .setPlaceholder(userOptions.length ? "Select a user to view" : "No users to select")
+      .setMinValues(1)
+      .setMaxValues(1)
+      .addOptions(userOptions.length ? userOptions : [{ label: "No users", value: "noop", default: true }])
+      .setDisabled(!userOptions.length)
+  ));
+
+  // Pagination controls: only show Prev/Next if multiple pages are needed
+  if (totalPages > 1) {
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`warns:list:prev:${curPage}`).setLabel("◀ Previous").setStyle(ButtonStyle.Secondary).setDisabled(curPage <= 1),
+      new ButtonBuilder().setCustomId(`warns:list:next:${curPage}`).setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(curPage >= totalPages)
+    ));
+  }
+
+  return { embed, rows, page: curPage, totalPages };
 }
 
-function buildWarningsRow(userOrMember) {
-  // Only show Add/Remove; no Back button for direct .warnings @user view
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`addwarn_${userOrMember.id}`)
-      .setLabel("Add Warning")
-      .setStyle(ButtonStyle.Success)
-      .setEmoji("⚠️"),
-    new ButtonBuilder()
-      .setCustomId(`removewarn_${userOrMember.id}`)
-      .setLabel("Remove Warning")
-      .setStyle(ButtonStyle.Danger)
-      .setEmoji("🗑️")
+function buildUserView(guild, userId, page = 1, opts = {}) {
+  const includeBack = opts.includeBack !== undefined ? opts.includeBack : true;
+  ensureWarningsMap();
+  maybeSeedTestingData(guild);
+  const arr = getVisibleWarnings(userId);
+  const memberName = memberLabel(guild, userId);
+  const total = arr.length;
+
+  const start = (page - 1) * MAX_WARNING_LIST;
+  const chunk = arr.slice(start, start + MAX_WARNING_LIST);
+  const totalPages = Math.max(1, Math.ceil(total / MAX_WARNING_LIST));
+
+  const baseDesc = total ? chunk.map((e, i) => formatWarnLine(guild, e, start + i + 1)).join("\n\n") : "This user has no warnings.";
+  const nxt = getNextPunishmentInfo(total);
+  const disclaimer = nxt ? `${nxt.remaining} warning${nxt.remaining === 1 ? "" : "s"} remaining until ${nxt.label}` : null;
+  const embed = new EmbedBuilder()
+    .setTitle(`⚠️Warnings — ${memberName}`)
+    .setColor(0x5865F2)
+    .setDescription([baseDesc, disclaimer].filter(Boolean).join("\n\n"))
+    .setFooter({ text: `Total: ${total} • Page ${Math.min(page, totalPages)}/${totalPages}` });
+
+  const rows = [];
+  const row = new ActionRowBuilder();
+  // Show Prev/Next only if more than one page
+  if (totalPages > 1) {
+    row.addComponents(
+      new ButtonBuilder().setCustomId(`warns:user:prev:${userId}:${page}`).setLabel("◀ Previous").setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
+      new ButtonBuilder().setCustomId(`warns:user:next:${userId}:${page}`).setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages)
+    );
+  }
+  // Primary actions
+  row.addComponents(
+    new ButtonBuilder().setCustomId(`warns:add:${userId}`).setLabel("Add Warning").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`warns:remove:${userId}`).setLabel("Remove Warning").setStyle(ButtonStyle.Danger).setDisabled(!total)
   );
+  // Back button goes at the end
+  if (includeBack) {
+    row.addComponents(new ButtonBuilder().setCustomId("warns:user:back").setLabel("Back to list").setStyle(ButtonStyle.Secondary));
+  }
+  rows.push(row);
+
+  return { embed, rows, total, totalPages, page };
 }
 
-async function showWarnings(context, userOrMember) {
-  // If no userOrMember is provided, show overview with pagination
-  if (!userOrMember) {
-    const guild = context.guild;
-    const isTesting = !!config.testingMode;
-    // Base map from config (cleaned)
-    const baseMap = Object.entries(config.warnings || {}).reduce((acc, [uid, arr]) => {
-      acc[uid] = (arr || []).filter(w => Date.now() - w.date < WARNING_EXPIRY);
-      return acc;
-    }, {});
-    // Synthetic map for testing mode (non-persistent)
-    let map = baseMap;
-    if (isTesting) {
-      const members = (await guild.members.fetch().catch(() => null)) || guild.members.cache;
-      const ids = members.filter(m => !m.user.bot).map(m => m.id);
-      map = {};
-      const nUsers = Math.min(24, ids.length);
-      for (let i = 0; i < nUsers; i++) {
-        const uid = ids[i];
-        const count = 1 + Math.floor(Math.random() * 3);
-        map[uid] = Array.from({ length: count }).map(() => ({ moderator: context.author?.id || context.user?.id || uid, reason: "Test warning", date: Date.now() - Math.floor(Math.random() * (WARNING_EXPIRY / 2)), logMsgId: null }));
-      }
-    }
-    // First page
-    const users = Object.keys(map).filter(uid => (map[uid] || []).length > 0);
-    const totalPages = Math.max(1, Math.ceil(users.length / 6));
-    const page = 1;
-    const start = (page - 1) * 6;
-    const slice = users.slice(start, start + 6);
-    const fields = slice.map(uid => {
-      const arr = map[uid] || [];
-      const name = guild.members.cache.get(uid)?.displayName || guild.client.users.cache.get(uid)?.username || `User ${uid}`;
-      const val = arr.map((w, i) => {
-        const link = w.logMsgId ? getWarnLogLink(guild.id, w.logMsgId) : "*Unable to provide message link*";
-        return `**${i + 1}.** ${w.reason || "No reason"} — <@${w.moderator}>\n${link}`;
-      }).join("\n");
-      return { name: `⚠️ ${name} (${arr.length})`, value: val || "—", inline: false };
-    });
-    const embed = new EmbedBuilder()
-      .setTitle("⚠️ Server Warnings Overview")
-      .setColor(0xffd700)
-      .addFields(fields)
-      .setFooter({ text: `Page ${page}/${totalPages}` })
-      .setTimestamp();
-    const rows = [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("warns_prev").setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(true),
-      new ButtonBuilder().setCustomId("warns_page").setLabel(`Page ${page}/${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-      new ButtonBuilder().setCustomId("warns_next").setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages)
-    )];
-    const sent = await context.reply({ embeds: [embed], components: rows }).catch(() => null);
-    if (sent) {
-      ActiveMenus.registerMessage(sent, { type: "warnings", userId: context.author?.id || context.user?.id, data: { page, warningsOverride: isTesting ? map : undefined } });
-    }
+async function showWarnings(client, message, targetUserId = null) {
+  const guild = message.guild;
+  if (!guild) return;
+  maybeSeedTestingData(guild);
+  if (targetUserId) {
+    const view = buildUserView(guild, targetUserId, 1, { includeBack: false });
+    await message.reply({ embeds: [view.embed], components: view.rows, allowedMentions: { parse: [] } });
     return;
   }
-
-  // Otherwise, show warnings for the specific user/member
-  const { embed, page, totalPages } = buildWarningsEmbed(userOrMember, context.guild);
-  const row = buildWarningsRow(userOrMember);
-  const nav = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`warn_user_prev_${userOrMember.id}`).setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
-    new ButtonBuilder().setCustomId(`warn_user_page_${userOrMember.id}`).setLabel(`Page ${page}/${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-    new ButtonBuilder().setCustomId(`warn_user_next_${userOrMember.id}`).setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages),
-  );
-  if (context instanceof Message) {
-    const sent = await context.reply({ content: `<@${userOrMember.id}>`, embeds: [embed], components: [row, nav], allowedMentions: { users: [userOrMember.id] } }).catch(() => null);
-    if (sent) {
-      ActiveMenus.registerMessage(sent, { type: "warn_user", userId: context.author?.id, data: { userId: userOrMember.id, page } });
-    }
-  }
-}
-
-async function handleWarningButtons(client, interaction) {
-  // Always acknowledge buttons quickly by showing a modal
-  if (interaction.isButton()) {
-    const [id, userId] = interaction.customId.split("_"); // addwarn_<id> | removewarn_<id>
-    if (id === "addwarn" && userId) {
-      const modal = new ModalBuilder()
-        .setCustomId(`addwarn_${userId}`)
-        .setTitle("Add Warning")
-        .addComponents(
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId("reason")
-              .setLabel("Reason")
-              .setStyle(TextInputStyle.Paragraph)
-              .setRequired(false)
-          )
-        );
-      await interaction.showModal(modal).catch(() => {});
-      return;
-    }
-    if (id === "removewarn" && userId) {
-      const modal = new ModalBuilder()
-        .setCustomId(`removewarn_${userId}`)
-        .setTitle("Remove Warning")
-        .addComponents(
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId("index")
-              .setLabel("Warning index (1 = oldest, empty = latest)")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(false)
-          )
-        );
-      await interaction.showModal(modal).catch(() => {});
-      return;
-    }
-    return;
-  }
-
-  // Modal submits
-  if (interaction.type === InteractionType.ModalSubmit) {
-    const [action, userId] = interaction.customId.split("_"); // addwarn_<id> | removewarn_<id>
-    const guild = interaction.guild;
-    const member = guild ? await guild.members.fetch(userId).catch(() => null) : null;
-    const user = member ? member.user : await interaction.client.users.fetch(userId).catch(() => null);
-    if (!user) {
-      await interaction.reply({ content: "User not found.", ephemeral: true }).catch(() => {});
-      return;
-    }
-
-    if (action === "addwarn") {
-      const reason = interaction.fields.getTextInputValue("reason") || "No reason provided";
-      // Delegate to moderation command logic via config store
-      if (!Array.isArray(config.warnings[user.id])) config.warnings[user.id] = [];
-      config.warnings[user.id].push({ moderator: interaction.user.id, reason, date: Date.now(), logMsgId: null });
-      saveConfig();
-      await interaction.reply({ content: "Warning added.", ephemeral: true }).catch(() => {});
-      return;
-    }
-
-    if (action === "removewarn") {
-      const raw = interaction.fields.getTextInputValue("index");
-      const list = config.warnings[user.id] || [];
-      if (!list.length) {
-        await interaction.reply({ content: "This user has no warnings.", ephemeral: true }).catch(() => {});
-        return;
-      }
-      let index = parseInt(raw, 10);
-      if (isNaN(index) || index < 1 || index > list.length) index = list.length;
-      list.splice(index - 1, 1);
-      config.warnings[user.id] = list;
-      saveConfig();
-      await interaction.reply({ content: `Removed warning #${index}.`, ephemeral: true }).catch(() => {});
-      return;
-    }
-  }
+  const dash = buildDashboardEmbed(guild, 1);
+  await message.reply({ embeds: [dash.embed], components: dash.rows, allowedMentions: { parse: [] } });
 }
 
 async function handleWarningsCommand(client, message) {
-  const mention = message.mentions.members.first() || message.mentions.users.first();
-  if (mention) {
-    return showWarnings(message, mention);
+  if (!isModerator(message.member)) return replyError(message, "You are not allowed to use this command.");
+  ensureWarningsMap();
+  const mentioned = message.mentions.members.first();
+  const argId = message.content.split(/\s+/)[1]?.replace(/[^0-9]/g, "");
+  const targetId = mentioned?.id || argId || null;
+  await showWarnings(client, message, targetId);
+}
+
+function buildRemoveSelect(guild, userId) {
+  const arr = getVisibleWarnings(userId);
+  const opts = arr.slice(0, 25).map((e, idx) => ({
+    label: `#${idx + 1} — ${(e.reason || "No reason").slice(0, 90)}`,
+    description: `${memberLabel(guild, e.moderator || "?")} • ${e.date ? new Date(e.date).toLocaleDateString() : "Unknown"}`,
+    value: String(idx)
+  }));
+  const row = new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`warns:remove:pick:${userId}`)
+      .setPlaceholder("Select warning(s) to remove")
+      .setMinValues(1)
+      .setMaxValues(Math.max(1, Math.min(25, opts.length)))
+      .addOptions(opts.length ? opts : [{ label: "No warnings", value: "noop", default: true }])
+      .setDisabled(!opts.length)
+  );
+  return row;
+}
+
+async function handleWarningButtons(client, interaction) {
+  // Route both buttons and selects and modal submits starting with warns:
+  try {
+    if (interaction.isButton()) {
+      const id = interaction.customId;
+      if (!id.startsWith("warns:")) return;
+      const parts = id.split(":");
+  // List pagination
+  if (parts[1] === "list") {
+        if (parts[2] === "prev" || parts[2] === "next") {
+          const cur = Number(parts[3] || 1) || 1;
+          const page = parts[2] === "prev" ? Math.max(1, cur - 1) : cur + 1;
+          const dash = buildDashboardEmbed(interaction.guild, page);
+          await interaction.update({ embeds: [dash.embed], components: dash.rows }).catch(() => {});
+          return;
+        }
+      }
+      // User view paging
+      if (parts[1] === "user") {
+        if (parts[2] === "back") {
+          const dash = buildDashboardEmbed(interaction.guild, 1);
+    await interaction.update({ embeds: [dash.embed], components: dash.rows }).catch(() => {});
+          return;
+        }
+        if (parts[2] === "prev" || parts[2] === "next") {
+          const userId = parts[3];
+          const cur = Number(parts[4] || 1) || 1;
+          const page = parts[2] === "prev" ? Math.max(1, cur - 1) : cur + 1;
+          const view = buildUserView(interaction.guild, userId, page);
+          await interaction.update({ embeds: [view.embed], components: view.rows }).catch(() => {});
+          return;
+        }
+      }
+      // Add warn -> modal
+      if (parts[1] === "add") {
+        const userId = parts[2];
+        const modal = new ModalBuilder()
+          .setCustomId(`warns:add:${userId}`)
+          .setTitle("Add warning");
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId("reason").setLabel("Reason").setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(400)
+          )
+        );
+  await interaction.showModal(modal);
+        return;
+      }
+      // Remove -> show select menu
+      if (parts[1] === "remove") {
+        const userId = parts[2];
+        const view = buildUserView(interaction.guild, userId, 1);
+        const selectRow = buildRemoveSelect(interaction.guild, userId);
+        const rows = [selectRow, ...view.rows];
+  await interaction.update({ embeds: [view.embed], components: rows }).catch(() => {});
+        return;
+      }
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("warns:")) {
+      const parts = interaction.customId.split(":");
+      // Select a user from dashboard
+      if (parts[1] === "selectuser") {
+        const uid = interaction.values?.[0] || "";
+        if (!uid || uid === "noop") { await interaction.deferUpdate().catch(() => {}); return; }
+        const view = buildUserView(interaction.guild, uid, 1);
+  await interaction.update({ embeds: [view.embed], components: view.rows }).catch(() => {});
+        return;
+      }
+      if (parts[1] === "remove" && parts[2] === "pick") {
+        const userId = parts[3];
+        const idxs = (interaction.values || []).map(v => Number(v)).filter(n => Number.isInteger(n));
+        ensureWarningsMap();
+        // If only seeded exists in testing, copy it to explicit store before modifying
+        let arr = getUserWarnings(userId);
+        if (config.testingMode && (!Array.isArray(arr) || arr.length === 0)) {
+          const vis = getVisibleWarnings(userId);
+          arr = Array.isArray(vis) ? vis.map(x => ({ moderator: x.moderator, reason: x.reason, date: x.date })) : [];
+        }
+        const removed = [];
+        // Remove from highest index to lowest
+        idxs.sort((a, b) => b - a);
+        for (const i of idxs) if (i >= 0 && i < arr.length) removed.push(arr.splice(i, 1)[0]);
+        setUserWarnings(userId, arr);
+  // Aggregate DM and log for removals
+  const count = removed.length;
+  const actionText = count > 1 ? `Warning removed x${count}` : `Warning removed`;
+  const lastReason = removed[0]?.reason || "No reason";
+  const nxt = getNextPunishmentInfo(arr.length);
+  const remainingNum = nxt ? nxt.remaining : 0;
+  const remLine = nxt ? `${nxt.remaining} warning${nxt.remaining === 1 ? "" : "s"} remaining until ${nxt.label}` : null;
+  // Resolve target for DM/log
+  let target = interaction.guild.members.cache.get(userId) || interaction.client.users.cache.get(userId);
+  if (!target) target = await interaction.client.users.fetch(userId).catch(() => null);
+  try { if (target) await sendUserDM(target, actionText, null, lastReason, null); } catch {}
+  try { if (target) await sendModLog(interaction.client, target, interaction.user, actionText, remLine ? `${lastReason}\n\n${remLine}` : `${lastReason}`, true, null, remainingNum); } catch {}
+        const view = buildUserView(interaction.guild, userId, 1);
+        // Update the message and send a hidden confirmation
+        await interaction.update({ embeds: [view.embed], components: view.rows }).catch(() => {});
+        try { await interaction.followUp({ content: `${EMOJI_SUCCESS} Removed ${count} warning${count === 1 ? "" : "s"}.`, ephemeral: true }); } catch {}
+        return;
+      }
+      return;
+    }
+
+    if (interaction.isUserSelectMenu && interaction.isUserSelectMenu() && interaction.customId.startsWith("warns:")) {
+      const parts = interaction.customId.split(":");
+      if (parts[1] === "uselect") {
+        const userId = interaction.values?.[0];
+        if (!userId) { await interaction.deferUpdate().catch(() => {}); return; }
+        const view = buildUserView(interaction.guild, userId, 1);
+        await interaction.update({ embeds: [view.embed], components: view.rows }).catch(() => {});
+        return;
+      }
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("warns:add:")) {
+      const userId = interaction.customId.split(":")[2];
+      const reason = interaction.fields.getTextInputValue("reason").trim() || "No reason provided";
+  ensureWarningsMap();
+  // In testing mode, avoid carrying over seeded items; start explicit list
+  let arr = getUserWarnings(userId);
+  if (config.testingMode && (!Array.isArray(arr) || arr.length === 0)) arr = [];
+  const entry = { moderator: interaction.user.id, reason, date: Date.now(), logMsgId: null, logChannelId: null };
+  arr.push(entry);
+  setUserWarnings(userId, arr);
+
+      const member = interaction.guild.members.cache.get(userId) || null;
+      const target = member || (await interaction.client.users.fetch(userId).catch(() => null));
+      // DM user and log (escalation handled elsewhere if configured)
+      const nxt = getNextPunishmentInfo(arr.length);
+      const adExtra = nxt ? `${nxt.remaining} warning${nxt.remaining === 1 ? "" : "s"} remaining until ${nxt.label}` : null;
+      try { await sendUserDM(target, "warned", null, reason, adExtra); } catch {}
+      try {
+        const nxtRemain = nxt ? nxt.remaining : 0;
+        // Do not include remaining line in warn logs; pass remaining separately for context
+        const msg = await sendModLog(interaction.client, target, interaction.user, "warned", `${reason}`, true, null, nxtRemain);
+        if (msg) { entry.logMsgId = msg.id; entry.logChannelId = msg.channelId; saveConfig(); }
+      } catch {}
+
+      // Update the original message if possible
+      try {
+        const view = buildUserView(interaction.guild, userId, 1);
+        if (interaction.message && interaction.message.edit) {
+          await interaction.message.edit({ embeds: [view.embed], components: view.rows }).catch(() => {});
+          await interaction.reply({ content: `${EMOJI_SUCCESS} Warning added.`, ephemeral: true });
+        } else {
+          await interaction.reply({ embeds: [view.embed], components: view.rows, ephemeral: true });
+        }
+      } catch {
+        await interaction.reply({ content: `${EMOJI_SUCCESS} Warning added.`, ephemeral: true }).catch(() => {});
+      }
+      return;
+    }
+  } catch (err) {
+    console.error("[Warnings Interaction Error]", err);
+    try {
+      if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: `An error occurred. ${err.message || err}`, ephemeral: true });
+      }
+    } catch {}
   }
-  const arg = message.content.trim().split(/\s+/)[1];
-  if (arg && /^\d{5,}$/.test(arg)) {
-    const member = await message.guild.members.fetch(arg).catch(() => null);
-    const user = member ? member.user : await client.users.fetch(arg).catch(() => null);
-    return showWarnings(message, member || user || null);
+}
+
+function cleanWarnings(userId = null) {
+  ensureWarningsMap();
+  if (userId) {
+    const arr = config.warnings[userId];
+    if (!Array.isArray(arr) || arr.length === 0) delete config.warnings[userId];
+  } else {
+    for (const [uid, arr] of Object.entries(config.warnings)) {
+      if (!Array.isArray(arr) || arr.length === 0) delete config.warnings[uid];
+    }
   }
-  return showWarnings(message, null);
+  saveConfig();
 }
 
 module.exports = {
   showWarnings,
-  handleWarningButtons,
   cleanWarnings,
-  handleWarningsCommand
+  handleWarningsCommand,
+  handleWarningButtons
 };
-
-// Warnings overview pagination handler
-const ActiveMenus = require("../../utils/activeMenus");
-ActiveMenus.registerHandler("warnings", async (interaction, session) => {
-  if (!interaction.isButton()) return;
-  const id = interaction.customId;
-  if (!["warns_prev", "warns_next", "warns_page"].includes(id)) return;
-  const map = session?.data?.warningsOverride || config.warnings || {};
-  const users = Object.keys(map).filter(uid => (map[uid] || []).length > 0);
-  const totalPages = Math.max(1, Math.ceil(users.length / 6));
-  let page = Number(session?.data?.page) || 1;
-  if (id === "warns_prev") page = Math.max(1, page - 1);
-  if (id === "warns_next") page = Math.min(totalPages, page + 1);
-  session.data.page = page;
-
-  const start = (page - 1) * 6;
-  const slice = users.slice(start, start + 6);
-  const fields = slice.map(uid => {
-    const arr = map[uid] || [];
-    const name = interaction.guild.members.cache.get(uid)?.displayName || interaction.client.users.cache.get(uid)?.username || `User ${uid}`;
-    const val = arr.map((w, i) => {
-      const link = w.logMsgId ? getWarnLogLink(interaction.guild.id, w.logMsgId) : "*No log link*";
-      return `**${i + 1}.** ${w.reason || "No reason"} — <@${w.moderator}>\n${link}`;
-    }).join("\n");
-    return { name: `⚠️ ${name} (${arr.length})`, value: val || "—", inline: false };
-  });
-  const embed = new EmbedBuilder()
-    .setTitle("⚠️ Server Warnings Overview")
-    .setColor(0xffd700)
-    .addFields(fields)
-    .setFooter({ text: `Page ${page}/${totalPages}` })
-    .setTimestamp();
-  const rows = [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("warns_prev").setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
-    new ButtonBuilder().setCustomId("warns_page").setLabel(`Page ${page}/${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-    new ButtonBuilder().setCustomId("warns_next").setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages)
-  )];
-  await interaction.update({ embeds: [embed], components: rows }).catch(() => {});
-});
-
-// Per-user warnings pagination handler
-ActiveMenus.registerHandler("warn_user", async (interaction, session) => {
-  if (!interaction.isButton()) return;
-  const id = interaction.customId;
-  const userId = session?.data?.userId;
-  if (!userId) return;
-  if (!id.startsWith("warn_user_")) return;
-  const [, , action, btnUserId] = id.split("_");
-  if (btnUserId !== userId) return;
-
-  let member = await interaction.guild.members.fetch(userId).catch(() => null);
-  const userOrMember = member || (await interaction.client.users.fetch(userId).catch(() => null));
-  if (!userOrMember) return;
-
-  let page = Number(session?.data?.page) || 1;
-  if (action === "prev") page = Math.max(1, page - 1);
-  if (action === "next") page = page + 1;
-
-  const { embed, page: safePage, totalPages } = buildWarningsEmbed(userOrMember, interaction.guild);
-  session.data.page = safePage;
-
-  const row = buildWarningsRow(userOrMember);
-  const nav = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`warn_user_prev_${userId}`).setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(safePage <= 1),
-    new ButtonBuilder().setCustomId(`warn_user_page_${userId}`).setLabel(`Page ${safePage}/${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true),
-    new ButtonBuilder().setCustomId(`warn_user_next_${userId}`).setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(safePage >= totalPages),
-  );
-  await interaction.update({ embeds: [embed], components: [row, nav] }).catch(() => {});
-});

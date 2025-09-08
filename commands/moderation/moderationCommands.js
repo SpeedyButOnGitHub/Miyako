@@ -14,6 +14,32 @@ function formatDuration(duration) {
   return ms(duration, { long: true });
 }
 
+// --- Warnings store helpers (testing-mode aware) ---
+function ensureStores() {
+  if (typeof config.warnings !== "object" || !config.warnings) config.warnings = {};
+  if (typeof config.testingWarnings !== "object" || !config.testingWarnings) config.testingWarnings = {};
+}
+function getStore() {
+  return config.testingMode ? config.testingWarnings : config.warnings;
+}
+function getUserWarnings(userId) {
+  ensureStores();
+  const store = getStore();
+  return Array.isArray(store[userId]) ? store[userId] : [];
+}
+function setUserWarnings(userId, arr) {
+  ensureStores();
+  const store = getStore();
+  store[userId] = Array.isArray(arr) ? arr : [];
+  saveConfig();
+}
+function getThresholds() {
+  const esc = config.escalation || {};
+  const muteT = Math.max(1, Number(esc.muteThreshold || 3));
+  const kickT = Math.max(muteT + 1, Number(esc.kickThreshold || 5));
+  return { muteT, kickT, muteDurationMs: Number.isFinite(esc.muteDuration) ? esc.muteDuration : 2 * 60 * 60 * 1000 };
+}
+
 async function findTarget(message, args) {
   let target = null;
   let reasonArgs = args;
@@ -132,12 +158,10 @@ async function handleModerationCommands(client, message, command, args) {
 
       case "warn": {
         const warnId = userObj.id;
-        if (!Array.isArray(config.warnings[warnId])) config.warnings[warnId] = [];
-        const warnings = config.warnings[warnId];
-
+        const warnings = getUserWarnings(warnId);
         const entry = { moderator: message.author.id, reason: finalReason, date: Date.now(), logMsgId: null };
         warnings.push(entry);
-        saveConfig();
+        setUserWarnings(warnId, warnings);
 
         const newCount = warnings.length;
 
@@ -145,35 +169,41 @@ async function handleModerationCommands(client, message, command, args) {
         let escalationNote = null;
         let escalationDurationText = null;
 
-        if (newCount >= kickThreshold) {
-          escalationNote = `Auto-kick threshold reached (${newCount}/${kickThreshold}).`;
+        const { muteT, kickT, muteDurationMs: mMs } = getThresholds();
+        if (newCount >= kickT) {
+          escalationNote = `Due to reaching ${newCount} warnings, you have been kicked.`;
           if (!isTesting && member && member.kickable) {
             try { await member.kick(finalReason); } catch {}
           }
-          // DM only (no public)
-          await sendUserDM(member || userObj, "kicked", null, finalReason, `You reached ${newCount} warnings.`);
-        } else if (newCount >= muteThreshold) {
-          escalationNote = `Auto-mute threshold reached (${newCount}/${muteThreshold}).`;
-          escalationDurationText = formatDuration(muteDurationMs);
+          // Single DM covering warn + punishment
+          await sendUserDM(member || userObj, "warned", null, finalReason, `Due to reaching ${newCount} warnings, you have been kicked.`);
+        } else if (newCount >= muteT) {
+          escalationNote = `Due to reaching ${newCount} warnings, you have been muted.`;
+          escalationDurationText = formatDuration(mMs);
           if (!isTesting && member) {
-            await tryTimeoutOrRoleMute(member, muteDurationMs, `${finalReason} • Auto-mute`);
+            await tryTimeoutOrRoleMute(member, mMs, `${finalReason} • Auto-mute`);
           }
-          await sendUserDM(member || userObj, "muted", escalationDurationText, finalReason, `You reached ${newCount} warnings.`);
+          await sendUserDM(member || userObj, "warned", escalationDurationText, finalReason, `Due to reaching ${newCount} warnings, you have been muted.`);
         }
 
-        const remainingToMute = Math.max(0, muteThreshold - newCount);
-        const remainingToKick = Math.max(0, kickThreshold - newCount);
-        const remainingLine = `Warnings until actions: ${remainingToMute} to auto-mute, ${remainingToKick} to auto-kick.`;
+        const remainingToMute = Math.max(0, muteT - newCount);
+        const remainingToKick = Math.max(0, kickT - newCount);
+  // Dynamic next punishment
+  let remainingLine = null;
+  if (newCount < muteT) remainingLine = `${muteT - newCount} warning${muteT - newCount === 1 ? "" : "s"} remaining until mute`;
+  else if (newCount < kickT) remainingLine = `${kickT - newCount} warning${kickT - newCount === 1 ? "" : "s"} remaining until kick`;
 
         await sendUserDM(
           member || userObj,
           "warned",
           escalationDurationText,
           finalReason,
-          `Current warnings: ${newCount}\n${remainingLine}${escalationNote ? `\n${escalationNote}` : ""}`
+          `${remainingLine ? remainingLine + "\n" : ""}${escalationNote ? escalationNote : ""}`.trim()
         );
 
-        const combinedReason = `${finalReason} • ${remainingLine}${escalationNote ? ` • ${escalationNote}` : ""}`;
+  // Build log reason without an explicit "warnings remaining" line; modLogs will place remaining in footer when applicable
+  const combinedReason = `${finalReason}${escalationNote ? `\n\n${escalationNote}` : ""}`;
+  const nxtRemain = remainingLine ? parseInt((remainingLine.match(/^(\d+)/) || [0,0])[1], 10) || 0 : 0;
         const logMsg = await sendModLog(
           client,
           member || userObj,
@@ -182,36 +212,41 @@ async function handleModerationCommands(client, message, command, args) {
           combinedReason,
           true,
           escalationDurationText,
-          newCount
+          nxtRemain
         );
         if (logMsg) {
           entry.logMsgId = logMsg.id;
           saveConfig();
         }
 
-        await replySuccess(message, `Warned <@${warnId}> for: **${finalReason}**`);
+  await replySuccess(message, `Warned <@${warnId}> for: **${finalReason}**${remainingLine ? `\n${remainingLine}` : ""}`);
         return;
       }
 
       case "removewarn": {
         const warnId = userObj.id;
-        if (!Array.isArray(config.warnings[warnId]) || config.warnings[warnId].length === 0) {
+        const warnings = getUserWarnings(warnId);
+        if (!Array.isArray(warnings) || warnings.length === 0) {
           return replyError(message, "This user has no warnings.");
         }
         let index = parseInt(reasonArgs[0], 10);
-        if (isNaN(index) || index < 1 || index > config.warnings[warnId].length) {
-          index = config.warnings[warnId].length; // default last
+        if (isNaN(index) || index < 1 || index > warnings.length) {
+          index = warnings.length; // default last
         }
-        const removed = config.warnings[warnId].splice(index - 1, 1)[0];
-        saveConfig();
+        const removed = warnings.splice(index - 1, 1)[0];
+        setUserWarnings(warnId, warnings);
 
-        const count = config.warnings[warnId].length;
-        const remainingToMute2 = Math.max(0, muteThreshold - count);
-        const remainingToKick2 = Math.max(0, kickThreshold - count);
-        const remainingLine2 = `Warnings until actions: ${remainingToMute2} to auto-mute, ${remainingToKick2} to auto-kick.`;
+    const count = warnings.length;
+    const { muteT, kickT } = getThresholds();
+    let remainingLine2 = null;
+    if (count < muteT) remainingLine2 = `${muteT - count} warning${muteT - count === 1 ? "" : "s"} remaining until mute`;
+    else if (count < kickT) remainingLine2 = `${kickT - count} warning${kickT - count === 1 ? "" : "s"} remaining until kick`;
 
-        await sendUserDM(member || userObj, "warning removed", null, removed?.reason || "No reason", `Current warnings: ${count}\n${remainingLine2}`);
-        await sendModLog(client, member || userObj, message.author, "warning removed", `${removed?.reason || "No reason"} • ${remainingLine2}`, true, null, count);
+    const nxtRemain2 = remainingLine2 ? parseInt((remainingLine2.match(/^(\d+)/) || [0,0])[1], 10) || 0 : 0;
+  await sendUserDM(member || userObj, "warning removed", null, removed?.reason || "No reason", null);
+  // Include remaining line in reason so the logger can move it to the footer
+  const reasonForLog = remainingLine2 ? `${removed?.reason || "No reason"}\n\n${remainingLine2}` : `${removed?.reason || "No reason"}`;
+  await sendModLog(client, member || userObj, message.author, "warning removed", reasonForLog, true, null, nxtRemain2);
         await replySuccess(message, `Removed warning #${index} from <@${warnId}>${removed?.reason ? `: **${removed.reason}**` : ""}`);
         return;
       }

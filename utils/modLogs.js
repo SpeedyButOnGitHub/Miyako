@@ -48,28 +48,44 @@ async function sendModLog(
   if (a.includes("removed")) color = 0x00c853;
   if (a.includes("mute") || a.includes("ban") || a.includes("kick")) color = 0xff5555;
 
-  const main = [];
-  const bottom = [];
-  // Main details first
-  if (reason) main.push(`📝 Reason: ${reason}`);
-  if (duration) main.push(`⏰ Duration: ${duration}`);
-  if (typeof currentWarnings === "number") main.push(`⚠️ Warnings: ${currentWarnings}`);
-  // Auto moderation note and advanced info at the bottom
+  // Build a modern, stacked description similar to DM style
+  // Extract any "warnings remaining until <punishment>" line from reason to place in footer (not for warn logs)
+  let footerRemaining = null;
+  let cleanReason = reason ? String(reason) : null;
+  if (cleanReason) {
+    const lines = cleanReason.split(/\n+/);
+    const idx = lines.findIndex(l => /\b\d+\s+warning(s)?\s+remaining\s+until\s+(mute|kick)\b/i.test(l));
+    if (idx !== -1 && a !== "warned") { // do not show remaining footer on warn logs
+      footerRemaining = lines[idx].trim();
+      lines.splice(idx, 1);
+      cleanReason = lines.join("\n").trim();
+    }
+  }
+
+  const descParts = [];
+  if (cleanReason) {
+    descParts.push(`📝 **Reason**\n${cleanReason}`);
+  }
+  if (duration) {
+    descParts.push(`⏰ **Duration**\n${duration}`);
+  }
+
+  // Auto moderation note if this action itself is a mute/kick and we know the warnings count
+  const bottomParts = [];
   const isAutoMute = a.includes("mute") && isPunishment && duration && typeof currentWarnings === "number";
   if (isAutoMute) {
     const durMs = typeof duration === "string" ? (ms(duration) || 0) : 0;
     const endTs = durMs > 0 ? `<t:${Math.floor((Date.now() + durMs) / 1000)}:R>` : null;
-    bottom.push(`🚨 Due to reaching ${currentWarnings} warning${currentWarnings === 1 ? "" : "s"}, this user has been auto-muted for ${duration}${endTs ? ` (ends ${endTs})` : ""}.`);
+    bottomParts.push(`🚨 This user has been muted due to reaching ${currentWarnings} warning${currentWarnings === 1 ? "" : "s"}.${endTs ? `\n⏰ Ends ${endTs}` : ""}`);
   }
-  // Kick case: when action text contains 'kicked' and we know warnings
   const isAutoKick = a.includes("kick") && isPunishment && typeof currentWarnings === "number";
   if (isAutoKick) {
-    bottom.push(`🚨 Due to reaching ${currentWarnings} warning${currentWarnings === 1 ? "" : "s"}, this user has been auto-kicked.`);
+    bottomParts.push(`🚨 This user has been kicked due to reaching ${currentWarnings} warning${currentWarnings === 1 ? "" : "s"}.`);
   }
-  bottom.push(`🔎 User ID: ${targetId}`);
 
   const toTitleCase = (s) => String(s || "").replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.substr(1));
-  const actionTitle = toTitleCase(action);
+  let actionTitle = toTitleCase(action);
+  actionTitle = actionTitle.replace(/\bX(\d+)\b/g, (m, n) => `x${n}`);
 
   const userObj = target?.user || target; // target can be GuildMember or User
   const displayName = target?.displayName || userObj?.username || `User ${target?.id || "Unknown"}`;
@@ -81,13 +97,19 @@ async function sendModLog(
     .setColor(color)
     .setAuthor({ name: modTag, iconURL: modUser?.displayAvatarURL ? modUser.displayAvatarURL({ dynamic: true }) : undefined })
     .setTitle(targetTag)
-    .setDescription([main.join("\n"), bottom.length ? "\n" + bottom.join("\n") : null].filter(Boolean).join(""))
+    .setDescription([descParts.join("\n\n"), bottomParts.length ? bottomParts.join("\n\n") : null].filter(Boolean).join("\n\n"))
     .addFields(
-      { name: "Action", value: `**${actionTitle}**` },
-      { name: "Target", value: `<@${targetId}>` },
-      { name: "Moderator", value: `<@${modId}>` }
-    )
-    .setTimestamp();
+      { name: "🧰 Action", value: `**${actionTitle}**`, inline: true },
+      { name: "🎯 Target", value: `<@${targetId}>`, inline: true },
+      { name: "🛡️ Moderator", value: `<@${modId}>`, inline: true }
+    );
+
+  // Always prefer a footer over timestamp; include emojis
+  if (footerRemaining) {
+    embed.setFooter({ text: `🧮 ${footerRemaining} • 🆔 ${targetId}` });
+  } else {
+    embed.setFooter({ text: `🆔 ${targetId}` });
+  }
 
   const avatarUrl = targetUser?.displayAvatarURL ? targetUser.displayAvatarURL({ dynamic: true, size: 256 }) : null;
   if (avatarUrl) embed.setThumbnail(avatarUrl);

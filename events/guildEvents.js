@@ -1,23 +1,9 @@
-<<<<<<< HEAD
-const { logMessageDelete, logMessageEdit } = require("../utils/messageLogs");
-const { handleMessageDelete } = require("../commands/snipes");
-
-function attachGuildEvents(client) {
-	client.on("messageDelete", (message) => {
-		logMessageDelete(client, message);
-		handleMessageDelete(client, message);
-	});
-	client.on("messageUpdate", (oldMsg, newMsg) => logMessageEdit(client, oldMsg, newMsg));
-}
-
-module.exports = { attachGuildEvents };
-=======
 const { logMemberLeave } = require("../utils/memberLogs");
 const { logRoleChange } = require("../utils/roleLogs");
 const { logMessageDelete, logMessageEdit } = require("../utils/messageLogs");
 const { handleMessageDelete: handleSnipeDelete } = require("../commands/snipes");
 
-module.exports = function(client) {
+function attachGuildEvents(client) {
   // Member leaves
   client.on("guildMemberRemove", async (member) => {
     try {
@@ -52,7 +38,7 @@ module.exports = function(client) {
     }
   });
 
-  // Message delete/edit logs
+  // Message delete/edit logs + snipes
   client.on("messageDelete", async (message) => {
     try { await logMessageDelete(client, message); } catch (err) { console.error("[messageDelete] log error:", err); }
     try { handleSnipeDelete(message); } catch (err) { console.error("[messageDelete] snipe error:", err); }
@@ -60,5 +46,6 @@ module.exports = function(client) {
   client.on("messageUpdate", async (oldMessage, newMessage) => {
     try { await logMessageEdit(client, oldMessage, newMessage); } catch (err) { console.error("[messageUpdate] log error:", err); }
   });
-};
->>>>>>> 8ac8742b5a91dd4a92460174d1c4c050e4ab6b92
+}
+
+module.exports = { attachGuildEvents };
