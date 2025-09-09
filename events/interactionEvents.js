@@ -4,7 +4,8 @@ const { handleWarningButtons } = require("../commands/moderation/index");
 const { config, saveConfig } = require("../utils/storage");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("../commands/moderation/replies");
 const { renderSettingEmbed } = require("../commands/configMenu");
-const { handleScheduleModal, handleEventCreateModal, handleEventEditModal } = require("../commands/schedule");
+const { handleScheduleModal, handleEventCreateModal, handleEventEditModal, handleEventNotificationModal } = require("../commands/schedule");
+const { getEvent, updateEvent } = require('../utils/eventsStorage');
 const ActiveMenus = require("../utils/activeMenus");
 const { sendModLog } = require("../utils/modLogs");
 const { sendUserDM } = require("../commands/moderation/dm");
@@ -700,19 +701,7 @@ function attachInteractionEvents(client) {
             await member.roles.add(NOTIFY_ROLE_ID, 'Toggle event notification subscription');
             await interaction.reply({ content: `Granted role: <@&${NOTIFY_ROLE_ID}>. You will now be notified whenever this event starts.`, ephemeral: true }).catch(()=>{});
           }
-          // Try to update button label to reflect state (optional)
-          try {
-            const rows = interaction.message.components.map(r => ({
-              type: 1,
-              components: r.components.map(c => {
-                if (c.customId === interaction.customId) {
-                  return { ...c.data, label: hasRole ? 'Sign up for notifications' : 'Unsubscribe notifications' };
-                }
-                return c;
-              })
-            }));
-            await interaction.message.edit({ components: rows }).catch(()=>{});
-          } catch {}
+          // Removed dynamic label toggle per request: keep the button text constant for all users.
         } catch (e) {
           await interaction.reply({ content: 'Failed to toggle role: '+ (e.message||e), ephemeral: true }).catch(()=>{});
         }
@@ -807,8 +796,79 @@ function attachInteractionEvents(client) {
         await handleEventCreateModal(interaction);
         return;
       }
-  if (interaction.type === InteractionType.ModalSubmit && /^event_(times|days|msg|edit)_modal_/.test(interaction.customId)) {
+      if (interaction.type === InteractionType.ModalSubmit && /^event_(times|days|msg|edit)_modal_/.test(interaction.customId)) {
         await handleEventEditModal(interaction);
+        return;
+      }
+  // Auto message notification modals (add / offset / message / channel / unified edit)
+  if (interaction.type === InteractionType.ModalSubmit && /^(notif_(add|offset|msg|channel|edit)_modal_)/.test(interaction.customId)) {
+        await handleEventNotificationModal(interaction);
+        return;
+      }
+
+      // Clock-In position select
+      if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clockin:')) {
+        const parts = interaction.customId.split(':'); // clockin:eventId:notifId
+        const evId = parts[1];
+        const notifId = parts[2]; // not used yet for constraints
+        const ev = getEvent(evId);
+        if (!ev) { await interaction.reply({ content:'Event missing.', ephemeral:true }).catch(()=>{}); return; }
+        const member = interaction.member;
+        if (!member) { await interaction.reply({ content:'Member not found.', ephemeral:true }).catch(()=>{}); return; }
+        const choice = interaction.values[0];
+        const ROLE_REQUIRED = '1375958480380493844';
+        const POS_META = {
+          'instance_manager': { label: 'Instance Manager', max:1, role: ROLE_REQUIRED },
+          'manager': { label: 'Manager', max:5, role: ROLE_REQUIRED },
+          'bouncer': { label: 'Bouncer', max:10 },
+          'bartender': { label: 'Bartender', max:15 },
+          'backup': { label: 'Backup', max:20 },
+          'maybe': { label: 'Maybe/Late', max:50 }
+        };
+        if (!POS_META[choice]) { await interaction.reply({ content:'Invalid selection.', ephemeral:true }).catch(()=>{}); return; }
+        const meta = POS_META[choice];
+        if (meta.role && !member.roles.cache.has(meta.role)) {
+          await interaction.reply({ content:`You need the required role to select ${meta.label}.`, ephemeral:true }).catch(()=>{}); return;
+        }
+        const clockKey = '__clockIn';
+        const state = ev[clockKey] && typeof ev[clockKey]==='object' ? { ...ev[clockKey] } : { positions: {}, messageIds: [] };
+        if (!state.positions) state.positions = {};
+        // Remove user from all other positions first
+        for (const key of Object.keys(state.positions)) {
+          state.positions[key] = Array.isArray(state.positions[key]) ? state.positions[key].filter(id=>id!==member.id) : [];
+        }
+        if (!Array.isArray(state.positions[choice])) state.positions[choice] = [];
+        if (state.positions[choice].length >= meta.max) {
+          await interaction.reply({ content:`${meta.label} is full.`, ephemeral:true }).catch(()=>{}); return;
+        }
+        state.positions[choice].push(member.id);
+        updateEvent(ev.id, { [clockKey]: state });
+        // Re-render all clock-in messages for this event
+        try {
+          const { EmbedBuilder } = require('discord.js');
+          const theme = require('../utils/theme');
+          const POSITIONS = ['instance_manager','manager','bouncer','bartender','backup','maybe'];
+          // Standardized header; ignore stored message for uniformity
+          const base = `🕒 Staff Clock-In — ${ev.name}`;
+          const embed = new EmbedBuilder()
+            .setTitle(`🕒 Staff Clock-In — ${ev.name}`)
+            .setColor(theme.colors?.primary || 0x5865F2)
+            .setDescription(`${base}\n\nSelect a position below. One slot per staff; re-select to move.`);
+          for (const k of POSITIONS) {
+            const arr = state.positions[k] || [];
+            const label = POS_META[k].label;
+            const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
+            embed.addFields({ name: `${label} (${arr.length}/${POS_META[k].max})`, value: value.substring(0,1024), inline: true });
+          }
+          for (const mid of state.messageIds || []) {
+            try {
+              const channel = await interaction.channel?.guild?.channels?.fetch(ev.channelId).catch(()=>null) || await interaction.client.channels.fetch(ev.channelId).catch(()=>null);
+              const msg = channel && channel.messages ? await channel.messages.fetch(mid).catch(()=>null) : null;
+              if (msg) await msg.edit({ embeds:[embed] }).catch(()=>{});
+            } catch {}
+          }
+        } catch {}
+        await interaction.reply({ content:`Registered as ${meta.label}.`, ephemeral:true }).catch(()=>{});
         return;
       }
     } catch (err) {

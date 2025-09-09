@@ -1,6 +1,10 @@
 const { addSchedule, updateSchedule, getSchedules } = require("./scheduleStorage");
 const { getEvents, updateEvent } = require("./eventsStorage");
+const { applyTimestampPlaceholders } = require('./timestampPlaceholders');
+const { config } = require('./storage');
 const ms = require("ms");
+const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
+const theme = require('./theme');
 
 /**
  * Schedule object shape (stored in schedules.json):
@@ -174,9 +178,8 @@ function startScheduler(client, opts = {}) {
         if (!Array.isArray(ev.times)) continue;
         const now = Date.now();
         // Determine if we have anchor message semantics (single persistent message)
-        const hasAnchor = ev.anchorMessageId && ev.anchorChannelId;
-
-        // Parse potential ranges for status detection
+  const hasAnchor = ev.anchorMessageId && ev.anchorChannelId;
+  // Parse potential ranges for status detection
         let status = 'upcoming'; // upcoming | open | closed (post)
         let activeRange = null;
         if (Array.isArray(ev.ranges) && ev.ranges.length) {
@@ -215,6 +218,93 @@ function startScheduler(client, opts = {}) {
           }
         }
 
+        // --- Automated relative messages (autoMessages) ---
+    if (Array.isArray(ev.autoMessages) && ev.autoMessages.length) {
+          const curMinutes = parseInt(hh,10)*60 + parseInt(mm,10);
+          for (const m of ev.autoMessages) {
+            if (!m || !m.enabled) continue;
+      // Skip if manually triggered recently and skip window active
+      if (!config.testingMode && m.__skipUntil && m.__skipUntil > Date.now()) continue;
+            const offset = Number(m.offsetMinutes)||0; // minutes before event time (0 = at start)
+            for (const t of ev.times) {
+              const [th, tm] = t.split(':').map(x=>parseInt(x,10));
+              if (Number.isNaN(th) || Number.isNaN(tm)) continue;
+              const eventStartMin = th*60+tm;
+              const targetMin = Math.max(0, eventStartMin - offset);
+              if (curMinutes === targetMin) {
+                const fireKey = `__auto_${m.id}_${t}`;
+                if (!(ev[fireKey] && now - ev[fireKey] < 60000)) {
+                  try {
+                    const targetChannelId = m.channelId || ev.channelId;
+                    const channel = await client.channels.fetch(targetChannelId).catch(()=>null);
+                    if (channel && channel.send) {
+                      // Clock-In special behavior
+                      if (m.isClockIn) {
+                        // Maintain per-event clockIn data structure: { positions: {key: [userId]}, messageIds:[], lastEventStart: timestamp }
+                        const POSITIONS = [
+                          { key: 'instance_manager', label: '🗝️ Instance Manager', short:'IM', max: 1, roleRequired: '1375958480380493844' },
+                          { key: 'manager', label: '🛠️ Manager', short:'M', max: 5, roleRequired: '1375958480380493844' },
+                          { key: 'bouncer', label: '🛡️ Bouncer', short:'B', max: 10 },
+                          { key: 'bartender', label: '🍸 Bartender', short:'BT', max: 15 },
+                          { key: 'backup', label: '🎯 Backup', short:'BK', max: 20 },
+                          { key: 'maybe', label: '⏳ Maybe/Late', short:'?', max: 50 }
+                        ];
+                        const clockKey = '__clockIn';
+                        const state = ev[clockKey] && typeof ev[clockKey]==='object' ? ev[clockKey] : { positions: {}, messageIds: [] };
+                        for (const p of POSITIONS) { if (!Array.isArray(state.positions[p.key])) state.positions[p.key] = []; }
+                        // Build base text (header) and embed fields
+                        // Standardized base text (ignore any custom saved clock-in message to ensure uniformity)
+                        let baseText = `🕒 Staff Clock-In — ${ev.name}`;
+                        baseText = applyTimestampPlaceholders(baseText, ev).replace(/\n{3,}/g,'\n\n');
+                        if (config.testingMode) {
+                          // Light sanitization of role/user mentions in testing
+                          baseText = baseText.replace(/<@&?\d+>/g, match => `\`${match}\``);
+                        }
+                        const embed = new EmbedBuilder()
+                          .setTitle(`🕒 Staff Clock-In — ${ev.name}`)
+                          .setColor(theme.colors?.primary || 0x5865F2)
+                          .setDescription(`${baseText}\n\nSelect a position from the menu below. One slot per staff (auto-updates).`);
+                        for (const p of POSITIONS) {
+                          const arr = state.positions[p.key];
+                          const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
+                          embed.addFields({ name: `${p.label} (${arr.length}/${p.max})`, value: value.substring(0,1024), inline: true });
+                        }
+                        const menu = new StringSelectMenuBuilder()
+                          .setCustomId(`clockin:${ev.id}:${m.id}`)
+                          .setPlaceholder('📋 Select a position')
+                          .addOptions(
+                            POSITIONS.map(p => ({ label: `${p.label.replace(/^[^ ]+ /,'')}`.slice(0,100), value: p.key, description: `${p.short} slots ${p.max}`.slice(0,100) }))
+                          );
+                        const row = new ActionRowBuilder().addComponents(menu);
+                        const sent = await channel.send({ embeds: [embed], components: [row] }).catch(()=>null);
+                        if (sent) {
+                          state.messageIds.push(sent.id);
+                          updateEvent(ev.id, { [clockKey]: state });
+                        }
+                      } else if (m.messageJSON && typeof m.messageJSON === 'object') {
+                        const payload = { ...m.messageJSON };
+                        if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
+                        if (payload.content) payload.content = applyTimestampPlaceholders(payload.content, ev);
+                        if (payload.content && payload.content.length > 2000) payload.content = payload.content.slice(0,1997)+'...';
+                        if (!payload.content && !payload.embeds) payload.content = m.message || `Auto message (${ev.name})`;
+                        if (payload.content) payload.content = applyTimestampPlaceholders(payload.content, ev);
+                        if (config.testingMode && payload.content) payload.content = payload.content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
+                        await channel.send(payload).catch(()=>{});
+                      } else {
+                        const raw = m.message || `Auto message (${ev.name})`;
+                        let content = applyTimestampPlaceholders(raw, ev);
+                        if (config.testingMode) content = content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
+                        await channel.send({ content }).catch(()=>{});
+                      }
+                    }
+                  } catch (e) { console.error('Auto message dispatch failed', ev.id, m.id, e); }
+                  ev[fireKey] = now; updateEvent(ev.id, { [fireKey]: now });
+                }
+              }
+            }
+          }
+        }
+
         // Dynamic anchor update
         if (hasAnchor) {
           try {
@@ -223,15 +313,37 @@ function startScheduler(client, opts = {}) {
               const msg = await channel.messages.fetch(ev.anchorMessageId).catch(()=>null);
               if (msg) {
                 let baseContent = ev.dynamicBaseContent || ev.messageJSON?.content || ev.message || '';
+                baseContent = applyTimestampPlaceholders(baseContent, ev);
                 if (!baseContent) baseContent = `Event: ${ev.name}`;
                 let newContent = baseContent;
                 // Replace status line tokens
-                const OPEN_TOKEN = /# The Midnight bar is opening in:[^\n]*\n?/i;
+                // Match entire status line beginning with header (case-insensitive)
+                // Match any existing status line variant so we can replace consistently
+                const OPEN_TOKEN = /^(# The Midnight bar is.*|🍷The Midnight Bar is currently open!🍷|The Midnight Bar is closed for now\.)$/im;
                 if (status === 'open') {
-                  newContent = newContent.replace(OPEN_TOKEN, '🍷The Midnight Bar is currently open!🍷\n');
+                  newContent = newContent.replace(OPEN_TOKEN, '🍷The Midnight Bar is currently open!🍷');
                 } else if (status === 'closed') {
-                  // Show closed marker (simple). Could compute next opening; placeholder.
-                  if (OPEN_TOKEN.test(newContent)) newContent = newContent.replace(OPEN_TOKEN, 'The Midnight Bar is closed for now.\n');
+                  try {
+                    const { computeNextRange } = require('./timestampPlaceholders');
+                    const next = computeNextRange(ev);
+                    if (next && OPEN_TOKEN.test(newContent)) {
+                      newContent = newContent.replace(OPEN_TOKEN, `# The Midnight bar is opening: <t:${next.startSec}:R>`);
+                    } else if (OPEN_TOKEN.test(newContent)) {
+                      // Fallback if we cannot compute next
+                      newContent = newContent.replace(OPEN_TOKEN, '# The Midnight bar is opening: (soon)');
+                    }
+                  } catch {
+                    if (OPEN_TOKEN.test(newContent)) newContent = newContent.replace(OPEN_TOKEN, '# The Midnight bar is opening: (soon)');
+                  }
+                } else if (status === 'upcoming') {
+                  try {
+                    const { computeNextRange } = require('./timestampPlaceholders');
+                    const range = computeNextRange(ev);
+                    if (range && OPEN_TOKEN.test(newContent)) {
+                      const relTs = `<t:${range.startSec}:R>`;
+                      newContent = newContent.replace(OPEN_TOKEN, `# The Midnight bar is opening in ${relTs}`);
+                    }
+                  } catch {}
                 }
                 // Minimal change detection
                 if (newContent !== msg.content) {
