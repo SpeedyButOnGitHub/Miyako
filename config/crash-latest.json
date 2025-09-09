@@ -1,5 +1,15 @@
 {
-  "ts": 1757450513368,
-  "scope": "fatal",
-  "reason": "signal:SIGINT"
+  "ts": 1757451387072,
+  "scope": "shutdown",
+  "reason": "signal:SIGINT",
+  "message": null,
+  "memory": {
+    "rss": 68968448,
+    "heapTotal": 23736320,
+    "heapUsed": 20969736
+  },
+  "cpu": {
+    "user": 437000,
+    "system": 203000
+  }
 }

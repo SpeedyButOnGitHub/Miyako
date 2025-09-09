@@ -217,7 +217,7 @@ function attachInteractionEvents(client) {
         return;
       }
       if (interaction.isButton() && (interaction.customId === "bank:decline")) {
-        await interaction.reply({ content: "❌ Cancelled.", ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content: "❌ Cancelled.", flags: 64 }).catch(()=>{});
         return;
       }
 

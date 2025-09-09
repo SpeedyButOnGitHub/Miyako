@@ -43,5 +43,15 @@
     "ts": 1757450513369,
     "scope": "fatal",
     "message": "signal:SIGINT"
+  },
+  {
+    "ts": 1757451223878,
+    "scope": "fatal",
+    "message": "signal:SIGINT"
+  },
+  {
+    "ts": 1757451387073,
+    "scope": "exit",
+    "message": "signal:SIGINT"
   }
 ]

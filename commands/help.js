@@ -5,8 +5,7 @@ const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
 const { applyStandardFooter } = require("../utils/ui");
 
-// Redesigned categorized help with interactive category buttons.
-// Add / edit categories here.
+// Categorized help with interactive buttons (compact mode removed per request).
 const HELP_CATEGORIES = [
   { id: 'general', label: 'General', emoji: '📌', commands: [
     '.help - show this menu',
@@ -53,48 +52,57 @@ function filterCategories(member) {
 }
 
 function buildCategoryEmbed(guild, member, categories, current) {
-  const embed = new EmbedBuilder()
-    .setColor(theme.colors.primary || 0x5865F2);
+  const embed = new EmbedBuilder().setColor(theme.colors.primary || 0x5865F2);
   if (current === 'all') {
     embed.setTitle('Help — All Categories');
-    embed.setDescription('Browse all commands below. Use the buttons to filter by category.');
+    embed.setDescription('Browse all commands. Use the buttons to filter categories.');
     for (const cat of categories) {
       embed.addFields({ name: `${cat.emoji||''} ${cat.label}`, value: cat.commands.map(c=>`• ${c}`).join('\n').slice(0,1024) });
     }
   } else {
     const cat = categories.find(c=>c.id===current) || categories[0];
     embed.setTitle(`Help — ${cat.label}`);
-    embed.setDescription('Use buttons to switch categories or view all.');
-    // Split if needed
+    embed.setDescription('Use buttons below to switch categories or view All.');
     const joined = cat.commands.map(c=>`• ${c}`).join('\n');
-    embed.addFields({ name: `${cat.emoji||''} ${cat.label} Commands`, value: joined.slice(0, 1024) || '*None*' });
+    embed.addFields({ name: `${cat.emoji||''} ${cat.label} Commands`, value: joined.slice(0,1024) || '*None*' });
   }
   applyStandardFooter(embed, guild, { testingMode: false });
   return embed;
 }
 
 function buildRows(categories, current) {
-  // Up to first 5 category buttons (fits typical set). If more, second row handles remainder.
-  const catButtons = categories.map(cat => new ButtonBuilder()
-    .setCustomId(`helpv2:${cat.id}`)
-    .setLabel(cat.label)
-    .setStyle(cat.id === current ? ButtonStyle.Primary : ButtonStyle.Secondary)
-    .setEmoji(cat.emoji || undefined)
-    .setDisabled(cat.id === current)
-  );
+  // Custom layout for narrower look: first row includes 'All' + up to 2 categories, rest distributed 3 per row.
+  const visible = [...categories];
   const rows = [];
-  // Split into rows of up to 5
-  for (let i=0;i<catButtons.length;i+=5) {
-    rows.push(new ActionRowBuilder().addComponents(catButtons.slice(i, i+5)));
+  const firstCats = visible.slice(0,2);
+  const firstRow = new ActionRowBuilder();
+  // All button
+  firstRow.addComponents(new ButtonBuilder()
+    .setCustomId('helpv2:all')
+    .setLabel('All')
+    .setStyle(current==='all'?ButtonStyle.Primary:ButtonStyle.Secondary));
+  for (const cat of firstCats) {
+    firstRow.addComponents(new ButtonBuilder()
+      .setCustomId(`helpv2:${cat.id}`)
+      .setLabel(cat.label)
+      .setEmoji(cat.emoji||undefined)
+      .setStyle(cat.id===current?ButtonStyle.Primary:ButtonStyle.Secondary));
   }
-  // Control row
-  const controls = new ActionRowBuilder();
-  controls.addComponents(
-    new ButtonBuilder().setCustomId('helpv2:all').setLabel('All').setStyle(current==='all'?ButtonStyle.Primary:ButtonStyle.Secondary).setDisabled(current==='all'),
-    new ButtonBuilder().setCustomId('helpv2:close').setLabel('Close').setStyle(ButtonStyle.Danger)
-  );
-  rows.push(controls);
-  return rows.slice(0,5); // safety (max 5 rows in Discord)
+  rows.push(firstRow);
+  const remaining = visible.slice(2);
+  for (let i=0;i<remaining.length;i+=3) {
+    const row = new ActionRowBuilder();
+    for (const cat of remaining.slice(i,i+3)) {
+      row.addComponents(new ButtonBuilder()
+        .setCustomId(`helpv2:${cat.id}`)
+        .setLabel(cat.label)
+        .setEmoji(cat.emoji||undefined)
+        .setStyle(cat.id===current?ButtonStyle.Primary:ButtonStyle.Secondary));
+    }
+    rows.push(row);
+    if (rows.length >= 5) break; // Discord limit
+  }
+  return rows;
 }
 
 async function handleHelpCommand(client, message) {
@@ -116,10 +124,6 @@ ActiveMenus.registerHandler('helpv2', async (interaction, session) => {
   const member = interaction.guild?.members?.cache?.get(interaction.user.id) || interaction.member;
   const cats = filterCategories(member);
   const id = interaction.customId;
-  if (id === 'helpv2:close') {
-    try { await interaction.update({ components: [], embeds: interaction.message.embeds }); } catch {}
-    return;
-  }
   let current = session.data.current;
   if (id === 'helpv2:all') current = 'all';
   else if (id.startsWith('helpv2:')) current = id.split(':')[1];

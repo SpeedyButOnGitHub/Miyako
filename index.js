@@ -1,6 +1,8 @@
 // Early crash reporter (must be first)
 require('./utils/crashReporter').initEarly();
 require("dotenv/config");
+// Shim for deprecated ephemeral option -> flags conversion
+require('./utils/ephemeralShim');
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
@@ -160,17 +162,7 @@ async function setStatusChannelName(online) {
   await channel.setName(name).catch(() => {});
 }
 
-// graceful shutdown
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, async () => {
-    config.testingMode = false;
-    saveConfig();
-    if (client.isReady()) await setStatusChannelName(false);
-  // Best-effort: create a fresh snapshot on shutdown so next start has a baseline
-  try { require("./utils/changelog").createSnapshot && require("./utils/changelog").createSnapshot(path.resolve(__dirname)); } catch {}
-    process.exit(0);
-  });
-}
+// (SIGINT/SIGTERM now handled gracefully by crashReporter; no duplicate handlers here)
 
 // Use 'clientReady' instead of deprecated 'ready' (v15 will remove 'ready')
 client.once("clientReady", async () => {

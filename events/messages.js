@@ -204,8 +204,7 @@ function attachMessageEvents(client) {
         const row = (page) => new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId('err_prev').setLabel('Prev').setStyle(ButtonStyle.Secondary).setDisabled(page===0),
           new ButtonBuilder().setCustomId('err_next').setLabel('Next').setStyle(ButtonStyle.Secondary).setDisabled(page>=totalPages-1),
-          new ButtonBuilder().setCustomId('err_refresh').setLabel('Refresh').setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId('err_close').setLabel('Close').setStyle(ButtonStyle.Danger)
+          new ButtonBuilder().setCustomId('err_refresh').setLabel('Refresh').setStyle(ButtonStyle.Primary)
         );
         const sent = await message.reply({ embeds: [buildPage(0)], components: [row(0)], allowedMentions: { repliedUser: false } });
         ActiveMenus.registerMessage(sent, { type: 'errors', userId: message.author.id, data: { page: 0, limit } });
@@ -259,10 +258,7 @@ try {
     if (customId === 'err_prev') page = Math.max(0, page - 1);
     if (customId === 'err_next') page = Math.min(totalPages - 1, page + 1);
     if (customId === 'err_refresh') page = Math.min(page, totalPages - 1);
-    if (customId === 'err_close') {
-      try { await interaction.update({ components: [], embeds: interaction.message.embeds }); } catch {}
-      return;
-    }
+  // Close button removed per design request
     const start = page * pageSize;
   const slice = rows.slice(start, start + pageSize);
   const embed = createEmbed({ title: '🧾 Recent Errors', description: `Page ${page+1}/${totalPages} • ${rows.length} item(s)`, color: 'danger' });

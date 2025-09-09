@@ -21,14 +21,14 @@ function appendEmergency(entry) {
   try { fs.appendFileSync(emergencyFile, JSON.stringify(entry) + '\n'); } catch { /* ignore */ }
 }
 
-async function gracefulShutdown(reason, err) {
+async function gracefulShutdown(reason, err, graceful = false) {
   if (fatalHandled) return; // ensure single execution
   fatalHandled = true;
   let mem = null; let cpu = null; try { const u = process.memoryUsage(); mem = { rss:u.rss, heapTotal:u.heapTotal, heapUsed:u.heapUsed }; } catch {}
   try { const usage = process.cpuUsage(); cpu = usage; } catch {}
   const entry = {
     ts: Date.now(),
-    scope: 'fatal',
+    scope: graceful ? 'shutdown' : 'fatal',
     reason,
     message: err && (err.stack || err.message || String(err)),
     memory: mem,
@@ -37,7 +37,7 @@ async function gracefulShutdown(reason, err) {
   // Write dedicated crash snapshot (overwrites)
   safeWrite(CRASH_LATEST_FILE, JSON.stringify(entry, null, 2));
   // Also ensure it is in the rolling log
-  try { logError('fatal', err || reason); } catch { appendEmergency(entry); }
+  try { logError(graceful ? 'exit' : 'fatal', err || reason); } catch { appendEmergency(entry); }
 
   // Attempt polite shutdown tasks only if we have a client and it's ready
   try {
@@ -50,12 +50,15 @@ async function gracefulShutdown(reason, err) {
     try { logError('fatal:shutdown', e); } catch { appendEmergency({ ts: Date.now(), scope: 'fatal:shutdown', message: String(e) }); }
   }
   // Force exit (skip during Jest tests to avoid interfering with test runner)
-  if (!process.env.JEST_WORKER_ID) process.exit(1);
+  if (!process.env.JEST_WORKER_ID) process.exit(graceful ? 0 : 1);
 }
 
 function onUncaught(err) { gracefulShutdown('uncaughtException', err); }
 function onUnhandled(reason) { gracefulShutdown('unhandledRejection', reason); }
-function onSignal(sig) { gracefulShutdown(`signal:${sig}`); }
+function onSignal(sig) {
+  const graceful = (sig === 'SIGINT' || sig === 'SIGTERM');
+  gracefulShutdown(`signal:${sig}`, null, graceful);
+}
 
 function initEarly() {
   if (attached) return;
