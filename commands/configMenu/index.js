@@ -35,22 +35,17 @@ ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
         const categoryName = id.split(':')[2];
         session.data.view = 'category';
         session.data.category = categoryName;
-        return interaction.update({ embeds: [buildCategoryEmbed(categoryName)], components: [buildCategorySelect(categoryName), buildSettingSelect(categoryName)] });
+        const catRows = buildCategorySelect(categoryName);
+        const setRows = buildSettingSelect(categoryName);
+        return interaction.update({ embeds: [buildCategoryEmbed(categoryName)], components: [...catRows, ...setRows].slice(0,5) });
       }
       if (id.startsWith('cfg:set:')) {
         const [, , catName, settingName] = id.split(':');
         session.data.view = 'setting';
         session.data.category = catName; session.data.setting = settingName;
-        return interaction.update({ embeds: [buildSettingEmbed(catName, settingName)], components: [buildCategorySelect(catName), buildSettingRow(catName, settingName)] });
-      }
-      if (id.startsWith('cfg:back:')) {
-        const target = id.split(':')[2];
-        if (target === 'root') {
-          session.data = { view: 'root' };
-          return interaction.update({ embeds: [buildRootEmbed()], components: buildRootComponents() });
-        }
-        session.data.view = 'category'; session.data.category = target;
-        return interaction.update({ embeds: [buildCategoryEmbed(target)], components: [buildCategorySelect(target), buildSettingSelect(target)] });
+        const catRows = buildCategorySelect(catName);
+        const settingRows = buildSettingRow(catName, settingName);
+        return interaction.update({ embeds: [buildSettingEmbed(catName, settingName)], components: [...catRows, ...settingRows].slice(0,5) });
       }
       if (id.startsWith('config:')) {
         // legacy setting action buttons
@@ -63,12 +58,16 @@ ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
         if (cat === 'Sniping' && key === 'ChannelList') {
           const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
           if (config.snipeMode !== newMode) { config.snipeMode = newMode; await saveConfig(); try { await logConfigChange(interaction.client, { user: interaction.user, change: `Set Sniping mode to ${newMode}.` }); } catch {} }
-          return interaction.update({ embeds: [buildSettingEmbed('Sniping', 'ChannelList')], components: [buildCategorySelect(cat), buildSettingRow('Sniping', 'ChannelList')] });
+          const catRows = buildCategorySelect(cat);
+          const rows = buildSettingRow('Sniping', 'ChannelList');
+          return interaction.update({ embeds: [buildSettingEmbed('Sniping', 'ChannelList')], components: [...catRows, ...rows].slice(0,5) });
         }
         if (cat === 'Leveling' && key === 'LevelingChannels') {
           const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
           if (config.levelingMode !== newMode) { config.levelingMode = newMode; await saveConfig(); try { await logConfigChange(interaction.client, { user: interaction.user, change: `Set Leveling mode to ${newMode}.` }); } catch {} }
-          return interaction.update({ embeds: [buildSettingEmbed('Leveling', 'LevelingChannels')], components: [buildCategorySelect(cat), buildSettingRow('Leveling', 'LevelingChannels')] });
+          const catRows = buildCategorySelect(cat);
+          const rows = buildSettingRow('Leveling', 'LevelingChannels');
+          return interaction.update({ embeds: [buildSettingEmbed('Leveling', 'LevelingChannels')], components: [...catRows, ...rows].slice(0,5) });
         }
         return;
       }

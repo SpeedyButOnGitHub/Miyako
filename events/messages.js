@@ -1,4 +1,5 @@
 const { handleHelpCommand } = require("../commands/help");
+const path = require('path'); // needed for restart spawn entry resolution
 const { handleModerationCommands } = require("../commands/moderation/moderationCommands");
 const { handlePurgeCommand } = require("../commands/moderation/purge");
 const { handleWarningsCommand } = require("../commands/moderation/warnings");
@@ -131,8 +132,11 @@ function attachMessageEvents(client) {
             stdio: 'ignore'
           });
           child.unref();
-        } catch (e) { console.error('[restart spawn failed]', e); }
-        setTimeout(() => process.exit(0), 150);
+        } catch (e) {
+          console.error('[restart spawn failed]', e);
+          // Fall back to plain exit (expect external supervisor like pm2/systemd/VSCode to restart)
+        }
+        setTimeout(() => process.exit(0), 200);
       } else if (command === "stop") {
         if (message.author.id !== process.env.OWNER_ID) return;
         await message.reply("🛑 Stopping bot...");

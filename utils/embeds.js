@@ -3,12 +3,13 @@
 // EmbedBuilder directly (except for highly custom dynamic cases which can still
 // start from createEmbed()).
 const { EmbedBuilder } = require('discord.js');
+const { toTitleCase } = require('./text');
 const theme = require('./theme');
 
 // Base factory
 function createEmbed({ title = null, description = null, color = 'primary', fields = [], footer = null, timestamp = true } = {}) {
   const embed = new EmbedBuilder();
-  if (title) embed.setTitle(title);
+  if (title) embed.setTitle(toTitleCase(title));
   if (description) embed.setDescription(description);
   // Allow passing numeric color or theme key
   const resolvedColor = typeof color === 'number' ? color : theme.color(color, theme.colors.neutral);

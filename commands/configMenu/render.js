@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { semanticButton, buildNavRow } = require('../../utils/ui');
+const { semanticButton, buildNavRow, applyToggleVisual } = require('../../utils/ui');
 const theme = require("../../utils/theme");
 const { config } = require("../../utils/storage");
 const { configCategories } = require("./constants");
@@ -25,21 +25,18 @@ function buildRootEmbed() {
 
 // Build category navigation as buttons (uniform with Help UI)
 function buildCategorySelect(currentCategory) {
-  const row = buildNavRow([]);
-  const emojiByCat = {
-    Sniping: "🔭",
-    Moderation: "🛡️",
-    Leveling: "📈",
-    Economy: "💰",
-    Testing: "🧪",
-  };
+  // Multi-row adaptive: show all categories; no Back concept
+  const rows = [];
+  const emojiByCat = { Sniping: '🔭', Moderation: '🛡️', Leveling: '📈', Economy: '💰', Testing: '🧪' };
+  let current = buildNavRow([]);
   for (const name of Object.keys(configCategories)) {
     const active = currentCategory === name;
-    if (row.components.length < 5) row.addComponents(
-      semanticButton(active ? 'primary' : 'nav', { id: `cfg:cat:${name}`, label: name, emoji: emojiByCat[name] || theme.emojis.settings, active })
-    );
+    const btn = semanticButton(active ? 'primary' : 'nav', { id: `cfg:cat:${name}`, label: name, emoji: emojiByCat[name] || theme.emojis.settings, active });
+    if (current.components.length >= 5) { rows.push(current); current = buildNavRow([]); }
+    current.addComponents(btn);
   }
-  return row;
+  if (current.components.length) rows.push(current);
+  return rows;
 }
 
 function buildSettingButtons(categoryName, settingName) {
@@ -104,43 +101,45 @@ function buildSettingEmbed(categoryName, settingName) {
 // Build per-category setting list as a single row of buttons + Back
 function buildSettingSelect(categoryName) {
   const cat = configCategories[categoryName];
-  const row = buildNavRow([]);
+  const rows = [];
+  let row = buildNavRow([]);
   for (const name of Object.keys(cat.settings)) {
-    if (row.components.length >= 4) break; // leave room for Back
     const s = cat.settings[name];
     const label = s.getLabel ? s.getLabel() : name;
     const compact = label.length > 12 ? label.slice(0,9)+'…' : label;
-    row.addComponents(semanticButton('primary', { id: `cfg:set:${categoryName}:${name}`, label: compact, emoji: theme.emojis.edit }));
+    const btn = semanticButton('primary', { id: `cfg:set:${categoryName}:${name}`, label: compact, emoji: theme.emojis.edit });
+    if (row.components.length >= 5) { rows.push(row); row = buildNavRow([]); }
+    row.addComponents(btn);
   }
-  // Back to root
-  row.addComponents(semanticButton('nav', { id: 'cfg:back:root', label: 'Back', emoji: theme.emojis.back }));
-  return row;
+  if (row.components.length) rows.push(row);
+  return rows;
 }
 
 // Build a single row for a specific setting: optional mode toggles + actions + Back
 function buildSettingRow(categoryName, settingName) {
-  const row = buildNavRow([]);
-  const isSnipingChannels = categoryName === "Sniping" && settingName === "ChannelList";
-  const isLevelingChannels = categoryName === "Leveling" && settingName === "LevelingChannels";
+  const rows = [];
+  let row = buildNavRow([]);
+  const isSnipingChannels = categoryName === 'Sniping' && settingName === 'ChannelList';
+  const isLevelingChannels = categoryName === 'Leveling' && settingName === 'LevelingChannels';
   if (isSnipingChannels || isLevelingChannels) {
-    const mode = isSnipingChannels ? (config.snipeMode || "whitelist") : (config.levelingMode || "blacklist");
-    const wlActive = mode === "whitelist";
-    const blActive = mode === "blacklist";
-    row.addComponents(semanticButton(wlActive ? 'success' : 'nav', { id: `settingMode_${categoryName}_${settingName}_whitelist`, label: 'White', emoji: theme.emojis.enable, active: wlActive }));
-    if (row.components.length < 4) {
-      row.addComponents(semanticButton(blActive ? 'danger' : 'nav', { id: `settingMode_${categoryName}_${settingName}_blacklist`, label: 'Black', emoji: theme.emojis.disable, active: blActive }));
-    }
+    const mode = isSnipingChannels ? (config.snipeMode || 'whitelist') : (config.levelingMode || 'blacklist');
+    const wlActive = mode === 'whitelist';
+    const blActive = mode === 'blacklist';
+    row.addComponents(semanticButton(wlActive ? 'success':'nav', { id: `settingMode_${categoryName}_${settingName}_whitelist`, label: 'White', emoji: theme.emojis.enable, active: wlActive }));
+    if (row.components.length >=5) { rows.push(row); row = buildNavRow([]); }
+    row.addComponents(semanticButton(blActive ? 'danger':'nav', { id: `settingMode_${categoryName}_${settingName}_blacklist`, label: 'Black', emoji: theme.emojis.disable, active: blActive }));
   }
   const cat = configCategories[categoryName];
   const setting = cat?.settings?.[settingName];
   for (const btn of (setting?.buttons || [])) {
-    if (row.components.length >= 4) break; // leave room for Back
     const compactBtn = btn.label.length > 12 ? btn.label.slice(0,9)+'…' : btn.label;
     const kind = btn.style === ButtonStyle.Danger ? 'danger' : (btn.style === ButtonStyle.Success ? 'success' : (btn.style === ButtonStyle.Primary ? 'primary' : 'nav'));
-    row.addComponents(semanticButton(kind, { id: `config:${categoryName}:${settingName}:${btn.id}`, label: compactBtn, emoji: btn.emoji }));
+    const b = semanticButton(kind, { id: `config:${categoryName}:${settingName}:${btn.id}`, label: compactBtn, emoji: btn.emoji });
+    if (row.components.length >=5) { rows.push(row); row = buildNavRow([]); }
+    row.addComponents(b);
   }
-  row.addComponents(semanticButton('nav', { id: `cfg:back:${categoryName}`, label: 'Back', emoji: theme.emojis.back }));
-  return row;
+  if (row.components.length) rows.push(row);
+  return rows;
 }
 
 module.exports = {

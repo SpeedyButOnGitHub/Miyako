@@ -1,9 +1,14 @@
 const { ButtonBuilder, ButtonStyle, EmbedBuilder, ActionRowBuilder } = require('discord.js');
 const theme = require('./theme');
 const { createEmbed } = require('./embeds');
+const { toTitleCase } = require('./text');
 
 // Semantic button helpers (navigation, toggle, confirm, danger, disabled display)
 function semanticButton(kind, { id, label, emoji, active = false, enabled = true } = {}) {
+  if (!id) return null;
+  // Suppress legacy Back buttons per new UX (no explicit back navigation)
+  if (label && /^(back)$/i.test(label)) return null;
+  if (/(:|_)back$/i.test(id)) return null;
   let style = ButtonStyle.Secondary;
   switch (kind) {
     case 'nav':
@@ -22,7 +27,9 @@ function semanticButton(kind, { id, label, emoji, active = false, enabled = true
     default:
       style = ButtonStyle.Secondary;
   }
-  const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
+  // Auto title-case labels universally
+  const cased = toTitleCase(label || '');
+  const b = new ButtonBuilder().setCustomId(id).setLabel(cased).setStyle(style);
   if (emoji) b.setEmoji(emoji);
   if (!enabled) b.setDisabled(true);
   return b;
@@ -31,7 +38,7 @@ function semanticButton(kind, { id, label, emoji, active = false, enabled = true
 // Row builders for consistent ordering (navigation | pagination | destructive)
 function buildNavRow(buttons) {
   const row = new ActionRowBuilder();
-  for (const b of buttons) row.addComponents(b);
+  for (const b of (buttons||[])) { if (b) row.addComponents(b); }
   return row;
 }
 
@@ -120,4 +127,19 @@ function closeRow(id = 'close_menu', label = 'Close') {
   );
 }
 
-module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow, closeRow, semanticButton, buildNavRow, buildToggleRow, buildDestructiveRow };
+// Toggle embed coloration helper (ON -> success / OFF -> neutral) + indicator prefix
+function applyToggleVisual(embed, { on } = { on: false }) {
+  try {
+    if (!embed || typeof embed.setColor !== 'function') return embed;
+    embed.setColor(on ? theme.colors.success : theme.colors.neutral);
+    // Prepend indicator to title if not already
+    if (embed.data && embed.data.title) {
+      const t = embed.data.title.replace(/^([🔴🟢✅❌]\s*)*/, '');
+      const prefix = on ? (theme.emojis.enable || '✅') : (theme.emojis.disable || '❌');
+      embed.setTitle(`${prefix} ${t}`);
+    }
+  } catch {}
+  return embed;
+}
+
+module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow, closeRow, semanticButton, buildNavRow, buildToggleRow, buildDestructiveRow, toTitleCase, applyToggleVisual };

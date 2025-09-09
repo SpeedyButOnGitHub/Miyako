@@ -1,15 +1,15 @@
 {
-  "ts": 1757451387072,
-  "scope": "shutdown",
-  "reason": "signal:SIGINT",
-  "message": null,
+  "ts": 1757454774949,
+  "scope": "fatal",
+  "reason": "uncaughtException",
+  "message": "TypeError: toTitleCase is not a function\n    at createEmbed (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\embeds.js:12:29)\n    at sendBotStatusMessage (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\index.js:117:17)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\index.js:198:3)",
   "memory": {
-    "rss": 68968448,
-    "heapTotal": 23736320,
-    "heapUsed": 20969736
+    "rss": 80093184,
+    "heapTotal": 37429248,
+    "heapUsed": 23764336
   },
   "cpu": {
-    "user": 437000,
-    "system": 203000
+    "user": 250000,
+    "system": 218000
   }
 }

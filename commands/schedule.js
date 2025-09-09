@@ -117,23 +117,21 @@ function mainRows() {
 function buildSelectRows(kind) {
   const evs = getEvents();
   const options = evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(' ').slice(0,100), emoji: kind === 'delete' ? theme.emojis.delete : (e.enabled?theme.emojis.enable:theme.emojis.disable) }));
-  return [
-    new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`events_${kind === 'delete' ? 'delete' : 'select'}`).setPlaceholder(kind==='delete'? 'Select event to delete' : 'Select event...').addOptions(options)),
-    buildNavRow([
-      semanticButton('nav', { id: 'events_back', label: 'Back', emoji: theme.emojis.back })
-    ])
+  const rows = [
+    new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`events_${kind === 'delete' ? 'delete' : 'select'}`).setPlaceholder(kind==='delete'? 'Select event to delete' : 'Select event...').addOptions(options))
   ];
+  return rows;
 }
 
 function detailRows(ev) {
   // Simplified: Toggle / Edit / Auto Msgs / Delete / Back
-  return [ buildNavRow([
+  const row = buildNavRow([
     semanticButton(ev.enabled ? 'danger' : 'success', { id: `events_toggle_${ev.id}`, label: ev.enabled ? 'Disable' : 'Enable', emoji: ev.enabled ? theme.emojis.disable : theme.emojis.enable }),
     semanticButton('primary', { id: `events_edit_${ev.id}`, label: 'Edit', emoji: theme.emojis.edit || theme.emojis.message || '✏️' }),
     semanticButton('nav', { id: `events_notifs_${ev.id}`, label: 'Auto Msgs', emoji: theme.emojis.bell || '🔔' }),
-    semanticButton('danger', { id: `events_delete_${ev.id}`, label: 'Delete', emoji: theme.emojis.delete }),
-    semanticButton('nav', { id: 'events_back', label: 'Back', emoji: theme.emojis.back })
-  ]) ];
+    semanticButton('danger', { id: `events_delete_${ev.id}`, label: 'Delete', emoji: theme.emojis.delete })
+  ]);
+  return [row];
 }
 
 // ---- Automated Messages (per-event) ----
@@ -173,20 +171,17 @@ function buildNotifsEmbed(guild, ev) {
 }
 
 function notifManagerRows(ev) {
-  return [ buildNavRow([
+  const row = buildNavRow([
     semanticButton('success', { id: `event_notif_add_${ev.id}`, label: 'Add', emoji: theme.emojis.create||'➕' }),
-    semanticButton('primary', { id: `event_notif_selectmode_${ev.id}`, label: 'Select', emoji: theme.emojis.events||'📋', enabled: !!(ev.autoMessages||[]).length }),
-    semanticButton('nav', { id: `event_notif_back_${ev.id}`, label: 'Back', emoji: theme.emojis.back })
-  ]) ];
+    semanticButton('primary', { id: `event_notif_selectmode_${ev.id}`, label: 'Select', emoji: theme.emojis.events||'📋', enabled: !!(ev.autoMessages||[]).length })
+  ]);
+  return [row];
 }
 
 function notifSelectRows(ev) {
   const opts = (ev.autoMessages||[]).slice(0,25).map(n => ({ label: `${humanizeMinutes(n.offsetMinutes)} ${n.enabled?'(on)':'(off)'} #${n.id}`.slice(0,100), value: n.id, description: (n.messageJSON?.content || n.message || '').replace(/\n/g,' ').slice(0,90) }));
   const row1 = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`event_notif_select_${ev.id}`).setPlaceholder('Select auto message').addOptions(opts));
-  const row2 = buildNavRow([
-    semanticButton('nav', { id: `event_notif_cancel_${ev.id}`, label: 'Cancel', emoji: theme.emojis.back })
-  ]);
-  return [row1,row2];
+  return [row1];
 }
 
 // Newly added: detailed auto message control rows
@@ -202,8 +197,7 @@ function notifDetailRows(ev, notif) {
   // Row 2: Trigger / Delete / Back
   const row2 = buildNavRow([
     semanticButton('success', { id: `event_notif_trigger_${ev.id}_${notif.id}`, label: 'Trigger', emoji: theme.emojis.enable || '✅' }),
-    semanticButton('danger', { id: `event_notif_delete_${ev.id}_${notif.id}`, label: 'Delete', emoji: theme.emojis.delete || '🗑️' }),
-    semanticButton('nav', { id: `event_notif_back_${ev.id}`, label: 'Back', emoji: theme.emojis.back })
+    semanticButton('danger', { id: `event_notif_delete_${ev.id}_${notif.id}`, label: 'Delete', emoji: theme.emojis.delete || '🗑️' })
   ]);
   return [row1, row2];
 }
@@ -232,31 +226,25 @@ async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
   const { applyTimestampPlaceholders } = require('../utils/timestampPlaceholders');
   let baseContent = ev.dynamicBaseContent || (ev.messageJSON?.content) || ev.message || ev.name;
   // Auto-build Midnight Bar template if missing signature header
-  if (/Midnight Bar/i.test(ev.name || '') && (!baseContent || !baseContent.includes('⊰-------')) ) {
-    const barDivider = '˸'.repeat(54); // decorative line
+  if (/Midnight Bar/i.test(ev.name || '') && (!baseContent || !/Midnight Bar/i.test(baseContent))) {
+    const barDivider = '─'.repeat(36);
     baseContent = [
-      '# ⊰-------『✩ Midnight Bar :wine_glass: ✩』-------⊱',
+      '## ✩ Midnight Bar ✩',
       '',
-      ' Check our ongoing Instances [here](https://vrchat.com/home/group/grp_d05ea22e-5c38-476e-9884-1cbea50643eb/instances).',
-      'We open daily, check the schedule in: https://discord.com/channels/1232701768316620840/1375987053950533722/1406328803227340941.',
-      '### :busts_in_silhouette: Looking to apply for staff?',
-      'Head over to <#1232701768832516101> and fill out a staff application.',
-      'Applying for Staff will get you a spot on the TV as well! ',
+      'Check our ongoing instances [here](https://vrchat.com/home/group/grp_d05ea22e-5c38-476e-9884-1cbea50643eb/instances).',
+      'We open daily; see the schedule channel for full details.',
       '',
-      '### :alarm_clock: Today\'s Opening Times:',
+      '### 🕒 Today\'s Opening Times',
       barDivider,
-      '**1st Opening**: timestamp_opening1 - timestamp_closing1',
-      barDivider,
-      '~~**2nd Opening**: timestamp_opening2 - timestamp_closing2~~',
+      '**First Opening:** timestamp_opening1 — timestamp_closing1',
+      '~~Second Opening: timestamp_opening2 — timestamp_closing2~~',
       barDivider,
       '',
-      '### :bell: Want to get notified for this event?',
-      'Head over to <#1402656938956689419> and subscribe to the Midnight Bar.',
-      'Or simply press the button below to subscribe to get notified.',
+      '### 🔔 Notifications',
+      'Use the subscribe button below to get notified when we open.',
       '',
-      '[Support us on Patreon! ](https://www.patreon.com/c/lnhvrc) <a:heartsblack:1402694900163809402>',
-      '',
-      '# The Midnight bar is opening:'
+      '### ❤️ Support',
+      '[Support us on Patreon](https://www.patreon.com/c/lnhvrc)'
     ].join('\n');
   }
   baseContent = applyTimestampPlaceholders(baseContent, ev);
@@ -283,8 +271,8 @@ async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(expectedButtonId)
-          .setLabel('Sign up for notifications')
-          .setStyle(ButtonStyle.Secondary)
+          .setLabel('Notify Me')
+          .setStyle(ButtonStyle.Primary)
           .setEmoji('🔔')
       );
       payload.components = [row];
