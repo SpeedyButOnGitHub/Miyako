@@ -1,12 +1,13 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { getXP, getLevel } = require("../utils/levels");
+const { getXP, getLevel, levels } = require("../utils/levels");
 const { getVCXP, getVCLevel, vcLevels } = require("../utils/vcLevels");
 const { getUserModifier } = require("../utils/leveling");
 const { config } = require("../utils/storage");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
-const { progressBar: sharedProgressBar, applyStandardFooter, applyFooterWithPagination } = require("../utils/ui");
-const { getCash, formatCash, getTopCash } = require("../utils/cash");
+const { progressBar: sharedProgressBar, applyStandardFooter, applyFooterWithPagination, paginationRow } = require("../utils/ui");
+const { getCash, formatCash } = require("../utils/cash");
+const { buildLeaderboardEmbed: sharedLeaderboardEmbed } = require("../utils/leaderboards");
 const { getBank, getBaseLimit } = require("../utils/bank");
 
 // Map configured level reward roles to human-friendly labels
@@ -91,10 +92,7 @@ function buildRows(view = "main", page = 1, totalPages = 1, mode = "text") {
       .setStyle(mode === "text" ? ButtonStyle.Secondary : ButtonStyle.Success)
   );
   if (!isLB) return [toggleRow, navRow];
-  const prev = new ButtonBuilder().setCustomId("lb_prev").setLabel("◀ Prev").setStyle(ButtonStyle.Secondary).setDisabled(page <= 1);
-  const pageBtn = new ButtonBuilder().setCustomId("lb_page").setLabel(`Page ${page}/${totalPages}`).setStyle(ButtonStyle.Secondary).setDisabled(true);
-  const next = new ButtonBuilder().setCustomId("lb_next").setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages);
-  const pageRow = new ActionRowBuilder().addComponents(prev, pageBtn, next);
+  const pageRow = paginationRow("lb", page, totalPages);
   return [toggleRow, navRow, pageRow];
 }
 
@@ -115,46 +113,7 @@ function buildRankEmbed(member, rank, level, progressBar, mode = "text") {
 }
 
 function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 10, mode = "text") {
-  const entries = Object.entries(levelsObj || {}).map(([uid, data]) => ({
-    userId: uid,
-    xp: data?.xp || 0,
-    level: data?.level || 0,
-  }));
-  entries.sort((a, b) => (b.level - a.level) || (b.xp - a.xp));
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
-  const safePage = Math.min(totalPages, Math.max(1, Math.floor(page)));
-  const start = (safePage - 1) * pageSize;
-  const pageEntries = entries.slice(start, start + pageSize);
-  const lines = pageEntries.map((e, i) => {
-    const rankNum = start + i + 1;
-    const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : `#${rankNum}`;
-    const isYou = String(e.userId) === String(viewerId);
-    const line = `${medal} <@${e.userId}> — Lv. ${e.level}`;
-    return isYou ? `**${line} ← You**` : line;
-  });
-  const rank = getRankFromLeaderboard(levelsObj, viewerId);
-  const viewerOnPage = pageEntries.some(e => String(e.userId) === String(viewerId));
-  const extra = !viewerOnPage && rank
-    ? `\n— —\nYou: **#${rank}** <@${viewerId}>`
-    : "";
-
-  // Build Bank leaderboard section (top 10)
-  const { getTopBank } = require("../utils/bank");
-  const topBank = getTopBank(10);
-  const bankLines = topBank.map((e, i) => {
-    const rankNum = i + 1;
-    const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : `#${rankNum}`;
-    return `${medal} <@${e.userId}> — $${e.amount.toLocaleString()}`;
-  });
-  const cashSection = `\n\n🏦 Bank Leaderboard\n${bankLines.length ? bankLines.join("\n") : "No balances yet."}`;
-  const embed = new EmbedBuilder()
-    .setTitle(mode === "text" ? `${theme.emojis.leaderboard} Leaderboard` : `${theme.emojis.vc} VC Leaderboard`)
-    .setColor(mode === "text" ? theme.colors.warning : theme.colors.danger)
-    .setDescription((lines.length ? lines.join("\n") + extra : "No data yet.") + cashSection)
-    .setTimestamp();
-  const extraFooter = rank ? `Your rank: #${rank}` : null;
-  applyFooterWithPagination(embed, guild, { testingMode: config.testingMode, page: safePage, totalPages, extra: extraFooter });
-  return embed;
+  return sharedLeaderboardEmbed(guild, levelsObj, viewerId, page, pageSize, mode);
 }
 
 async function handleProfileCommand(client, message) {

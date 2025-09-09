@@ -1,4 +1,4 @@
-const { ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ButtonBuilder, ButtonStyle, EmbedBuilder, ActionRowBuilder } = require('discord.js');
 const theme = require('./theme');
 
 function btn(id, label, style = ButtonStyle.Secondary, emoji, disabled = false) {
@@ -64,4 +64,15 @@ function applyFooterWithPagination(embed, guild, { testingMode = false, page = n
   return embed;
 }
 
-module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination };
+// Generic pagination row builder (Prev | Page x/y | Next)
+function paginationRow(prefix, page, totalPages) {
+  const row = new ActionRowBuilder();
+  row.addComponents(
+    new ButtonBuilder().setCustomId(`${prefix}_prev`).setLabel('◀ Prev').setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
+    new ButtonBuilder().setCustomId(`${prefix}_page`).setLabel(paginationLabel(page, totalPages)).setStyle(ButtonStyle.Secondary).setDisabled(true),
+    new ButtonBuilder().setCustomId(`${prefix}_next`).setLabel('Next ▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages)
+  );
+  return row;
+}
+
+module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow };

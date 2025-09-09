@@ -1,87 +1,61 @@
-const { EmbedBuilder } = require("discord.js");
-const { config } = require("../utils/storage");
-const { levels } = require("../utils/levels");
 const ActiveMenus = require("../utils/activeMenus");
-const { buildLeaderboardEmbed, buildRows } = require("./profile");
+const { levels } = require("../utils/levels");
 const { vcLevels } = require("../utils/vcLevels");
-const theme = require("../utils/theme");
-
-function createProgressBar(current, max, size = 14) {
-  const safeMax = Math.max(1, max);
-  const filled = Math.min(size, Math.max(0, Math.round((current / safeMax) * size)));
-  const empty = size - filled;
-  return `\`${"█".repeat(filled)}${"░".repeat(empty)}\` ${current}/${max}`;
-}
-
-function getLevelXP(level) {
-  const BASE_XP = 150;
-  return Math.floor(BASE_XP * Math.pow(level, 1 / 0.7));
-}
-
-function pickRandom(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+const { buildLeaderboardEmbed } = require("../utils/leaderboards");
+const { paginationRow } = require("../utils/ui");
 
 async function handleLeaderboardCommand(client, message) {
   const guild = message.guild;
   if (!guild) return;
-
-  // Build a list of users with levels
-  let entries = Object.entries(levels).map(([userId, data]) => ({
-    userId,
-    xp: data?.xp || 0,
-    level: data?.level || 0,
-  }));
-
-  // Testing mode: fabricate a randomized leaderboard from guild members
-  if (config.testingMode) {
-    let pool = [];
-    try {
-      const members = await guild.members.fetch();
-      pool = members.filter(m => !m.user.bot).map(m => m.id);
-    } catch (e) {
-      // Fallback to cache to avoid requiring privileged member intents
-      pool = guild.members.cache.filter(m => !m.user.bot).map(m => m.id);
-    }
-    if (!pool.length) {
-      // Last resort: use existing level keys present
-      pool = Object.keys(levels);
-    }
-    const n = Math.min(50, pool.length);
-    const chosen = new Set();
-    while (chosen.size < n && chosen.size < pool.length) chosen.add(pickRandom(pool));
-    entries = Array.from(chosen).map(userId => {
-      const level = Math.floor(Math.random() * 75) + 1; // 1 - 75
-      const curLevelXP = getLevelXP(level);
-      const nextLevelXP = getLevelXP(level + 1);
-      const xpIntoLevel = Math.floor(Math.random() * Math.max(1, nextLevelXP - curLevelXP));
-      const xp = curLevelXP + xpIntoLevel;
-      return { userId, level, xp };
-    });
+  const member = message.member;
+  if (!member) return;
+  const mode = "text";
+  const page = 1;
+  const source = mode === "vc" ? vcLevels : levels;
+  const embed = buildLeaderboardEmbed(guild, source, member.id, page, 10, mode);
+  const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+  function rows(m, p, total) {
+    const toggle = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("lb_toggle_mode").setLabel(m === "text" ? "🎙️ VC Mode" : "💬 Text Mode").setStyle(ButtonStyle.Secondary)
+    );
+    return [toggle, paginationRow("lb", p, total)];
   }
-
-  // Sort by level desc, then xp desc
-  entries.sort((a, b) => (b.level - a.level) || (b.xp - a.xp));
-
-  const viewerId = message.author.id;
-  const dataset = config.testingMode
-    ? entries.reduce((acc, e) => { acc[e.userId] = { level: e.level, xp: e.xp }; return acc; }, {})
-    : require("../utils/levels").levels; // ensure fresh reference
-  const totalPages = Math.max(1, Math.ceil(Object.keys(dataset || {}).length / 10));
-  let page = 1;
-  const args = (message.content || "").slice(1).trim().split(/\s+/).slice(1);
-  if (args[0]) {
-    const p = Number(args[0]);
-    if (Number.isFinite(p) && p > 0) page = Math.floor(p);
-  }
-  if (page > totalPages) page = totalPages;
-
-  const embed = buildLeaderboardEmbed(guild, dataset, viewerId, page, 10, "text");
-  const rows = buildRows("leaderboard", page, totalPages, "text");
-  const sent = await message.reply({ embeds: [embed], components: rows }).catch(() => null);
+  const totalPages = Math.max(1, Math.ceil(Object.keys(source || {}).length / 10));
+  const sent = await message.reply({ embeds: [embed], components: rows(mode, page, totalPages) }).catch(() => null);
   if (sent) {
-    ActiveMenus.registerMessage(sent, { type: "profile", userId: message.author.id, data: { view: "leaderboard", page, mode: "text", levelsOverride: config.testingMode ? dataset : undefined } });
+    ActiveMenus.registerMessage(sent, { type: "leaderboard", userId: member.id, data: { mode, page } });
   }
 }
+
+ActiveMenus.registerHandler("leaderboard", async (interaction, session) => {
+  const member = interaction.member;
+  if (!member || member.id !== session.userId) {
+    try { await interaction.reply({ content: "Only the original user can use this leaderboard.", ephemeral: true }); } catch {}
+    return;
+  }
+  const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+  function rows(m, p, total) {
+    const toggle = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("lb_toggle_mode").setLabel(m === "text" ? "🎙️ VC Mode" : "💬 Text Mode").setStyle(ButtonStyle.Secondary)
+    );
+    return [toggle, paginationRow("lb", p, total)];
+  }
+  let mode = session.data.mode || "text";
+  let page = Number(session.data.page) || 1;
+  if (interaction.customId === "lb_toggle_mode") {
+    mode = mode === "vc" ? "text" : "vc";
+    session.data.mode = mode;
+  } else if (interaction.customId === "lb_prev") {
+    page = Math.max(1, page - 1);
+  } else if (interaction.customId === "lb_next") {
+    page = page + 1;
+  }
+  const src = mode === "vc" ? vcLevels : levels;
+  const totalPages = Math.max(1, Math.ceil(Object.keys(src || {}).length / 10));
+  if (page > totalPages) page = totalPages;
+  session.data.page = page;
+  const embed = buildLeaderboardEmbed(member.guild, src, member.id, page, 10, mode);
+  await interaction.update({ embeds: [embed], components: rows(mode, page, totalPages) });
+});
 
 module.exports = { handleLeaderboardCommand };
