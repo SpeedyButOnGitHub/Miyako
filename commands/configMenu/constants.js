@@ -9,7 +9,7 @@ const configCategories = {
   Sniping: {
     description: "Settings for sniping commands.",
     settings: {
-      ChannelList: {
+  ChannelList: {
         description: () =>
           config.snipeMode === "blacklist"
             ? "Channels where snipes are **not** allowed."
@@ -33,8 +33,8 @@ const configCategories = {
           return `${count}`;
         },
         buttons: [
-          { id: "addChannel", label: "Add Channel", style: ButtonStyle.Success, emoji: "➕" },
-          { id: "removeChannel", label: "Remove Channel", style: ButtonStyle.Danger, emoji: "➖" }
+          { id: "addChannel", label: "Add", style: ButtonStyle.Secondary, emoji: "#️⃣" },
+          { id: "removeChannel", label: "Remove", style: ButtonStyle.Secondary, emoji: "🚫" }
         ]
       }
     }
@@ -54,8 +54,8 @@ const configCategories = {
           return `${n}`;
         },
         buttons: [
-          { id: "addRole", label: "Add Role", style: ButtonStyle.Success, emoji: "🛡️" },
-          { id: "removeRole", label: "Remove Role", style: ButtonStyle.Danger, emoji: "🧹" }
+          { id: "addRole", label: "Add", style: ButtonStyle.Secondary, emoji: "🛡️" },
+          { id: "removeRole", label: "Remove", style: ButtonStyle.Secondary, emoji: "🧹" }
         ]
       },
       RoleLogBlacklist: {
@@ -70,8 +70,8 @@ const configCategories = {
           return `${n}`;
         },
         buttons: [
-          { id: "addBlacklistRole", label: "Add Role", style: ButtonStyle.Success, emoji: "➕" },
-          { id: "removeBlacklistRole", label: "Remove Role", style: ButtonStyle.Danger, emoji: "➖" }
+          { id: "addBlacklistRole", label: "Add", style: ButtonStyle.Secondary, emoji: "➕" },
+          { id: "removeBlacklistRole", label: "Remove", style: ButtonStyle.Secondary, emoji: "🚫" }
         ]
       }
     }
@@ -91,8 +91,8 @@ const configCategories = {
         getLabel: () => 'Channels',
         getSummary: () => `${config.levelingChannelList?.length || 0}`,
         buttons: [
-          { id: "addChannel", label: "Add Channel", style: ButtonStyle.Success, emoji: "➕" },
-          { id: "removeChannel", label: "Remove Channel", style: ButtonStyle.Danger, emoji: "➖" }
+          { id: "addChannel", label: "Add", style: ButtonStyle.Secondary, emoji: "#️⃣" },
+          { id: "removeChannel", label: "Remove", style: ButtonStyle.Secondary, emoji: "🚫" }
         ]
       },
       RoleXPBlacklist: {
@@ -100,11 +100,11 @@ const configCategories = {
         getDisplay: () => (config.roleXPBlacklist && config.roleXPBlacklist.length)
           ? config.roleXPBlacklist.map(id => `<@&${id}>`).join("\n")
           : "*None*",
-        getLabel: () => "Blocked Roles",
+        getLabel: () => "roles",
         getSummary: () => `${config.roleXPBlacklist?.length || 0}`,
         buttons: [
-          { id: "addRole", label: "Add Roles", style: ButtonStyle.Success, emoji: "➕" },
-          { id: "removeRole", label: "Remove Roles", style: ButtonStyle.Danger, emoji: "➖" }
+          { id: "addRole", label: "Add", style: ButtonStyle.Secondary, emoji: "🚫" },
+          { id: "removeRole", label: "Remove", style: ButtonStyle.Secondary, emoji: "🧹" }
         ]
       },
       GlobalXPMultiplier: {
@@ -114,14 +114,14 @@ const configCategories = {
           const badge = mult > 1 ? "🔥 Boost Active" : (mult === 1 ? "➖ Normal" : "🧪 Custom");
           return `Multiplier: **x${mult.toFixed(2)}**  •  ${badge}`;
         },
-        getLabel: () => "XP Multiplier",
+        getLabel: () => "xp",
         getSummary: () => {
           const mult = typeof config.globalXPMultiplier === 'number' ? config.globalXPMultiplier : 1;
           return `x${mult.toFixed(2)}`;
         },
         buttons: [
-          { id: "set", label: "Set Multiplier", style: ButtonStyle.Primary, emoji: "🧮" },
-          { id: "reset", label: "Reset to 1x", style: ButtonStyle.Secondary, emoji: "♻️" }
+          { id: "set", label: "Set", style: ButtonStyle.Secondary, emoji: "📈" },
+          { id: "reset", label: "Reset", style: ButtonStyle.Secondary, emoji: "🔄" }
         ]
       },
       LevelRewards: {
@@ -135,16 +135,16 @@ const configCategories = {
             return `Lvl ${lvl} → ${list}`;
           }).join("\n");
         },
-        getLabel: () => "Level Rewards",
+        getLabel: () => "rewards",
         getSummary: () => {
           const levels = Object.keys(config.levelRewards || {}).length;
           return `${levels} tier${levels === 1 ? '' : 's'}`;
         },
         buttons: [
-          { id: "addLevel", label: "Add Level", style: ButtonStyle.Success, emoji: "➕" },
-          { id: "addReward", label: "Add Rewards", style: ButtonStyle.Success, emoji: "🎁" },
-          { id: "removeReward", label: "Remove Rewards", style: ButtonStyle.Danger, emoji: "🧹" },
-          { id: "removeLevel", label: "Remove Level", style: ButtonStyle.Danger, emoji: "🗑️" }
+          { id: "addLevel", label: "Add Lvl", style: ButtonStyle.Secondary, emoji: "🏆" },
+          { id: "addReward", label: "Add", style: ButtonStyle.Secondary, emoji: "🎁" },
+          { id: "removeReward", label: "Rm Rwd", style: ButtonStyle.Secondary, emoji: "✖️" },
+          { id: "removeLevel", label: "Rm Lvl", style: ButtonStyle.Secondary, emoji: "🗑️" }
         ]
       },
       VCLevelRewards: {
@@ -158,16 +158,16 @@ const configCategories = {
             return `Lvl ${lvl} → ${list}`;
           }).join("\n");
         },
-        getLabel: () => "VC Level Rewards",
+        getLabel: () => "vc rewards",
         getSummary: () => {
           const levels = Object.keys(config.vcLevelRewards || {}).length;
           return `${levels} tier${levels === 1 ? '' : 's'}`;
         },
         buttons: [
-          { id: "addLevel", label: "Add Level", style: ButtonStyle.Success, emoji: "➕" },
-          { id: "addReward", label: "Add Rewards", style: ButtonStyle.Success, emoji: "🎁" },
-          { id: "removeReward", label: "Remove Rewards", style: ButtonStyle.Danger, emoji: "🧹" },
-          { id: "removeLevel", label: "Remove Level", style: ButtonStyle.Danger, emoji: "🗑️" }
+          { id: "addLevel", label: "Add Lvl", style: ButtonStyle.Secondary, emoji: "🎙️" },
+          { id: "addReward", label: "Add", style: ButtonStyle.Secondary, emoji: "🔊" },
+          { id: "removeReward", label: "Rm Rwd", style: ButtonStyle.Secondary, emoji: "✖️" },
+          { id: "removeLevel", label: "Rm Lvl", style: ButtonStyle.Secondary, emoji: "🗑️" }
         ]
       }
     }
@@ -199,9 +199,9 @@ const configCategories = {
           return `${chance.toFixed(1)}%`;
         },
         buttons: [
-          { id: "setChance", label: "Set Chance", style: ButtonStyle.Primary, emoji: "🎲" },
-          { id: "setAmount", label: "Set Amounts", style: ButtonStyle.Primary, emoji: "💰" },
-          { id: "setLifetime", label: "Set Lifetime", style: ButtonStyle.Secondary, emoji: "⏱️" },
+          { id: "setChance", label: "Chance", style: ButtonStyle.Secondary, emoji: "🎲" },
+          { id: "setAmount", label: "Amounts", style: ButtonStyle.Secondary, emoji: "💰" },
+          { id: "setLifetime", label: "Lifetime", style: ButtonStyle.Secondary, emoji: "⏱️" },
         ]
       }
     }
@@ -215,8 +215,8 @@ const configCategories = {
         getLabel: () => "Testing Mode",
         getSummary: () => (config.testingMode ? "On" : "Off"),
         buttons: [
-          { id: "enable", label: "Enable", style: ButtonStyle.Success, emoji: "✅" },
-          { id: "disable", label: "Disable", style: ButtonStyle.Danger, emoji: "🛑" }
+          { id: "enable", label: "Enable", style: ButtonStyle.Secondary, emoji: "✅" },
+          { id: "disable", label: "Disable", style: ButtonStyle.Secondary, emoji: "🛑" }
         ]
       },
       TestingWarnings: {
@@ -237,7 +237,7 @@ const configCategories = {
           return `${explicitUsers} explicit • ${seededUsers} seeded`;
         },
         buttons: [
-          { id: "reseed", label: "Reseed", style: ButtonStyle.Primary, emoji: "🌱" },
+          { id: "reseed", label: "Reseed", style: ButtonStyle.Secondary, emoji: "🌱" },
           { id: "clear", label: "Clear", style: ButtonStyle.Secondary, emoji: "🧹" }
         ]
       }

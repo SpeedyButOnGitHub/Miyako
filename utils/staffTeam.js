@@ -54,14 +54,14 @@ const updateStaffMessage = async (guild) => {
       await staffMessage.edit({ content: newContent, components: [getStaffMessageRow()] });
     } else {
       staffMessage = await channel.send({ content: newContent, components: [getStaffMessageRow()] });
-      await staffMessage.pin();
+      try { await staffMessage.pin(); } catch {}
     }
-  } catch (err) { console.error("Failed to update staff message:", err); }
+    return staffMessage;
+  } catch (err) { console.error("Failed to update staff message:", err); return null; }
 };
 
 module.exports = {
   updateStaffMessage,
   ALLOWED_ROLES,
-  CHATBOX_BUTTON_ID,
-  CHATBOX_CHANNEL_ID
+  CHATBOX_BUTTON_ID
 };

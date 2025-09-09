@@ -1,5 +1,5 @@
 require("dotenv/config");
-const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require("discord.js");
+const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
 const { config, saveConfig } = require("./utils/storage");
@@ -50,6 +50,8 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
+const { runHealthChecks, formatHealthLines } = require('./utils/health');
+
 async function sendBotStatusMessage() {
   let lastOnline = 0;
   if (fs.existsSync(BOT_STATUS_FILE)) {
@@ -64,13 +66,14 @@ async function sendBotStatusMessage() {
   const title = isColdStart ? "🟢 Miyako is Online" : "🔄 Miyako Restarted";
     const color = isColdStart ? 0x5865F2 : 0xFFD700;
 
-    const embed = new EmbedBuilder()
+  const embed = new EmbedBuilder()
       .setTitle(title)
       .setColor(color)
   .setDescription(isColdStart ? "All systems are up. Here's what changed since last run:" : `Restart complete. ${lastOfflineDurationMs!=null ? `Offline for ${Math.max(0, Math.round(lastOfflineDurationMs/1000))}s.` : ""} Here's what changed since last run:`)
       .setTimestamp();
 
-    // Inline changelog: compute diff and add as fields/description
+    // Build changelog overview + store details for button expansion
+    let changelogSession = null;
     try {
       const { createSnapshot, compareSnapshots } = require("./utils/changelog");
       const snapshotFile = path.resolve(__dirname, "./config/changelogSnapshot.json");
@@ -78,32 +81,51 @@ async function sendBotStatusMessage() {
       try { if (fs.existsSync(snapshotFile)) prev = JSON.parse(fs.readFileSync(snapshotFile, "utf8")); } catch {}
       const curr = createSnapshot(path.resolve(__dirname));
       const result = compareSnapshots(prev, curr);
-      // save new snapshot
       try { fs.writeFileSync(snapshotFile, JSON.stringify({ createdAt: Date.now(), files: curr }, null, 2)); } catch {}
-
       const total = result.added.length + result.removed.length + result.modified.length;
       if (total === 0) {
-        embed.addFields({ name: "Changelog", value: "No changes have been made since last restart." });
+        embed.addFields({ name: "Changelog Overview", value: "No changes have been made since last restart." });
       } else {
-        const lines = [];
-        const cap = (arr, n) => arr.slice(0, n);
-        for (const it of cap(result.added, 4)) lines.push(`➕ ${it.path}`);
-        for (const it of cap(result.removed, 4)) lines.push(`✖️ ${it.path}`);
-        for (const it of cap(result.modified, 6)) {
-          const ld = it.linesDelta === 0 ? "±0" : (it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`);
-          lines.push(`🔧 ${it.path} (${ld} lines)`);
-        }
-        // Simple "smart" grouping summary
         const summary = `Files changed: ${total} (➕ ${result.added.length}, ✖️ ${result.removed.length}, 🔧 ${result.modified.length})`;
-        embed.addFields({ name: "Changelog", value: summary });
-        if (lines.length) embed.addFields({ name: "Details", value: lines.join("\n").slice(0, 1024) });
+        embed.addFields({ name: "Changelog Overview", value: summary });
+        // Prepare detailed lines (full lists capped)
+        const detailLines = [];
+        for (const it of result.added) detailLines.push(`➕ ${it.path}`);
+        for (const it of result.removed) detailLines.push(`✖️ ${it.path}`);
+        for (const it of result.modified) {
+          const ld = it.linesDelta === 0 ? "±0" : (it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`);
+          detailLines.push(`🔧 ${it.path} (${ld} lines)`);
+        }
+        changelogSession = { summary, detailLines };
       }
     } catch (e) {
-      // Fallback description
-      embed.addFields({ name: "Changelog", value: "No changes have been made since last restart." });
+      embed.addFields({ name: "Changelog Overview", value: "No changes have been made since last restart." });
     }
 
-    await channel.send({ embeds: [embed] }).catch(() => null);
+    // Run health checks (events + staff team) and append compact status block at top of embed
+    try {
+      const health = await runHealthChecks(client);
+      if (health && health.length) {
+        const lines = formatHealthLines(health).slice(0, 1024);
+        embed.spliceFields(0, 0, { name: 'Health', value: lines });
+      }
+    } catch (e) {
+      embed.addFields({ name: 'Health', value: '✖️ Health checks failed: ' + e.message.slice(0, 200) });
+    }
+
+    // Components: Details button only if we have detail lines
+    let components = [];
+    if (changelogSession && changelogSession.detailLines && changelogSession.detailLines.length) {
+      components = [ new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('status_show').setLabel('Details').setStyle(ButtonStyle.Primary)
+      ) ];
+    }
+    const sent = await channel.send({ embeds: [embed], components }).catch(() => null);
+    if (sent && changelogSession) {
+      try {
+        ActiveMenus.registerMessage(sent, { type: 'status', data: { ...changelogSession, expanded: false } });
+      } catch {}
+    }
   }
   fs.writeFileSync(BOT_STATUS_FILE, JSON.stringify({ lastOnline: now }, null, 2));
 }
@@ -181,6 +203,60 @@ client.once("ready", async () => {
     } catch (err) { console.error("[Startup Menu Cleanup Error]:", err); }
   }
 });
+
+// Status (startup) details handler
+try {
+  ActiveMenus.registerHandler('status', async (interaction, session) => {
+    if (!interaction.isButton()) return;
+    const data = session.data || {}; // { summary, detailLines, expanded }
+    if (interaction.customId === 'status_show') {
+      data.expanded = true;
+      // Rebuild embed from original message but replace/add Details field
+      const embed = EmbedBuilder.from(interaction.message.embeds[0] || {});
+      // Remove existing Details field if any
+      const fields = embed.data.fields || [];
+      const filtered = fields.filter(f => f.name !== 'Details');
+      if (data.detailLines && data.detailLines.length) {
+        const chunked = [];
+        let current = [];
+        let totalLen = 0;
+        for (const line of data.detailLines) {
+          if ((totalLen + line.length + 1) > 1000 && current.length) {
+            chunked.push(current.join('\n'));
+            current = [];
+            totalLen = 0;
+          }
+          current.push(line);
+          totalLen += line.length + 1;
+        }
+        if (current.length) chunked.push(current.join('\n'));
+        // Discord limit: keep at most 2 detail fields for brevity
+        filtered.push({ name: 'Details', value: chunked[0].slice(0,1024) });
+        if (chunked[1]) filtered.push({ name: 'Details (cont.)', value: chunked[1].slice(0,1024) });
+      }
+      embed.setFields(filtered);
+      const rows = [ new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('status_hide').setLabel('Hide Details').setStyle(ButtonStyle.Secondary)
+      ) ];
+      await interaction.update({ embeds: [embed], components: rows });
+      session.data = data;
+      return;
+    }
+    if (interaction.customId === 'status_hide') {
+      data.expanded = false;
+      const embed = EmbedBuilder.from(interaction.message.embeds[0] || {});
+      const fields = (embed.data.fields||[]).filter(f => !f.name.startsWith('Details'));
+      // Ensure overview field name is 'Changelog Overview'
+      embed.setFields(fields.map(f => f.name === 'Changelog' ? { ...f, name: 'Changelog Overview' } : f));
+      const rows = [ new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('status_show').setLabel('Details').setStyle(ButtonStyle.Primary)
+      ) ];
+      await interaction.update({ embeds: [embed], components: rows });
+      session.data = data;
+      return;
+    }
+  });
+} catch (e) { /* ignore registration errors */ }
 
 // attach modular handlers
 attachMessageEvents(client);

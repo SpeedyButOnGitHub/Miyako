@@ -47,8 +47,9 @@ function buildBalancePayload(userId) {
   embed.setFooter({ text: `Deposit to grow your bank${config.testingMode ? ' • Testing Mode' : ''}. Taxes apply above the limit.` });
 
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("bank:menu:deposit").setLabel("Deposit").setEmoji(theme.emojis.deposit).setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("bank:menu:withdraw").setLabel("Withdraw").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("bank:menu:deposit").setLabel("Deposit").setEmoji(theme.emojis.deposit).setStyle(ButtonStyle.Secondary),
+    // Withdraw button requested blue (Primary)
+    new ButtonBuilder().setCustomId("bank:menu:withdraw").setLabel("Withdraw").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Primary)
   );
   return { embeds: [embed], components: [row] };
 }
@@ -84,8 +85,9 @@ function buildDepositMenuPayload(userId) {
   applyStandardFooter(embed, null, { testingMode: config.testingMode });
   embed.setFooter({ text: `Choose Deposit Amount or Deposit Max. Back returns to Wallet.${config.testingMode ? ' • Testing Mode' : ''}` });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("bank:deposit:amount").setLabel("Deposit Amount").setEmoji(theme.emojis.edit).setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("bank:deposit:max").setLabel("Deposit Max").setEmoji(theme.emojis.deposit).setStyle(bank >= base ? ButtonStyle.Danger : ButtonStyle.Success),
+    // Simplify labels & make gray per theme; remove pencil/edit emoji
+    new ButtonBuilder().setCustomId("bank:deposit:amount").setLabel("Deposit").setEmoji(theme.emojis.deposit).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("bank:deposit:max").setLabel("Deposit Max").setEmoji(theme.emojis.deposit).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("bank:back").setLabel("Back").setEmoji(theme.emojis.back).setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row] };
@@ -108,8 +110,8 @@ function buildWithdrawMenuPayload(userId) {
   applyStandardFooter(embed, null, { testingMode: config.testingMode });
   embed.setFooter({ text: `Choose Withdraw Amount or Withdraw Max. Back returns to Wallet.${config.testingMode ? ' • Testing Mode' : ''}` });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("bank:withdraw:amount").setLabel("Withdraw Amount").setEmoji(theme.emojis.edit).setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("bank:withdraw:max").setLabel("Withdraw Max").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("bank:withdraw:amount").setLabel("Withdraw Amount").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("bank:withdraw:max").setLabel("Withdraw Max").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("bank:back").setLabel("Back").setEmoji(theme.emojis.back).setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row] };

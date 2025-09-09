@@ -15,7 +15,13 @@ function ensureFile() {
 function loadObj() {
   ensureFile();
   try {
-    const data = JSON.parse(fs.readFileSync(EVENTS_FILE, "utf8"));
+    let raw = fs.readFileSync(EVENTS_FILE, "utf8");
+    // Attempt to heal common JSON mistakes (trailing commas) before parse
+    try {
+      // Remove trailing commas before } or ]
+      raw = raw.replace(/,\s*([}\]])/g, '$1');
+    } catch {}
+    const data = JSON.parse(raw);
     if (!Array.isArray(data.events)) data.events = [];
     if (typeof data.nextId !== "number") data.nextId = 1;
     return data;

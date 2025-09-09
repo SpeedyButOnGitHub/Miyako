@@ -22,7 +22,7 @@ function attachInteractionEvents(client) {
   client.on("interactionCreate", async (interaction) => {
     try {
       // Route persistent session UIs first
-      if (interaction.isButton()) {
+  if (interaction.isButton() || interaction.isStringSelectMenu()) {
         const res = await ActiveMenus.processInteraction(interaction);
         if (res && res.handled) return;
       }
@@ -769,12 +769,12 @@ function attachInteractionEvents(client) {
         await handleScheduleModal(interaction);
         return;
       }
-      // Event creation modal submit
-      if (interaction.type === InteractionType.ModalSubmit && interaction.customId === "event_create_modal") {
+      // Event creation modal submit (id pattern: event_create_modal_<managerMessageId>)
+      if (interaction.type === InteractionType.ModalSubmit && interaction.customId.startsWith("event_create_modal")) {
         await handleEventCreateModal(interaction);
         return;
       }
-      if (interaction.type === InteractionType.ModalSubmit && /^event_(times|days|msg)_modal_/.test(interaction.customId)) {
+  if (interaction.type === InteractionType.ModalSubmit && /^event_(times|days|msg|edit)_modal_/.test(interaction.customId)) {
         await handleEventEditModal(interaction);
         return;
       }

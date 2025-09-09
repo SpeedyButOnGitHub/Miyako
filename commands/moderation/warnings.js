@@ -202,8 +202,8 @@ function buildUserView(guild, userId, page = 1, opts = {}) {
   rows.push(paginationRow(`warns_user_${userId}_${page}`, page, totalPages));
   // Actions row
   const actions = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`warns_add_${userId}`).setLabel("Add Warning").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`warns_remove_${userId}`).setLabel("Remove Warning").setStyle(ButtonStyle.Danger).setDisabled(!total)
+    new ButtonBuilder().setCustomId(`warns_add_${userId}`).setLabel("Add Warning").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`warns_remove_${userId}`).setLabel("Remove Warning").setStyle(ButtonStyle.Secondary).setDisabled(!total)
   );
   if (includeBack) actions.addComponents(new ButtonBuilder().setCustomId("warns_user_back").setLabel("Back to list").setStyle(ButtonStyle.Secondary));
   rows.push(actions);

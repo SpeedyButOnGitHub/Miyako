@@ -20,7 +20,7 @@ const theme = {
     id: "🆔",
     // CRUD / navigation
     create: "➕",
-    delete: "🗑️",
+    delete: "➖",
     back: "⬅️",
     select: "🎯",
     events: "📅",

@@ -159,7 +159,7 @@ function startScheduler(client, opts = {}) {
         console.error("Scheduler loop error for schedule", schedule.id, err);
       }
     }
-    // Handle multi-daily events
+    // Handle multi-daily events and dynamic anchor updates
     try {
       const events = getEvents();
       const nowDt = new Date();
@@ -172,20 +172,80 @@ function startScheduler(client, opts = {}) {
         if (ev.type !== "multi-daily") continue;
         if (Array.isArray(ev.days) && ev.days.length && !ev.days.includes(currentDay)) continue;
         if (!Array.isArray(ev.times)) continue;
-        // fire exactly at listed time once (no duplicate within same minute)
-        if (ev.times.includes(currentHM)) {
-          const lastKey = `__lastFired_${currentHM}`;
-          if (ev[lastKey] && now - ev[lastKey] < 60000) continue; // already fired this minute
-          try {
-            const channel = await client.channels.fetch(ev.channelId).catch(() => null);
-            if (channel && channel.send) {
-              await channel.send({ content: ev.message || `Event: ${ev.name}` });
-            }
-          } catch (e) {
-            console.error("Event dispatch failed", ev.id, e);
+        const now = Date.now();
+        // Determine if we have anchor message semantics (single persistent message)
+        const hasAnchor = ev.anchorMessageId && ev.anchorChannelId;
+
+        // Parse potential ranges for status detection
+        let status = 'upcoming'; // upcoming | open | closed (post)
+        let activeRange = null;
+        if (Array.isArray(ev.ranges) && ev.ranges.length) {
+          for (const r of ev.ranges) {
+            if (!r || !r.start || !r.end) continue;
+            const [sh, sm] = r.start.split(':').map(n=>parseInt(n,10));
+            const [eh, em] = r.end.split(':').map(n=>parseInt(n,10));
+            if ([sh,sm,eh,em].some(n => Number.isNaN(n))) continue;
+            const startMinutes = sh*60+sm;
+            const endMinutes = eh*60+em;
+            const curMinutes = parseInt(hh,10)*60+parseInt(mm,10);
+            if (curMinutes >= startMinutes && curMinutes < endMinutes) { status='open'; activeRange = r; break; }
+            if (curMinutes >= endMinutes) { status='closed'; }
           }
-          ev[lastKey] = now;
-          updateEvent(ev.id, { [lastKey]: now });
+        } else {
+          // Fallback: treat individual times as fire moments (legacy behavior)
+          if (ev.times.includes(currentHM)) {
+            const lastKey = `__lastFired_${currentHM}`;
+            if (!(ev[lastKey] && now - ev[lastKey] < 60000)) {
+              try {
+                const channel = await client.channels.fetch(ev.channelId).catch(() => null);
+                if (channel && channel.send && !hasAnchor) {
+                  if (ev.messageJSON && typeof ev.messageJSON === 'object') {
+                    const payload = { ...ev.messageJSON };
+                    if (!payload.content && !payload.embeds) payload.content = ev.message || `Event: ${ev.name}`;
+                    if (payload.content && payload.content.length > 2000) payload.content = payload.content.slice(0,1997)+'...';
+                    if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
+                    await channel.send(payload).catch(()=>{});
+                  } else {
+                    await channel.send({ content: ev.message || `Event: ${ev.name}` }).catch(()=>{});
+                  }
+                }
+              } catch (e) { console.error('Event dispatch failed', ev.id, e); }
+              ev[lastKey] = now; updateEvent(ev.id, { [lastKey]: now });
+            }
+          }
+        }
+
+        // Dynamic anchor update
+        if (hasAnchor) {
+          try {
+            const channel = await client.channels.fetch(ev.anchorChannelId).catch(()=>null);
+            if (channel) {
+              const msg = await channel.messages.fetch(ev.anchorMessageId).catch(()=>null);
+              if (msg) {
+                let baseContent = ev.dynamicBaseContent || ev.messageJSON?.content || ev.message || '';
+                if (!baseContent) baseContent = `Event: ${ev.name}`;
+                let newContent = baseContent;
+                // Replace status line tokens
+                const OPEN_TOKEN = /# The Midnight bar is opening in:[^\n]*\n?/i;
+                if (status === 'open') {
+                  newContent = newContent.replace(OPEN_TOKEN, '🍷The Midnight Bar is currently open!🍷\n');
+                } else if (status === 'closed') {
+                  // Show closed marker (simple). Could compute next opening; placeholder.
+                  if (OPEN_TOKEN.test(newContent)) newContent = newContent.replace(OPEN_TOKEN, 'The Midnight Bar is closed for now.\n');
+                }
+                // Minimal change detection
+                if (newContent !== msg.content) {
+                  if (ev.messageJSON) {
+                    const payload = { ...ev.messageJSON, content: newContent };
+                    if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
+                    await msg.edit(payload).catch(()=>{});
+                  } else {
+                    await msg.edit({ content: newContent }).catch(()=>{});
+                  }
+                }
+              }
+            }
+          } catch (e) { /* ignore anchor update errors */ }
         }
       }
     } catch (e) { /* ignore event errors */ }
