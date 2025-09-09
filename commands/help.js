@@ -3,122 +3,130 @@ const { isModerator } = require("./moderation/index");
 const { OWNER_ID } = require("./moderation/permissions");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
-const { applyStandardFooter, paginationRow } = require("../utils/ui");
+const { applyStandardFooter } = require("../utils/ui");
 
-// Simple categorized help. We keep static for now; could be dynamic later.
+// Redesigned categorized help with interactive category buttons.
+// Add / edit categories here.
 const HELP_CATEGORIES = [
-  {
-    id: 'general',
-    label: 'General',
-    commands: [
-      '.help - show this menu',
-      '.profile - show your profile',
-      '.leaderboard - show leaderboard',
-      '.cash - show wallet balance'
-    ]
-  },
-  {
-    id: 'level',
-    label: 'Leveling',
-    commands: [
-      '.rank / .level - show rank card',
-      '.leaderboard - text leveling leaderboard',
-      '.profile vc - show VC stats'
-    ]
-  },
-  {
-    id: 'economy',
-    label: 'Economy',
-    commands: [
-      '.balance - open bank & wallet UI',
-      '.deposit <amount> - deposit into bank',
-      '.withdraw <amount> - withdraw from bank'
-    ]
-  },
-  {
-    id: 'moderation',
-    label: 'Moderation',
-    modOnly: true,
-    commands: [
-      '.mute <@user> [time] [reason]',
-      '.unmute <@user>',
-      '.timeout <@user> <time> [reason]',
-      '.ban <@user> [reason]',
-      '.kick <@user> [reason]',
-      '.warn <@user> <reason>',
-      '.warnings [@user]',
-      '.removewarn <@user> <index>'
-    ]
-  },
-  {
-    id: 'config',
-    label: 'Config',
-    ownerOnly: true,
-    commands: [
-      '.config - open configuration menu',
-      '.test - owner test utilities'
-    ]
-  }
+  { id: 'general', label: 'General', emoji: '📌', commands: [
+    '.help - show this menu',
+    '.profile - show your profile',
+    '.leaderboard - show leaderboard(s)',
+    '.cash - show wallet balance'
+  ]},
+  { id: 'level', label: 'Leveling', emoji: '🧬', commands: [
+    '.rank / .level - show rank card',
+    '.leaderboard - text leveling leaderboard',
+    '.profile vc - show VC stats'
+  ]},
+  { id: 'economy', label: 'Economy', emoji: '💰', commands: [
+    '.balance - open bank & wallet UI',
+    '.deposit <amount> - deposit into bank',
+    '.withdraw <amount> - withdraw from bank'
+  ]},
+  { id: 'moderation', label: 'Moderation', emoji: '🛡️', modOnly: true, commands: [
+    '.mute <@user> [time] [reason]',
+    '.unmute <@user>',
+    '.timeout <@user> <time> [reason]',
+    '.ban <@user> [reason]',
+    '.kick <@user> [reason]',
+    '.warn <@user> <reason>',
+    '.warnings [@user]',
+    '.removewarn <@user> <index>',
+    '.purge <count> [@user|filters]' 
+  ]},
+  { id: 'config', label: 'Config', emoji: '🛠️', ownerOnly: true, commands: [
+    '.config - open configuration menu',
+    '.test - owner test utilities',
+    '.errors - list recent errors',
+    '.errdetail <index> - full error detail',
+    '.restart - restart bot'
+  ]}
 ];
 
-function visibleCategories(member) {
+function filterCategories(member) {
   return HELP_CATEGORIES.filter(cat => {
-    if (cat.ownerOnly) return String(member.id) === String(OWNER_ID);
-    if (cat.modOnly) return isModerator(member);
+    if (cat.ownerOnly && String(member.id) !== String(OWNER_ID)) return false;
+    if (cat.modOnly && !isModerator(member)) return false;
     return true;
   });
 }
 
-function buildHelpEmbed(guild, cats, page, pageSize) {
-  const totalPages = Math.max(1, Math.ceil(cats.length / pageSize));
-  page = Math.min(totalPages, Math.max(1, page));
-  const slice = cats.slice((page - 1) * pageSize, page * pageSize);
+function buildCategoryEmbed(guild, member, categories, current) {
   const embed = new EmbedBuilder()
-    .setTitle('Help')
-    .setColor(theme.colors.primary || 0x5865F2)
-    .setDescription('Command reference. Use the buttons below to switch pages.');
-  for (const cat of slice) {
-    embed.addFields({ name: cat.label, value: cat.commands.map(c => `• ${c}`).join('\n') || '*None*' });
+    .setColor(theme.colors.primary || 0x5865F2);
+  if (current === 'all') {
+    embed.setTitle('Help — All Categories');
+    embed.setDescription('Browse all commands below. Use the buttons to filter by category.');
+    for (const cat of categories) {
+      embed.addFields({ name: `${cat.emoji||''} ${cat.label}`, value: cat.commands.map(c=>`• ${c}`).join('\n').slice(0,1024) });
+    }
+  } else {
+    const cat = categories.find(c=>c.id===current) || categories[0];
+    embed.setTitle(`Help — ${cat.label}`);
+    embed.setDescription('Use buttons to switch categories or view all.');
+    // Split if needed
+    const joined = cat.commands.map(c=>`• ${c}`).join('\n');
+    embed.addFields({ name: `${cat.emoji||''} ${cat.label} Commands`, value: joined.slice(0, 1024) || '*None*' });
   }
   applyStandardFooter(embed, guild, { testingMode: false });
-  return { embed, totalPages, page };
+  return embed;
+}
+
+function buildRows(categories, current) {
+  // Up to first 5 category buttons (fits typical set). If more, second row handles remainder.
+  const catButtons = categories.map(cat => new ButtonBuilder()
+    .setCustomId(`helpv2:${cat.id}`)
+    .setLabel(cat.label)
+    .setStyle(cat.id === current ? ButtonStyle.Primary : ButtonStyle.Secondary)
+    .setEmoji(cat.emoji || undefined)
+    .setDisabled(cat.id === current)
+  );
+  const rows = [];
+  // Split into rows of up to 5
+  for (let i=0;i<catButtons.length;i+=5) {
+    rows.push(new ActionRowBuilder().addComponents(catButtons.slice(i, i+5)));
+  }
+  // Control row
+  const controls = new ActionRowBuilder();
+  controls.addComponents(
+    new ButtonBuilder().setCustomId('helpv2:all').setLabel('All').setStyle(current==='all'?ButtonStyle.Primary:ButtonStyle.Secondary).setDisabled(current==='all'),
+    new ButtonBuilder().setCustomId('helpv2:close').setLabel('Close').setStyle(ButtonStyle.Danger)
+  );
+  rows.push(controls);
+  return rows.slice(0,5); // safety (max 5 rows in Discord)
 }
 
 async function handleHelpCommand(client, message) {
-  const member = message.member;
-  if (!member) return;
-  const cats = visibleCategories(member);
-  const PAGE_SIZE = 2;
-  const page = 1;
-  const { embed, totalPages } = buildHelpEmbed(message.guild, cats, page, PAGE_SIZE);
-  const row = paginationRow(`help_${page}`, page, totalPages);
-  const msg = await message.reply({ embeds: [embed], components: [row] }).catch(() => null);
+  const member = message.member; if (!member) return;
+  const cats = filterCategories(member);
+  const current = cats[0]?.id || 'general';
+  const embed = buildCategoryEmbed(message.guild, member, cats, current);
+  const rows = buildRows(cats, current);
+  const msg = await message.reply({ embeds: [embed], components: rows, allowedMentions:{repliedUser:false} }).catch(()=>null);
   if (!msg) return;
-  ActiveMenus.registerMessage(msg, {
-    type: 'help',
-    userId: message.author.id,
-    page,
-    totalPages,
-    pageSize: PAGE_SIZE,
-  });
+  ActiveMenus.registerMessage(msg, { type: 'helpv2', userId: message.author.id, data: { current } });
 }
 
-ActiveMenus.registerHandler('help', async (interaction, session) => {
-  const member = interaction.guild?.members?.cache?.get(interaction.user.id) || interaction.member;
-  const cats = visibleCategories(member);
+ActiveMenus.registerHandler('helpv2', async (interaction, session) => {
   if (!interaction.isButton()) return;
-  const m = interaction.customId.match(/^help_(\d+)_(prev|next|page)$/);
-  if (!m) return;
-  let cur = Number(m[1]) || 1;
-  const action = m[2];
-  const totalPages = Math.max(1, Math.ceil(cats.length / session.pageSize));
-  if (action === 'prev') cur = Math.max(1, cur - 1);
-  else if (action === 'next') cur = Math.min(totalPages, cur + 1);
-  const { embed } = buildHelpEmbed(interaction.guild, cats, cur, session.pageSize);
-  const row = paginationRow(`help_${cur}`, cur, totalPages);
-  session.page = cur;
-  session.totalPages = totalPages;
-  await interaction.update({ embeds: [embed], components: [row] }).catch(() => {});
+  if (interaction.user.id !== session.userId) {
+    return interaction.reply({ content: 'Not your session.', ephemeral: true }).catch(()=>{});
+  }
+  const member = interaction.guild?.members?.cache?.get(interaction.user.id) || interaction.member;
+  const cats = filterCategories(member);
+  const id = interaction.customId;
+  if (id === 'helpv2:close') {
+    try { await interaction.update({ components: [], embeds: interaction.message.embeds }); } catch {}
+    return;
+  }
+  let current = session.data.current;
+  if (id === 'helpv2:all') current = 'all';
+  else if (id.startsWith('helpv2:')) current = id.split(':')[1];
+  const embed = buildCategoryEmbed(interaction.guild, member, cats, current);
+  const rows = buildRows(cats, current);
+  session.data.current = current;
+  try { await interaction.update({ embeds:[embed], components: rows }); } catch {}
 });
 
 module.exports = { handleHelpCommand };

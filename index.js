@@ -210,6 +210,8 @@ client.once("clientReady", async () => {
 
   // Initialize global button/session manager (restores timers and disables expired UIs)
   try { await ActiveMenus.init(client); } catch (e) { console.error("[ActiveMenus init]", e); }
+  // Sweep orphaned (stale) interactive menus (older than 1h) for cleanliness
+  try { if (ActiveMenus.sweepOrphans) await ActiveMenus.sweepOrphans(client); } catch {}
 
   // Start the scheduler loop
   try { startScheduler(client); } catch (e) { console.error("[Scheduler] start error:", e); }
@@ -219,6 +221,17 @@ client.once("clientReady", async () => {
 
   // Start cash drops cleanup loop
   try { startCashDrops(); } catch (e) { console.error("[CashDrops] start error:", e); }
+
+  // Basic permission health check for critical channels
+  try {
+    const important = [STATUS_CHANNEL_ID, config.modLogChannelId].filter(Boolean);
+    for (const id of important) {
+      const ch = await client.channels.fetch(id).catch(()=>null);
+      if (ch && ch.permissionsFor && !ch.permissionsFor(client.user.id)?.has('SendMessages')) {
+        console.warn('[perm] Missing SendMessages in channel', id);
+      }
+    }
+  } catch {}
 
   // Cleanup lingering menus on restart
   if (fs.existsSync(ACTIVE_MENUS_FILE)) {

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const pending = new Map(); // filePath -> { timer, lastContent }
+let metrics = { enqueued: 0, flushed: 0, lastFlushAt: 0 };
 
 function ensureDir(filePath) {
   const dir = path.dirname(filePath);
@@ -20,6 +21,7 @@ function flush(filePath) {
     ensureDir(filePath);
     fs.writeFileSync(filePath, entry.lastContent);
   } catch {}
+  metrics.flushed++; metrics.lastFlushAt = Date.now();
 }
 
 function flushAll() {
@@ -40,6 +42,8 @@ function enqueueWrite(filePath, getContentFn, { delay = 150 } = {}) {
   }
   entry.timer = setTimeout(() => flush(filePath), delay);
   if (typeof entry.timer.unref === 'function') entry.timer.unref();
+  metrics.enqueued++;
 }
+function getWriteQueueMetrics() { return { ...metrics, pending: pending.size }; }
 
-module.exports = { enqueueWrite, flushAll };
+module.exports = { enqueueWrite, flushAll, getWriteQueueMetrics };

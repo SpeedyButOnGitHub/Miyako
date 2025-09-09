@@ -38,7 +38,14 @@ function parseArgs(message, args) {
       continue;
     }
   }
-  return { count, userFilter };
+  // Extra filters: bots, images, contains:<text>
+  let contains = null; let bots = false; let images = false;
+  for (const a of args) {
+    if (/^bots$/i.test(a)) bots = true;
+    else if (/^images?$/i.test(a)) images = true;
+    else if (/^contains:/i.test(a)) contains = a.slice(9).replace(/^"|"$/g,'');
+  }
+  return { count, userFilter, contains, bots, images };
 }
 
 async function handlePurgeCommand(client, message, args) {
@@ -49,7 +56,7 @@ async function handlePurgeCommand(client, message, args) {
     return message.reply({ content: '❌ This channel is blacklisted for purge operations.', allowedMentions: { repliedUser: false } });
   }
 
-  const { count, userFilter } = parseArgs(message, args);
+  const { count, userFilter, contains, bots, images } = parseArgs(message, args);
   if (!count || count <= 0) {
     return message.reply({ content: 'Usage: `.purge <amount 1-100> [@user]`', allowedMentions: { repliedUser: false } });
   }
@@ -68,25 +75,32 @@ async function handlePurgeCommand(client, message, args) {
     );
     const embed = createEmbed({
       title: '⚠️ Confirm Purge',
-      description: `This will delete up to **${count}** recent message(s)${userFilter ? ` from <@${userFilter}>` : ''}. This action cannot be undone.`,
+      description: `This will delete up to **${count}** recent message(s)${userFilter ? ` from <@${userFilter}>` : ''}${contains?` containing "${contains}"`:''}${bots?` (bots only)`:''}${images?` (with images)`:''}. This action cannot be undone.`,
       color: 'warning'
     });
     const sent = await message.reply({ embeds: [embed], components: [row], allowedMentions: { repliedUser: false } });
     const ActiveMenus = require('../../utils/activeMenus');
-    ActiveMenus.registerMessage(sent, { type: 'purgeConfirm', userId: message.author.id, data: { count, userFilter } });
+    ActiveMenus.registerMessage(sent, { type: 'purgeConfirm', userId: message.author.id, data: { count, userFilter, contains, bots, images } });
     return;
   }
 
-  return executePurge(client, message, count, userFilter);
+  return executePurge(client, message, count, userFilter, { contains, bots, images });
 }
 
-async function executePurge(client, message, count, userFilter) {
+async function executePurge(client, message, count, userFilter, filters={}) {
   try {
     // Fetch up to count * 2 to allow filtering by user without extra roundtrips
     const fetchLimit = Math.min(100, Math.max(count, Math.min(count * 2, 100)));
     const messages = await message.channel.messages.fetch({ limit: fetchLimit });
-    const target = userFilter ? messages.filter(m => m.author && m.author.id === userFilter) : messages;
-    const toDelete = target.filter(m => (Date.now() - m.createdTimestamp) < 14 * 24 * 60 * 60 * 1000).first(count);
+    let filtered = messages;
+    if (userFilter) filtered = filtered.filter(m => m.author && m.author.id === userFilter);
+    if (filters.bots) filtered = filtered.filter(m => m.author?.bot);
+    if (filters.images) filtered = filtered.filter(m => m.attachments?.size > 0);
+    if (filters.contains) {
+      const needle = filters.contains.toLowerCase();
+      filtered = filtered.filter(m => (m.content||'').toLowerCase().includes(needle));
+    }
+    const toDelete = filtered.filter(m => (Date.now() - m.createdTimestamp) < 14 * 24 * 60 * 60 * 1000).first(count);
     if (!toDelete || toDelete.length === 0) {
       return message.reply({ content: 'Nothing to delete (messages may be too old or no matches).', allowedMentions: { repliedUser: false } });
     }
@@ -108,12 +122,18 @@ async function executePurge(client, message, count, userFilter) {
     }
     // Log action
     try {
-      await sendModLog(client, message.member || message.author, message.author, 'purged', `${deletedCount} message(s)${userFilter ? ` (filter: <@${userFilter}>)` : ''}`, true, null, null);
+  const filterParts = [];
+  if (userFilter) filterParts.push(`user=<@${userFilter}>`);
+  if (filters.contains) filterParts.push(`contains="${filters.contains}"`);
+  if (filters.bots) filterParts.push('bots');
+  if (filters.images) filterParts.push('images');
+  const filterStr = filterParts.length ? ` filters: ${filterParts.join(', ')}` : '';
+  await sendModLog(client, message.member || message.author, message.author, 'purged', `${deletedCount} message(s)${filterStr}`, true, null, null);
     } catch {}
 
     const resultEmbed = createEmbed({
       title: '🧹 Purge Complete',
-      description: `Deleted **${deletedCount}** message(s)${userFilter ? ` from <@${userFilter}>` : ''}.`,
+      description: `Deleted **${deletedCount}** message(s)${userFilter ? ` from <@${userFilter}>` : ''}${filters.contains?` containing "${filters.contains}"`:''}${filters.bots?` (bots only)`:''}${filters.images?` (with images)`:''}.`,
       color: 'success'
     });
     try { await message.reply({ embeds: [resultEmbed], allowedMentions: { repliedUser: false } }); } catch {}

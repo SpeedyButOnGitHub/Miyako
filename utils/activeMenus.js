@@ -119,6 +119,24 @@ function snapshotSessions() {
   return out.sort((a,b)=>a.expiresIn - b.expiresIn);
 }
 
+// Sweep and disable orphaned sessions older than 1h beyond expiry
+async function sweepOrphans(client) {
+  try {
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    for (const [id, sess] of sessions.entries()) {
+      if (sess.expiresAt < cutoff) {
+        try {
+          const channel = await client.channels.fetch(sess.channelId).catch(()=>null);
+          const msg = channel ? await channel.messages.fetch(id).catch(()=>null) : null;
+          if (msg) await msg.edit({ components: timeoutRow() }).catch(()=>{});
+        } catch {}
+        sessions.delete(id);
+      }
+    }
+    saveSessions();
+  } catch {}
+}
+
 async function processInteraction(interaction) {
   const messageId = interaction.message?.id;
   if (!messageId) return { handled: false };
@@ -171,6 +189,7 @@ module.exports = {
   registerMessage,
   processInteraction,
   snapshotSessions,
+  sweepOrphans,
   // expose standardized timeout row for other ephemeral collectors
   timeoutRow
 };

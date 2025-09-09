@@ -24,11 +24,15 @@ function appendEmergency(entry) {
 async function gracefulShutdown(reason, err) {
   if (fatalHandled) return; // ensure single execution
   fatalHandled = true;
+  let mem = null; let cpu = null; try { const u = process.memoryUsage(); mem = { rss:u.rss, heapTotal:u.heapTotal, heapUsed:u.heapUsed }; } catch {}
+  try { const usage = process.cpuUsage(); cpu = usage; } catch {}
   const entry = {
     ts: Date.now(),
     scope: 'fatal',
     reason,
-    message: err && (err.stack || err.message || String(err))
+    message: err && (err.stack || err.message || String(err)),
+    memory: mem,
+    cpu
   };
   // Write dedicated crash snapshot (overwrites)
   safeWrite(CRASH_LATEST_FILE, JSON.stringify(entry, null, 2));

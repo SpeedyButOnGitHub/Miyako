@@ -30,7 +30,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
   // Economy > CashDrops
   if (categoryName === 'Economy' && settingName === 'CashDrops') {
     if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({ content: 'Admin only.', ephemeral: true });
+  return interaction.reply({ content: 'Admin only.', flags: 1<<6 });
     }
     const e = (config.cashDrops = typeof config.cashDrops === 'object' && config.cashDrops ? config.cashDrops : { dropChance: 0.02, minAmount: 25, maxAmount: 125, lifetimeMs: 60000 });
 
@@ -50,12 +50,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       const raw = submitted.fields.getTextInputValue('chance');
       const n = Number(raw);
       if (!Number.isFinite(n) || n < 0 || n > 100) {
-        return submitted.reply({ content: 'Enter a valid percent between 0 and 100.', ephemeral: true });
+  return submitted.reply({ content: 'Enter a valid percent between 0 and 100.', flags: 1<<6 });
       }
       e.dropChance = Math.max(0, Math.min(1, n / 100));
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop chance to ${(e.dropChance * 100).toFixed(2)}%/msg.` });
-      await submitted.reply({ content: `Drop chance set to ${(e.dropChance * 100).toFixed(2)}% per message.`, ephemeral: true });
+  await submitted.reply({ content: `Drop chance set to ${(e.dropChance * 100).toFixed(2)}% per message.`, flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
     }
@@ -83,12 +83,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       const min = Math.floor(Number(submitted.fields.getTextInputValue('min')));
       const max = Math.floor(Number(submitted.fields.getTextInputValue('max')));
       if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < 0 || max < min) {
-        return submitted.reply({ content: 'Enter valid non-negative integers (max >= min).', ephemeral: true });
+  return submitted.reply({ content: 'Enter valid non-negative integers (max >= min).', flags: 1<<6 });
       }
       e.minAmount = min; e.maxAmount = max;
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop amount range to ${min}-${max}.` });
-      await submitted.reply({ content: `Drop amount range set to ${min}-${max}.`, ephemeral: true });
+  await submitted.reply({ content: `Drop amount range set to ${min}-${max}.`, flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
     }
@@ -108,12 +108,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       if (!submitted) return;
       const s = Math.floor(Number(submitted.fields.getTextInputValue('secs')));
       if (!Number.isFinite(s) || s < 5 || s > 86400) {
-        return submitted.reply({ content: 'Enter a valid seconds value between 5 and 86400.', ephemeral: true });
+  return submitted.reply({ content: 'Enter a valid seconds value between 5 and 86400.', flags: 1<<6 });
       }
       e.lifetimeMs = s * 1000;
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop lifetime to ${s}s.` });
-      await submitted.reply({ content: `Drop lifetime set to ${s}s.`, ephemeral: true });
+  await submitted.reply({ content: `Drop lifetime set to ${s}s.`, flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
     }
@@ -139,12 +139,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       const v = submitted.fields.getTextInputValue('xpmult');
       const num = Number(v);
       if (!Number.isFinite(num) || num <= 0 || num > 100) {
-        return submitted.reply({ content: 'Enter a valid number >0 and <=100.', ephemeral: true });
+  return submitted.reply({ content: 'Enter a valid number >0 and <=100.', flags: 1<<6 });
       }
       config.globalXPMultiplier = num;
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Set Global XP multiplier to x${num.toFixed(2)}` });
-      await submitted.reply({ content: `XP multiplier set to x${num.toFixed(2)}.`, ephemeral: true });
+  await submitted.reply({ content: `XP multiplier set to x${num.toFixed(2)}.`, flags: 1<<6 });
       return;
     }
     if (action === 'reset') {
@@ -158,7 +158,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
   // Testing Mode toggle
   if (categoryName === 'Testing' && settingName === 'TestingMode') {
     if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({ content: 'Admin only.', ephemeral: true });
+  return interaction.reply({ content: 'Admin only.', flags: 1<<6 });
     }
     const prev = !!config.testingMode;
     if (action === 'enable') config.testingMode = true; else if (action === 'disable') config.testingMode = false;
@@ -175,7 +175,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     if (String(interaction.user.id) !== String(process.env.OWNER_ID || '')) {
       // owner-only by environment guard; fall back to admin
       if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: 'Owner/Admin only.', ephemeral: true });
+  return interaction.reply({ content: 'Owner/Admin only.', flags: 1<<6 });
       }
     }
     if (action === 'reseed') {
@@ -183,7 +183,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       config.testingWarnings = JSON.parse(JSON.stringify(seed));
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Reseeded testing warnings from seed (${Object.keys(seed).length} users).` });
-      await interaction.reply({ content: 'Reseeded testing warnings from seed.', ephemeral: true });
+  await interaction.reply({ content: 'Reseeded testing warnings from seed.', flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
     }
@@ -191,7 +191,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       config.testingWarnings = {};
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Cleared testing warnings.` });
-      await interaction.reply({ content: 'Cleared testing warnings.', ephemeral: true });
+  await interaction.reply({ content: 'Cleared testing warnings.', flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
     }
@@ -199,7 +199,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
 
   // Sniping Channel management via modal
   if (categoryName === 'Sniping' && settingName === 'ChannelList' && (action === 'addChannel' || action === 'removeChannel')) {
-    if (!interaction.guild) return interaction.reply({ content: 'Guild only.', ephemeral: true });
+  if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });
     const modalId = `config:modal:sniping:${action}:${Date.now()}`;
     const modal = new ModalBuilder().setCustomId(modalId).setTitle(action === 'addChannel' ? 'Add Channel' : 'Remove Channel');
     const input = new TextInputBuilder()
@@ -215,7 +215,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     const raw = submitted.fields.getTextInputValue('channel');
     const id = parseId(raw);
     const channel = interaction.guild.channels.cache.get(id);
-    if (!channel) return submitted.reply({ content: 'Invalid or unknown channel.', ephemeral: true });
+  if (!channel) return submitted.reply({ content: 'Invalid or unknown channel.', flags: 1<<6 });
     const mode = (config.snipeMode === 'blacklist') ? 'blacklist' : 'whitelist';
     if (mode === 'whitelist') {
       config.snipingWhitelist = ensureArray(config.snipingWhitelist);
@@ -223,12 +223,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
         if (!config.snipingWhitelist.includes(id)) config.snipingWhitelist.push(id);
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to sniping whitelist.` });
-        await submitted.reply({ content: `Added <#${id}> to whitelist.`, ephemeral: true });
+  await submitted.reply({ content: `Added <#${id}> to whitelist.`, flags: 1<<6 });
       } else {
         config.snipingWhitelist = config.snipingWhitelist.filter(x => x !== id);
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from sniping whitelist.` });
-        await submitted.reply({ content: `Removed <#${id}> from whitelist.`, ephemeral: true });
+  await submitted.reply({ content: `Removed <#${id}> from whitelist.`, flags: 1<<6 });
       }
     } else {
       config.snipingChannelList = ensureArray(config.snipingChannelList);
@@ -236,12 +236,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
         if (!config.snipingChannelList.includes(id)) config.snipingChannelList.push(id);
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to sniping blacklist.` });
-        await submitted.reply({ content: `Added <#${id}> to blacklist.`, ephemeral: true });
+  await submitted.reply({ content: `Added <#${id}> to blacklist.`, flags: 1<<6 });
       } else {
         config.snipingChannelList = config.snipingChannelList.filter(x => x !== id);
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from sniping blacklist.` });
-        await submitted.reply({ content: `Removed <#${id}> from blacklist.`, ephemeral: true });
+  await submitted.reply({ content: `Removed <#${id}> from blacklist.`, flags: 1<<6 });
       }
     }
     await refreshSettingMessage(interaction.message, categoryName, settingName);
@@ -250,7 +250,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
 
   // Leveling Channel management via modal
   if (categoryName === 'Leveling' && settingName === 'LevelingChannels' && (action === 'addChannel' || action === 'removeChannel')) {
-    if (!interaction.guild) return interaction.reply({ content: 'Guild only.', ephemeral: true });
+  if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });
     const modalId = `config:modal:leveling:${action}:${Date.now()}`;
     const modal = new ModalBuilder().setCustomId(modalId).setTitle(action === 'addChannel' ? 'Add Leveling Channel' : 'Remove Leveling Channel');
     const input = new TextInputBuilder()
@@ -266,18 +266,18 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     const raw = submitted.fields.getTextInputValue('channel');
     const id = parseId(raw);
     const channel = interaction.guild.channels.cache.get(id);
-    if (!channel) return submitted.reply({ content: 'Invalid or unknown channel.', ephemeral: true });
+  if (!channel) return submitted.reply({ content: 'Invalid or unknown channel.', flags: 1<<6 });
     config.levelingChannelList = ensureArray(config.levelingChannelList);
     if (action === 'addChannel') {
       if (!config.levelingChannelList.includes(id)) config.levelingChannelList.push(id);
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to leveling channel list.` });
-      await submitted.reply({ content: `Added <#${id}>.`, ephemeral: true });
+  await submitted.reply({ content: `Added <#${id}>.`, flags: 1<<6 });
     } else {
       config.levelingChannelList = config.levelingChannelList.filter(x => x !== id);
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from leveling channel list.` });
-      await submitted.reply({ content: `Removed <#${id}>.`, ephemeral: true });
+  await submitted.reply({ content: `Removed <#${id}>.`, flags: 1<<6 });
     }
     await refreshSettingMessage(interaction.message, categoryName, settingName);
     return;
@@ -285,7 +285,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
 
   // Moderation roles management
   if (categoryName === 'Moderation' && settingName === 'ModeratorRoles' && (action === 'addRole' || action === 'removeRole')) {
-    if (!interaction.guild) return interaction.reply({ content: 'Guild only.', ephemeral: true });
+  if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });
     const modalId = `config:modal:modroles:${action}:${Date.now()}`;
     const modal = new ModalBuilder().setCustomId(modalId).setTitle(action === 'addRole' ? 'Add Moderator Role' : 'Remove Moderator Role');
     const input = new TextInputBuilder()
@@ -301,18 +301,18 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     const raw = submitted.fields.getTextInputValue('role');
     const id = parseId(raw);
     const role = interaction.guild.roles.cache.get(id);
-    if (!role) return submitted.reply({ content: 'Invalid or unknown role.', ephemeral: true });
+  if (!role) return submitted.reply({ content: 'Invalid or unknown role.', flags: 1<<6 });
     config.moderatorRoles = ensureArray(config.moderatorRoles);
     if (action === 'addRole') {
       if (!config.moderatorRoles.includes(id)) config.moderatorRoles.push(id);
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Added <@&${id}> to moderatorRoles.` });
-      await submitted.reply({ content: `Added <@&${id}>.`, ephemeral: true });
+  await submitted.reply({ content: `Added <@&${id}>.`, flags: 1<<6 });
     } else {
       config.moderatorRoles = config.moderatorRoles.filter(x => x !== id);
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <@&${id}> from moderatorRoles.` });
-      await submitted.reply({ content: `Removed <@&${id}>.`, ephemeral: true });
+  await submitted.reply({ content: `Removed <@&${id}>.`, flags: 1<<6 });
     }
     await refreshSettingMessage(interaction.message, categoryName, settingName);
     return;
@@ -320,7 +320,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
 
   // Role Log Blacklist management
   if (categoryName === 'Moderation' && settingName === 'RoleLogBlacklist' && (action === 'addBlacklistRole' || action === 'removeBlacklistRole')) {
-    if (!interaction.guild) return interaction.reply({ content: 'Guild only.', ephemeral: true });
+  if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });
     const modalId = `config:modal:rolelog:${action}:${Date.now()}`;
     const modal = new ModalBuilder().setCustomId(modalId).setTitle(action === 'addBlacklistRole' ? 'Add Role to Blacklist' : 'Remove Role from Blacklist');
     const input = new TextInputBuilder()
@@ -336,18 +336,18 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     const raw = submitted.fields.getTextInputValue('role');
     const id = parseId(raw);
     const role = interaction.guild.roles.cache.get(id);
-    if (!role) return submitted.reply({ content: 'Invalid or unknown role.', ephemeral: true });
+  if (!role) return submitted.reply({ content: 'Invalid or unknown role.', flags: 1<<6 });
     config.roleLogBlacklist = ensureArray(config.roleLogBlacklist);
     if (action === 'addBlacklistRole') {
       if (!config.roleLogBlacklist.includes(id)) config.roleLogBlacklist.push(id);
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Blacklisted <@&${id}> from role logs.` });
-      await submitted.reply({ content: `Blacklisted <@&${id}> from role logs.`, ephemeral: true });
+  await submitted.reply({ content: `Blacklisted <@&${id}> from role logs.`, flags: 1<<6 });
     } else {
       config.roleLogBlacklist = config.roleLogBlacklist.filter(x => x !== id);
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <@&${id}> from role log blacklist.` });
-      await submitted.reply({ content: `Removed <@&${id}> from role log blacklist.`, ephemeral: true });
+  await submitted.reply({ content: `Removed <@&${id}> from role log blacklist.`, flags: 1<<6 });
     }
     await refreshSettingMessage(interaction.message, categoryName, settingName);
     return;
@@ -355,7 +355,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
 
   // Leveling Role XP Blacklist management
   if (categoryName === 'Leveling' && settingName === 'RoleXPBlacklist' && (action === 'addRole' || action === 'removeRole')) {
-    if (!interaction.guild) return interaction.reply({ content: 'Guild only.', ephemeral: true });
+  if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });
     const modalId = `config:modal:rolexp:${action}:${Date.now()}`;
     const modal = new ModalBuilder().setCustomId(modalId).setTitle(action === 'addRole' ? 'Add Blocked Role' : 'Remove Blocked Role');
     const input = new TextInputBuilder()
@@ -371,18 +371,18 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     const raw = submitted.fields.getTextInputValue('role');
     const id = parseId(raw);
     const role = interaction.guild.roles.cache.get(id);
-    if (!role) return submitted.reply({ content: 'Invalid or unknown role.', ephemeral: true });
+  if (!role) return submitted.reply({ content: 'Invalid or unknown role.', flags: 1<<6 });
     config.roleXPBlacklist = ensureArray(config.roleXPBlacklist);
     if (action === 'addRole') {
       if (!config.roleXPBlacklist.includes(id)) config.roleXPBlacklist.push(id);
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Added <@&${id}> to XP blacklist.` });
-      await submitted.reply({ content: `Added <@&${id}> to XP blacklist.`, ephemeral: true });
+  await submitted.reply({ content: `Added <@&${id}> to XP blacklist.`, flags: 1<<6 });
     } else {
       config.roleXPBlacklist = config.roleXPBlacklist.filter(x => x !== id);
       await saveConfig();
       await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <@&${id}> from XP blacklist.` });
-      await submitted.reply({ content: `Removed <@&${id}> from XP blacklist.`, ephemeral: true });
+  await submitted.reply({ content: `Removed <@&${id}> from XP blacklist.`, flags: 1<<6 });
     }
     await refreshSettingMessage(interaction.message, categoryName, settingName);
     return;
@@ -390,7 +390,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
 
   // Level Rewards management
   if (categoryName === 'Leveling' && settingName === 'LevelRewards' && (action === 'addLevel' || action === 'removeLevel' || action === 'addReward' || action === 'removeReward')) {
-    if (!interaction.guild) return interaction.reply({ content: 'Guild only.', ephemeral: true });
+  if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });
     const parseRolesCsv = (txt) =>
       (txt || '')
         .split(',')
@@ -420,18 +420,18 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       const levelStr = submitted.fields.getTextInputValue('level');
       const lvlNum = Number(levelStr);
       if (!Number.isInteger(lvlNum) || lvlNum < 0 || lvlNum > 10000) {
-        return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', ephemeral: true });
+  return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', flags: 1<<6 });
       }
       if (action === 'addLevel') {
         ensureLevelArr(String(lvlNum));
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Created Level ${lvlNum} in levelRewards.` });
-        await submitted.reply({ content: `Created level ${lvlNum}.`, ephemeral: true });
+  await submitted.reply({ content: `Created level ${lvlNum}.`, flags: 1<<6 });
       } else {
         if (config.levelRewards && config.levelRewards[String(lvlNum)]) delete config.levelRewards[String(lvlNum)];
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Removed Level ${lvlNum} from levelRewards.` });
-        await submitted.reply({ content: `Removed level ${lvlNum}.`, ephemeral: true });
+  await submitted.reply({ content: `Removed level ${lvlNum}.`, flags: 1<<6 });
       }
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
@@ -461,12 +461,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       const rolesStr = submitted.fields.getTextInputValue('roles');
       const lvlNum = Number(levelStr);
       if (!Number.isInteger(lvlNum) || lvlNum < 0 || lvlNum > 10000) {
-        return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', ephemeral: true });
+  return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', flags: 1<<6 });
       }
       const ids = parseRolesCsv(rolesStr);
-      if (!ids.length) return submitted.reply({ content: 'Provide at least one role.', ephemeral: true });
+  if (!ids.length) return submitted.reply({ content: 'Provide at least one role.', flags: 1<<6 });
       const validIds = ids.filter(id => !!interaction.guild.roles.cache.get(id));
-      if (!validIds.length) return submitted.reply({ content: 'No valid roles found in input.', ephemeral: true });
+  if (!validIds.length) return submitted.reply({ content: 'No valid roles found in input.', flags: 1<<6 });
 
       const key = String(lvlNum);
       const arr = ensureLevelArr(key);
@@ -474,7 +474,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
         for (const id of validIds) if (!arr.includes(id)) arr.push(id);
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to Level ${lvlNum}.` });
-        await submitted.reply({ content: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to level ${lvlNum}.`, ephemeral: true });
+  await submitted.reply({ content: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to level ${lvlNum}.`, flags: 1<<6 });
       } else {
         const before = arr.length;
         const set = new Set(validIds);
@@ -482,7 +482,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
         const after = config.levelRewards[key].length;
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Removed ${before - after} role(s) from Level ${lvlNum}.` });
-        await submitted.reply({ content: `Removed ${before - after} role(s) from level ${lvlNum}.`, ephemeral: true });
+  await submitted.reply({ content: `Removed ${before - after} role(s) from level ${lvlNum}.`, flags: 1<<6 });
       }
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
@@ -491,7 +491,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
 
   // VC Level Rewards management
   if (categoryName === 'Leveling' && settingName === 'VCLevelRewards' && (action === 'addLevel' || action === 'removeLevel' || action === 'addReward' || action === 'removeReward')) {
-    if (!interaction.guild) return interaction.reply({ content: 'Guild only.', ephemeral: true });
+  if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });
     const parseRolesCsv = (txt) =>
       (txt || '')
         .split(',')
@@ -521,18 +521,18 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       const levelStr = submitted.fields.getTextInputValue('level');
       const lvlNum = Number(levelStr);
       if (!Number.isInteger(lvlNum) || lvlNum < 0 || lvlNum > 10000) {
-        return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', ephemeral: true });
+  return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', flags: 1<<6 });
       }
       if (action === 'addLevel') {
         ensureLevelArr(String(lvlNum));
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Created VC Level ${lvlNum} in vcLevelRewards.` });
-        await submitted.reply({ content: `Created VC level ${lvlNum}.`, ephemeral: true });
+  await submitted.reply({ content: `Created VC level ${lvlNum}.`, flags: 1<<6 });
       } else {
         if (config.vcLevelRewards && config.vcLevelRewards[String(lvlNum)]) delete config.vcLevelRewards[String(lvlNum)];
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Removed VC Level ${lvlNum} from vcLevelRewards.` });
-        await submitted.reply({ content: `Removed VC level ${lvlNum}.`, ephemeral: true });
+  await submitted.reply({ content: `Removed VC level ${lvlNum}.`, flags: 1<<6 });
       }
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
@@ -562,12 +562,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       const rolesStr = submitted.fields.getTextInputValue('roles');
       const lvlNum = Number(levelStr);
       if (!Number.isInteger(lvlNum) || lvlNum < 0 || lvlNum > 10000) {
-        return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', ephemeral: true });
+  return submitted.reply({ content: 'Enter a valid non-negative integer level (<= 10000).', flags: 1<<6 });
       }
       const ids = parseRolesCsv(rolesStr);
-      if (!ids.length) return submitted.reply({ content: 'Provide at least one role.', ephemeral: true });
+  if (!ids.length) return submitted.reply({ content: 'Provide at least one role.', flags: 1<<6 });
       const validIds = ids.filter(id => !!interaction.guild.roles.cache.get(id));
-      if (!validIds.length) return submitted.reply({ content: 'No valid roles found in input.', ephemeral: true });
+  if (!validIds.length) return submitted.reply({ content: 'No valid roles found in input.', flags: 1<<6 });
 
       const key = String(lvlNum);
       const arr = ensureLevelArr(key);
@@ -575,7 +575,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
         for (const id of validIds) if (!arr.includes(id)) arr.push(id);
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to VC Level ${lvlNum}.` });
-        await submitted.reply({ content: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to VC level ${lvlNum}.`, ephemeral: true });
+  await submitted.reply({ content: `Added ${validIds.map(id => `<@&${id}>`).join(', ')} to VC level ${lvlNum}.`, flags: 1<<6 });
       } else {
         const before = arr.length;
         const set = new Set(validIds);
@@ -583,14 +583,14 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
         const after = config.vcLevelRewards[key].length;
         await saveConfig();
         await logConfigChange(interaction.client, { user: interaction.user, change: `Removed ${before - after} role(s) from VC Level ${lvlNum}.` });
-        await submitted.reply({ content: `Removed ${before - after} role(s) from VC level ${lvlNum}.`, ephemeral: true });
+  await submitted.reply({ content: `Removed ${before - after} role(s) from VC level ${lvlNum}.`, flags: 1<<6 });
       }
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
     }
   }
 
-  return interaction.reply({ content: 'This action is not implemented yet in the modular UI.', ephemeral: true });
+  return interaction.reply({ content: 'This action is not implemented yet in the modular UI.', flags: 1<<6 });
 }
 
 // No-op for now; kept for future modal routes if needed from elsewhere

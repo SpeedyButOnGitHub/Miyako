@@ -24,6 +24,11 @@ const { levels } = require("../utils/levels");
 const { vcLevels } = require("../utils/vcLevels");
 const { getTopCash } = require("../utils/cash");
 const { getRecentErrors, clearErrorLog } = require('../utils/errorUtil');
+// Simple in-memory command cooldowns
+const _cooldowns = new Map(); // key cmd:user -> lastTs
+function cdOk(userId, cmd, ms=2000) {
+  const k = cmd+':'+userId; const now = Date.now(); const prev = _cooldowns.get(k)||0; if (now - prev < ms) return false; _cooldowns.set(k, now); return true;
+}
 const ActiveMenus = require('../utils/activeMenus');
 
 const LEVEL_ROLES = {
@@ -86,8 +91,10 @@ function attachMessageEvents(client) {
       if (command === "help") {
         await handleHelpCommand(client, message);
       } else if (["mute", "unmute", "timeout", "untimeout", "ban", "kick", "warn", "removewarn"].includes(command)) {
+        if (!cdOk(message.author.id, command, 2500)) return;
         await handleModerationCommands(client, message, command, args);
       } else if (command === 'purge' || command === 'clean') {
+        if (!cdOk(message.author.id, 'purge', 5000)) return;
         await handlePurgeCommand(client, message, args);
       } else if (["snipe", "s", "ds"].includes(command)) {
         await handleSnipeCommands(client, message, command, args);
@@ -147,6 +154,19 @@ function attachMessageEvents(client) {
         lines.push(`Levels: ${Object.keys(levels).length}`);
         lines.push(`VC Levels: ${Object.keys(vcLevels).length}`);
         try { const top = getTopCash(3); lines.push(`Top cash: ${top.map(t=>t.userId+':'+t.amount).join(', ')||'none'}`); } catch {}
+        try {
+          const { getWriteQueueMetrics } = require('../utils/writeQueue');
+          const m = getWriteQueueMetrics();
+          lines.push(`WriteQ enq:${m.enqueued} flushed:${m.flushed} pending:${m.pending}`);
+          if (m.lastFlushAt) lines.push(`Last flush ${(Date.now()-m.lastFlushAt)/1000|0}s ago`);
+        } catch {}
+        try {
+          const fs = require('fs');
+          if (fs.existsSync('./config/process-heartbeat.json')) {
+            const hb = JSON.parse(fs.readFileSync('./config/process-heartbeat.json','utf8'));
+            if (hb.ts) lines.push(`Heartbeat age ${(Date.now()-hb.ts)/1000|0}s`);
+          }
+        } catch {}
         await message.reply({ content: '🩺 Diagnostics\n'+lines.join('\n'), allowedMentions: { repliedUser: false } }).catch(()=>{});
   } else if (command === 'errors' || command === 'err') {
         if (message.author.id !== process.env.OWNER_ID) return;
@@ -193,6 +213,17 @@ function attachMessageEvents(client) {
         if (message.author.id !== process.env.OWNER_ID) return;
         clearErrorLog();
         await message.reply({ content: '🧹 Error log cleared.', allowedMentions: { repliedUser: false } });
+      } else if (command === 'errdetail') {
+        if (message.author.id !== process.env.OWNER_ID) return;
+        const idx = Number(args[0]);
+        if (!Number.isInteger(idx)) return message.reply({ content: 'Provide an index from .errors list.', allowedMentions:{repliedUser:false}});
+        const full = getRecentErrors(100);
+        if (idx < 0 || idx >= full.length) return message.reply({ content: 'Index out of range.', allowedMentions:{repliedUser:false}});
+        const entry = full[idx];
+        const { createEmbed, addChunkedField } = require('../utils/embeds');
+        const embed = createEmbed({ title: `Error #${idx} [${entry.scope}]`, description: new Date(entry.ts).toISOString(), color: 'danger' });
+        addChunkedField(embed, 'Stack / Message', entry.message, 950);
+        await message.reply({ embeds:[embed], allowedMentions:{repliedUser:false}});
       }
     } catch (err) {
       console.error(`[Message Command Error]:`, err);

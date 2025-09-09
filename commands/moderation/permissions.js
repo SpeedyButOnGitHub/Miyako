@@ -1,4 +1,5 @@
 const { config } = require("../../utils/storage");
+const { getCached, setCached } = require('../../utils/permissionsCache');
 const { PermissionFlagsBits } = require("discord.js");
 
 const OWNER_ID = process.env.OWNER_ID || "349282473085239298";
@@ -22,19 +23,23 @@ const CHATBOX_BUTTON_ID = "staffteam_chatbox";
 
 function isModerator(member) {
   if (!member) return false;
-  if (String(member.id) === String(OWNER_ID)) return true;
+  const cached = getCached(member.guild?.id || 'global', member.id);
+  if (cached !== null) return cached;
+  if (String(member.id) === String(OWNER_ID)) { setCached(member.guild?.id || 'global', member.id, true); return true; }
 
   const roleCache = member.roles?.cache || new Map();
   const hasRole = (rid) => roleCache.has(rid);
   const configured = Array.isArray(config.moderatorRoles) ? config.moderatorRoles : [];
-  if (configured.some(hasRole)) return true;
-  if (ALLOWED_ROLES.some(hasRole)) return true;
+  if (configured.some(hasRole)) { setCached(member.guild?.id || 'global', member.id, true); return true; }
+  if (ALLOWED_ROLES.some(hasRole)) { setCached(member.guild?.id || 'global', member.id, true); return true; }
 
   if (member.permissions && typeof member.permissions.has === "function") {
     if (member.permissions.has(PermissionFlagsBits.Administrator) || member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+      setCached(member.guild?.id || 'global', member.id, true);
       return true;
     }
   }
+  setCached(member.guild?.id || 'global', member.id, false);
   return false;
 }
 
