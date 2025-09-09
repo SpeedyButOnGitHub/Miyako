@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const theme = require("../../utils/theme");
+const { applyStandardFooter } = require("../../utils/ui");
 
 async function sendUserDM(target, action, duration = null, reason = null, extra = null) {
   let description;
@@ -8,8 +9,8 @@ async function sendUserDM(target, action, duration = null, reason = null, extra 
   const al = a.toLowerCase();
   switch (al) {
     case "warned":
-  description = `${theme.emojis.warn} You have been warned in **Late Night Hours**.`;
-  color = theme.colors.warning;
+      description = `${theme.emojis.warn} You have been warned in **Late Night Hours**.`;
+      color = theme.colors.warning;
       break;
     default:
       if (al.startsWith("warning removed")) {
@@ -29,11 +30,11 @@ async function sendUserDM(target, action, duration = null, reason = null, extra 
   description = "🔇 You have been **muted** in **Late Night Hours**.";
   color = theme.colors.danger;
       } else if (al === "unmuted") {
-  description = "🔊 You have been **unmuted** in **Late Night Hours**.";
-  color = theme.colors.success;
+        description = `${theme.emojis.unmute || "🔊"} You have been **unmuted** in **Late Night Hours**.`;
+        color = theme.colors.success;
       } else {
-  description = `${theme.emojis.info} You have been **${a}** in **Late Night Hours**.`;
-  color = theme.colors.primary;
+        description = `${theme.emojis.info} You have been **${a}** in **Late Night Hours**.`;
+        color = theme.colors.primary;
       }
       break;
   }

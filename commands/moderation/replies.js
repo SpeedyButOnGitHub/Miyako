@@ -1,8 +1,9 @@
 const { Message, BaseInteraction } = require("discord.js");
-const { config } = require("../../utils/storage");
+const theme = require("../../utils/theme");
 
-const EMOJI_SUCCESS = "<a:kyoukoThumbsUp:1413767126547828757>";
-const EMOJI_ERROR = "<:VRLSad:1413770577080094802>";
+// Centralize via theme; retain exported constants for downstream compatibility
+const EMOJI_SUCCESS = theme.emojis.success;
+const EMOJI_ERROR = theme.emojis.error || "❌";
 
 function replySuccess(target, text) {
   if (target instanceof Message || target instanceof BaseInteraction) {
@@ -18,9 +19,4 @@ function replyError(target, text) {
   return `${EMOJI_ERROR} ${text}`;
 }
 
-module.exports = {
-  replySuccess,
-  replyError,
-  EMOJI_SUCCESS,
-  EMOJI_ERROR
-};
+module.exports = { replySuccess, replyError, EMOJI_SUCCESS, EMOJI_ERROR };

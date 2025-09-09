@@ -14,10 +14,10 @@ function buildEventsMainEmbed() {
   const lines = evs.map(e => {
     const times = (e.times || []).join(", ") || "–";
     const days = (e.days || []).map(d => DAY_NAMES[d] || d).join(" ") || "All";
-    return `${e.enabled ? "✅" : "❌"} **${e.name}** • Times: \`${times}\` • Days: \`${days}\` • ID: \`${e.id}\``;
+  return `${e.enabled ? theme.emojis.enable : theme.emojis.disable} **${e.name}** • Times: \`${times}\` • Days: \`${days}\` • ID: \`${e.id}\``;
   });
   return new EmbedBuilder()
-    .setTitle("🎉 Events Manager")
+  .setTitle(`${theme.emojis.toggle} Events Manager`)
     .setColor(theme.colors?.primary || 0x5865F2)
     .setDescription(lines.length ? lines.join("\n") : "*No events defined yet.*")
     .setFooter({ text: `${evs.length} event${evs.length === 1 ? '' : 's'} total • Use buttons below` });
@@ -27,7 +27,7 @@ function buildEventDetailEmbed(ev) {
   const times = (ev.times || []).length ? ev.times.join(", ") : "(none)";
   const days = (ev.days || []).length ? ev.days.map(d => DAY_NAMES[d] || d).join(", ") : "(none)";
   return new EmbedBuilder()
-    .setTitle(`${ev.enabled ? "✅" : "❌"} ${ev.name}`)
+  .setTitle(`${ev.enabled ? theme.emojis.enable : theme.emojis.disable} ${ev.name}`)
     .setColor(ev.enabled ? (theme.colors?.success || 0x2ecc71) : (theme.colors?.danger || 0xe74c3c))
     .setDescription(ev.description || "No description provided.")
     .addFields(
@@ -51,9 +51,9 @@ async function handleScheduleCommand(client, message) {
     const evs = getEvents();
     return [
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("ev_create").setLabel("Create").setStyle(ButtonStyle.Success).setEmoji("➕"),
-        new ButtonBuilder().setCustomId("ev_delete_mode").setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
-        new ButtonBuilder().setCustomId("ev_select_mode").setLabel("Select").setStyle(ButtonStyle.Primary).setEmoji("🎯").setDisabled(!evs.length)
+  new ButtonBuilder().setCustomId("ev_create").setLabel("Create").setStyle(ButtonStyle.Success).setEmoji(theme.emojis.create),
+  new ButtonBuilder().setCustomId("ev_delete_mode").setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.delete),
+  new ButtonBuilder().setCustomId("ev_select_mode").setLabel("Select").setStyle(ButtonStyle.Primary).setEmoji(theme.emojis.select).setDisabled(!evs.length)
       )
     ];
   };
@@ -88,12 +88,12 @@ async function handleScheduleCommand(client, message) {
         mode = "select";
         await interaction.deferUpdate();
         const evs = getEvents();
-        const options = evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(" ").slice(0,100), emoji: e.enabled?"🟢":"🔴" }));
+  const options = evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(" ").slice(0,100), emoji: e.enabled?theme.emojis.enable:theme.emojis.disable }));
         const rowSel = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder().setCustomId("ev_select").setPlaceholder("Select an event...").addOptions(options)
         );
         const rowBack = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+          new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.back)
         );
         await replyMsg.edit({ embeds: [buildEventsMainEmbed()], components: [rowSel, rowBack] });
         return;
@@ -109,11 +109,11 @@ async function handleScheduleCommand(client, message) {
         }
         const rowSel = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder().setCustomId("ev_delete_select").setPlaceholder("Select event to delete").addOptions(
-            evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(" ").slice(0,100), emoji: "🗑️" }))
+            evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(" ").slice(0,100), emoji: theme.emojis.delete }))
           )
         );
         const rowBack = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+          new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.back)
         );
         await replyMsg.edit({ embeds: [buildEventsMainEmbed()], components: [rowSel, rowBack] });
         return;
@@ -312,9 +312,9 @@ async function handleEventCreateModal(interaction) {
         const evs = getEvents();
         await mgrMsg.edit({ embeds: [buildEventsMainEmbed()], components: [
           new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId("ev_create").setLabel("Create").setStyle(ButtonStyle.Success).setEmoji("➕"),
-            new ButtonBuilder().setCustomId("ev_delete_mode").setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
-            new ButtonBuilder().setCustomId("ev_select_mode").setLabel("Select").setStyle(ButtonStyle.Primary).setEmoji("🎯").setDisabled(!evs.length)
+            new ButtonBuilder().setCustomId("ev_create").setLabel("Create").setStyle(ButtonStyle.Success).setEmoji(theme.emojis.create),
+            new ButtonBuilder().setCustomId("ev_delete_mode").setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.delete),
+            new ButtonBuilder().setCustomId("ev_select_mode").setLabel("Select").setStyle(ButtonStyle.Primary).setEmoji(theme.emojis.select).setDisabled(!evs.length)
           )
         ] });
       }
@@ -325,17 +325,17 @@ async function handleEventCreateModal(interaction) {
 function buildDetailRows(ev) {
   const toggleLabel = ev.enabled ? "Disable" : "Enable";
   const toggleStyle = ev.enabled ? ButtonStyle.Danger : ButtonStyle.Success;
-  const toggleEmoji = ev.enabled ? "🛑" : "✅";
+  const toggleEmoji = ev.enabled ? theme.emojis.disable : theme.emojis.enable;
   return [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`ev_toggle_${ev.id}`).setLabel(toggleLabel).setStyle(toggleStyle).setEmoji(toggleEmoji),
-      new ButtonBuilder().setCustomId(`ev_edit_times_${ev.id}`).setLabel("Times").setStyle(ButtonStyle.Primary).setEmoji("🕒"),
-      new ButtonBuilder().setCustomId(`ev_edit_days_${ev.id}`).setLabel("Days").setStyle(ButtonStyle.Primary).setEmoji("📅")
+  new ButtonBuilder().setCustomId(`ev_edit_times_${ev.id}`).setLabel("Times").setStyle(ButtonStyle.Primary).setEmoji(theme.emojis.times),
+  new ButtonBuilder().setCustomId(`ev_edit_days_${ev.id}`).setLabel("Days").setStyle(ButtonStyle.Primary).setEmoji(theme.emojis.days)
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`ev_edit_msg_${ev.id}`).setLabel("Message").setStyle(ButtonStyle.Secondary).setEmoji("📝"),
-      new ButtonBuilder().setCustomId(`ev_delete_${ev.id}`).setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
-      new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+  new ButtonBuilder().setCustomId(`ev_edit_msg_${ev.id}`).setLabel("Message").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.message),
+  new ButtonBuilder().setCustomId(`ev_delete_${ev.id}`).setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.delete),
+  new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.back)
     )
   ];
 }

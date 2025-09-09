@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
 const theme = require("../utils/theme");
+const { progressBar: sharedProgressBar, applyStandardFooter } = require("../utils/ui");
 const { getCash, getTestingCash } = require("../utils/cash");
 const { getUserModifier } = require("../utils/leveling");
 const { getBank, getBaseLimit } = require("../utils/bank");
@@ -19,20 +20,7 @@ function buildStatusLine(bank, base) {
 }
 
 // Root wallet view (public message)
-function progressBar(current, max, size = 14) {
-  const safeMax = Math.max(1, max);
-  const ratio = current / safeMax; // can exceed 1 (overfill)
-  const capped = Math.min(1, ratio);
-  const filled = Math.round(capped * size);
-  const empty = size - filled;
-  const bar = `【${"█".repeat(filled)}${"░".repeat(empty)}】`;
-  if (ratio > 1) {
-    // Append a small overfill indicator with +X% over
-    const overPct = ((ratio - 1) * 100).toFixed(1);
-    return `${bar} +${overPct}%`;
-  }
-  return bar;
-}
+const progressBar = (current, max, size = 14) => sharedProgressBar(current, max, size, { allowOverflow: true, showNumbers: false });
 
 function buildBalancePayload(userId) {
   const { config } = require("../utils/storage");
@@ -46,7 +34,7 @@ function buildBalancePayload(userId) {
   const bar = progressBar(used, base);
   const over = used > base;
   const embed = new EmbedBuilder()
-    .setTitle("💳 Wallet & Bank")
+    .setTitle(`${theme.emojis.bank} Wallet & Bank`)
     .setColor(bankColor(bank, base))
     .addFields(
       { name: "Cash", value: `**$${cash.toLocaleString()}**`, inline: true },
@@ -54,11 +42,13 @@ function buildBalancePayload(userId) {
       { name: "Multiplier", value: `${mult.toFixed(2)}x`, inline: true }
     )
   .addFields({ name: "Daily Deposit Progress", value: `${bar}\n$${used.toLocaleString()}/$${base.toLocaleString()}${over ? " ⚠️" : ""}` })
-    .setFooter({ text: "Deposit to grow your bank. Taxes apply above the limit." });
+    .setTimestamp();
+  applyStandardFooter(embed, null, { testingMode: config.testingMode });
+  embed.setFooter({ text: `Deposit to grow your bank${config.testingMode ? ' • Testing Mode' : ''}. Taxes apply above the limit.` });
 
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("bank:menu:deposit").setLabel("Deposit").setEmoji("🏦").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("bank:menu:withdraw").setLabel("Withdraw").setEmoji("💵").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("bank:menu:deposit").setLabel("Deposit").setEmoji(theme.emojis.deposit).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("bank:menu:withdraw").setLabel("Withdraw").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row] };
 }
@@ -87,14 +77,16 @@ function buildDepositMenuPayload(userId) {
     lines.push(bank === base ? "At limit: further deposits will incur tax." : "Warning: Above limit – deposits incur heavy progressive tax.");
   }
   const embed = new EmbedBuilder()
-    .setTitle("🏦 Deposit Menu")
+    .setTitle(`${theme.emojis.deposit} Deposit Menu`)
     .setColor(bankColor(bank, base))
     .setDescription(lines.join("\n"))
-    .setFooter({ text: "Choose Deposit Amount or Deposit Max. Back returns to Wallet." });
+    .setTimestamp();
+  applyStandardFooter(embed, null, { testingMode: config.testingMode });
+  embed.setFooter({ text: `Choose Deposit Amount or Deposit Max. Back returns to Wallet.${config.testingMode ? ' • Testing Mode' : ''}` });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("bank:deposit:amount").setLabel("Deposit Amount").setEmoji("📝").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("bank:deposit:max").setLabel("Deposit Max").setEmoji("📈").setStyle(bank >= base ? ButtonStyle.Danger : ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("bank:back").setLabel("Back").setEmoji("⬅️").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("bank:deposit:amount").setLabel("Deposit Amount").setEmoji(theme.emojis.edit).setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("bank:deposit:max").setLabel("Deposit Max").setEmoji(theme.emojis.deposit).setStyle(bank >= base ? ButtonStyle.Danger : ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("bank:back").setLabel("Back").setEmoji(theme.emojis.back).setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row] };
 }
@@ -109,14 +101,16 @@ function buildWithdrawMenuPayload(userId) {
     "Withdrawals have no penalties."
   ];
   const embed = new EmbedBuilder()
-    .setTitle("💵 Withdraw Menu")
+    .setTitle(`${theme.emojis.withdraw} Withdraw Menu`)
     .setColor(bankColor(bank, base))
     .setDescription(lines.join("\n"))
-    .setFooter({ text: "Choose Withdraw Amount or Withdraw Max. Back returns to Wallet." });
+    .setTimestamp();
+  applyStandardFooter(embed, null, { testingMode: config.testingMode });
+  embed.setFooter({ text: `Choose Withdraw Amount or Withdraw Max. Back returns to Wallet.${config.testingMode ? ' • Testing Mode' : ''}` });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("bank:withdraw:amount").setLabel("Withdraw Amount").setEmoji("📝").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("bank:withdraw:max").setLabel("Withdraw Max").setEmoji("📉").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("bank:back").setLabel("Back").setEmoji("⬅️").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("bank:withdraw:amount").setLabel("Withdraw Amount").setEmoji(theme.emojis.edit).setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("bank:withdraw:max").setLabel("Withdraw Max").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("bank:back").setLabel("Back").setEmoji(theme.emojis.back).setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row] };
 }

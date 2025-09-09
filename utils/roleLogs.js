@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { config } = require("./storage");
 const theme = require("./theme");
+const { applyStandardFooter } = require("./ui");
 const { ROLE_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
 
 async function logRoleChange(client, member, role, action) {
@@ -14,7 +15,7 @@ async function logRoleChange(client, member, role, action) {
   if (!channel) return;
 
   const embed = new EmbedBuilder()
-    .setTitle(`Role ${action === "add" ? "Added" : "Removed"}`)
+    .setTitle(`${action === "add" ? theme.emojis.enable : theme.emojis.disable} Role ${action === "add" ? "Added" : "Removed"}`)
     .setColor(action === "add" ? theme.colors.success : theme.colors.danger)
     .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .addFields(
@@ -22,6 +23,7 @@ async function logRoleChange(client, member, role, action) {
       { name: "Member", value: `<@${member.id}>`, inline: true }
     )
     .setTimestamp();
+  applyStandardFooter(embed, member.guild, { testingMode: config.testingMode });
 
   await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
 }

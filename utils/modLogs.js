@@ -3,6 +3,7 @@ const ms = require("ms");
 const { config } = require("./storage");
 const theme = require("./theme");
 const { MOD_ACTION_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
+const { applyStandardFooter } = require("./ui");
 
 // Testing mode routes to test channel; otherwise prefer config.modLogChannelId, then MOD_ACTION_LOG_CHANNEL
 
@@ -106,9 +107,13 @@ async function sendModLog(
 
   // Always prefer a footer over timestamp; include emojis
   if (footerRemaining) {
-  embed.setFooter({ text: `${theme.emojis.counter} ${footerRemaining} • ${theme.emojis.id} ${targetId}` });
+    embed.setFooter({ text: `${theme.emojis.counter} ${footerRemaining} • ${theme.emojis.id} ${targetId}` });
   } else {
-  embed.setFooter({ text: `${theme.emojis.id} ${targetId}` });
+    // Apply standard footer for server/testing context then append ID line
+    applyStandardFooter(embed, channel.guild, { testingMode: config.testingMode });
+    // Merge existing footer text with ID token
+    const existing = embed.data.footer?.text || '';
+    embed.setFooter({ text: `${existing}${existing ? ' • ' : ''}${theme.emojis.id} ${targetId}` });
   }
 
   const avatarUrl = targetUser?.displayAvatarURL ? targetUser.displayAvatarURL({ dynamic: true, size: 256 }) : null;
@@ -118,10 +123,10 @@ async function sendModLog(
   const userIdSafe = String(targetId);
   const rows = [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`modact:menu:warnings:${userIdSafe}`).setLabel("Warnings").setStyle(ButtonStyle.Secondary).setEmoji("⚠️"),
-      new ButtonBuilder().setCustomId(`modact:menu:mute:${userIdSafe}`).setLabel("Mute").setStyle(ButtonStyle.Secondary).setEmoji("⏰"),
-      new ButtonBuilder().setCustomId(`modact:init:kick:${userIdSafe}`).setLabel("Kick").setStyle(ButtonStyle.Secondary).setEmoji("👢"),
-      new ButtonBuilder().setCustomId(`modact:init:ban:${userIdSafe}`).setLabel("Ban").setStyle(ButtonStyle.Danger).setEmoji("🔨")
+      new ButtonBuilder().setCustomId(`modact:menu:warnings:${userIdSafe}`).setLabel("Warnings").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.warn),
+      new ButtonBuilder().setCustomId(`modact:menu:mute:${userIdSafe}`).setLabel("Mute").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.mute),
+      new ButtonBuilder().setCustomId(`modact:init:kick:${userIdSafe}`).setLabel("Kick").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.kick),
+      new ButtonBuilder().setCustomId(`modact:init:ban:${userIdSafe}`).setLabel("Ban").setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.ban)
     )
   ];
 

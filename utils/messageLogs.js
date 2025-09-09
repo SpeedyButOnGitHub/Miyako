@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { config } = require("./storage");
 const theme = require("./theme");
+const { applyStandardFooter } = require("./ui");
 const { MESSAGE_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
 
 async function logMessageDelete(client, message) {
@@ -9,12 +10,13 @@ async function logMessageDelete(client, message) {
   if (!channel || !message || !message.guild || !message.author || message.author.bot) return;
 
   const embed = new EmbedBuilder()
-    .setTitle("Message Deleted")
+    .setTitle(`${theme.emojis.delete} Message Deleted`)
     .setColor(theme.colors.danger)
     .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
     .setDescription(message.content || "*No content*")
     .addFields({ name: "Channel", value: `<#${message.channel.id}>`, inline: true })
     .setTimestamp();
+  applyStandardFooter(embed, message.guild, { testingMode: config.testingMode });
 
   await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
 }
@@ -26,8 +28,8 @@ async function logMessageEdit(client, oldMessage, newMessage) {
   if (!newMessage.guild || (newMessage.author && newMessage.author.bot)) return;
 
   const embed = new EmbedBuilder()
-    .setTitle("Message Edited")
-    .setColor(0xffd700)
+    .setTitle(`${theme.emojis.edit} Message Edited`)
+    .setColor(theme.colors.warning)
     .setAuthor({ name: (newMessage.author && newMessage.author.tag) || "Unknown", iconURL: newMessage.author ? newMessage.author.displayAvatarURL({ dynamic: true }) : undefined })
     .addFields(
       { name: "Channel", value: `<#${newMessage.channel.id}>`, inline: true },
@@ -35,6 +37,7 @@ async function logMessageEdit(client, oldMessage, newMessage) {
       { name: "After", value: newMessage.content || "*No content*" }
     )
     .setTimestamp();
+  applyStandardFooter(embed, newMessage.guild, { testingMode: config.testingMode });
 
   await channel.send({ embeds: [embed] }).catch(() => {});
 }

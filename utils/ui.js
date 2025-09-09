@@ -1,19 +1,67 @@
-const { ButtonBuilder, ButtonStyle, EmbedBuilder, ActionRowBuilder } = require('discord.js');
+const { ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const theme = require('./theme');
 
-function btn(id, label, style, emoji, disabled=false) {
+function btn(id, label, style = ButtonStyle.Secondary, emoji, disabled = false) {
   const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
   if (emoji) b.setEmoji(emoji);
   if (disabled) b.setDisabled(true);
   return b;
 }
 
+function navBtn(id, label, active, emoji) {
+  return btn(id, label, active ? ButtonStyle.Primary : ButtonStyle.Secondary, emoji, false);
+}
+
+function toggleModeBtn(id, mode, nextModeLabel, isVC) {
+  return btn(id, nextModeLabel, isVC ? ButtonStyle.Success : ButtonStyle.Secondary, isVC ? theme.emojis.vc : theme.emojis.text);
+}
+
+function backButton(id = 'back', label = 'Back') {
+  return btn(id, label, ButtonStyle.Secondary, theme.emojis.back);
+}
+
 function primaryEmbed(title, description) {
   return new EmbedBuilder().setTitle(title).setDescription(description || '').setColor(theme.colors.primary);
 }
 
-function sectionField(name, value, inline=false) {
+function sectionField(name, value, inline = false) {
   return { name, value, inline };
 }
 
-module.exports = { btn, primaryEmbed, sectionField };
+function progressBar(current, max, size = 20, { showNumbers = true, allowOverflow = true, style = 'blocks' } = {}) {
+  const safeMax = Math.max(1, max);
+  const ratio = current / safeMax;
+  const capped = Math.min(1, ratio);
+  const filled = Math.round(capped * size);
+  const empty = size - filled;
+  const fullChar = style === 'bars' ? '█' : '█';
+  const emptyChar = style === 'bars' ? '░' : '░';
+  let bar = `\`${fullChar.repeat(filled)}${emptyChar.repeat(empty)}\``;
+  if (allowOverflow && ratio > 1) bar += ` +${((ratio - 1) * 100).toFixed(1)}%`;
+  if (showNumbers) bar += ` ${current}/${max}`;
+  return bar;
+}
+
+function applyStandardFooter(embed, guild, { testingMode } = { testingMode: false }) {
+  try {
+    embed.setFooter({ text: `${guild?.name || 'Server'}${testingMode ? ' • Testing Mode' : ''}` });
+  } catch {}
+  return embed;
+}
+
+// Generic pagination display helper for consistency
+function paginationLabel(page, totalPages) {
+  return `Page ${page}/${totalPages}`;
+}
+
+// Apply standard footer + pagination (appended) and optional extra text
+function applyFooterWithPagination(embed, guild, { testingMode = false, page = null, totalPages = null, extra = null } = {}) {
+  const base = `${guild?.name || 'Server'}${testingMode ? ' • Testing Mode' : ''}`;
+  const parts = [base];
+  if (page && totalPages) parts.push(paginationLabel(page, totalPages));
+  if (extra) parts.push(extra);
+  try { embed.setFooter({ text: parts.join(' • ') }); } catch {}
+  return embed;
+}
+
+module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination };

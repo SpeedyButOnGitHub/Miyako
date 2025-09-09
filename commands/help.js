@@ -3,6 +3,8 @@ const { isModerator } = require("./moderation/index");
 const { handleMessageCreate } = require("./configMenu");
 const { OWNER_ID } = require("./moderation/permissions");
 const ActiveMenus = require("../utils/activeMenus");
+const theme = require("../utils/theme");
+const { applyStandardFooter } = require("../utils/ui");
 
 const EMOJI_ERROR = "❌";
 
@@ -60,8 +62,8 @@ async function handleHelpCommand(client, message) {
 
   // Build main help menu embed
   const embed = new EmbedBuilder()
-    .setTitle("🌙 Command Help Menu")
-    .setColor(0x5865F2)
+    .setTitle(`${theme.emojis.info} Command Help Menu`)
+    .setColor(theme.colors.primary)
     .setDescription(
   "Welcome to the help menu!\n\n" +
   "Tip: durations accept values like `30m`, `2h`, `1d`.\n\n" +
@@ -86,24 +88,18 @@ async function handleHelpCommand(client, message) {
     tag = `User ${user.id}`;
   }
 
-  embed.setFooter({ 
-    text: `Requested by ${message.author.tag}`, 
-    iconURL: (message.member && message.member.user && typeof message.member.user.displayAvatarURL === "function")
-      ? message.member.user.displayAvatarURL({ dynamic: true })
-      : (typeof message.author.displayAvatarURL === "function"
-        ? message.author.displayAvatarURL({ dynamic: true })
-        : "https://cdn.discordapp.com/embed/avatars/0.png")
-  });
   embed.setTimestamp();
+  applyStandardFooter(embed, message.guild, { testingMode: false });
 
   // Buttons for categories and config
   const row = new ActionRowBuilder();
   shownCategories.forEach(cat => {
+    const style = ButtonStyle.Secondary; // uniform base style
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(`help_${cat.name.toLowerCase()}`)
         .setLabel(cat.name)
-        .setStyle(cat.name === "Moderation" ? ButtonStyle.Primary : ButtonStyle.Success)
+        .setStyle(style)
         .setEmoji(cat.emoji)
     );
   });
@@ -113,8 +109,8 @@ async function handleHelpCommand(client, message) {
       new ButtonBuilder()
         .setCustomId("help_config")
         .setLabel("Config Menu")
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji("⚙️")
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji(theme.emojis.settings)
     );
   }
 
@@ -180,15 +176,16 @@ async function handleHelpCommand(client, message) {
 
         const catEmbed = new EmbedBuilder()
           .setTitle(`${selectedCat.emoji} ${selectedCat.name} Commands`)
-          .setColor(0x5865F2)
+          .setColor(theme.colors.primary)
           .setDescription(selectedCat.commands.map(cmd => `**${cmd.name}:**\n${cmd.value}`).join("\n\n"))
-          .setFooter({ text: `Requested by ${message.author.tag}`, iconURL: footerIcon })
           .setTimestamp();
+        applyStandardFooter(catEmbed, message.guild, { testingMode: false });
 
         const backRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("help_back")
-            .setLabel("⬅️ Back")
+            .setLabel("Back")
+            .setEmoji(theme.emojis.back)
             .setStyle(ButtonStyle.Secondary)
         );
         await interaction.deferUpdate();

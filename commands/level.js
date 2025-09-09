@@ -1,14 +1,13 @@
 const { getXP, getLevel } = require("../utils/levels");
 const ActiveMenus = require("../utils/activeMenus");
-const { buildRows } = require("./profile");
+const { buildRows, buildRankEmbed } = require("./profile");
 const { EmbedBuilder } = require("discord.js");
 const { buildLeaderboardEmbed } = require("./profile"); // type-only context
 const { levels: levelsObj } = require("../utils/levels");
 const { buildLeaderboardEmbed: _ignore, buildRows: _ignore2 } = require("./profile");
-const { buildRankEmbed } = (() => {
-  // pull from profile module exports by require cache
-  try { return require("./profile"); } catch { return {}; }
-})();
+const { progressBar: sharedProgressBar } = require("../utils/ui");
+const theme = require("../utils/theme");
+const { config } = require("../utils/storage");
 
 function getLevelXP(level) {
   const BASE_XP = 150; // keep in sync with utils/levels addXP
@@ -16,10 +15,7 @@ function getLevelXP(level) {
 }
 
 function createProgressBar(current, max, size = 20) {
-  const safeMax = Math.max(1, max);
-  const filled = Math.min(size, Math.max(0, Math.round((current / safeMax) * size)));
-  const empty = size - filled;
-  return `\`${"█".repeat(filled)}${"░".repeat(empty)}\` ${current} / ${max}`;
+  return sharedProgressBar(current, max, size, { showNumbers: true, allowOverflow: false });
 }
 
 async function handleLevelCommand(client, message) {
@@ -43,16 +39,15 @@ async function handleLevelCommand(client, message) {
 
   let embed;
   if (buildRankEmbed) {
-    // Use shared builder for uniformity
-    embed = buildRankEmbed(message.member, rank, level, progressBar);
+    embed = buildRankEmbed(message.member, rank, level, progressBar, "text");
   } else {
     embed = new EmbedBuilder()
-      .setTitle("📊 Your Rank")
-      .setColor(0x5865F2)
+      .setTitle(`${theme.emojis.rank} Your Rank`)
+      .setColor(theme.colors.primary)
       .addFields(
-        { name: "Level", value: `Lv. ${level}`, inline: true },
+        { name: "Level", value: `Lv. ${level}` , inline: true },
         { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
-        { name: `Progress`, value: progressBar, inline: false }
+        { name: "Progress", value: progressBar, inline: false }
       )
       .setTimestamp();
   }

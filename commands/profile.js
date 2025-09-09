@@ -5,6 +5,7 @@ const { getUserModifier } = require("../utils/leveling");
 const { config } = require("../utils/storage");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
+const { progressBar: sharedProgressBar, applyStandardFooter, applyFooterWithPagination } = require("../utils/ui");
 const { getCash, formatCash, getTopCash } = require("../utils/cash");
 const { getBank, getBaseLimit } = require("../utils/bank");
 
@@ -26,11 +27,9 @@ function getLevelXP(level) {
   return Math.floor(BASE_XP * Math.pow(level, 1 / 0.7));
 }
 
+// Deprecated local progress bar; use shared UI helper for consistency
 function createProgressBar(current, max, size = 18) {
-  const safeMax = Math.max(1, max);
-  const filled = Math.min(size, Math.max(0, Math.round((current / safeMax) * size)));
-  const empty = size - filled;
-  return `\`${"█".repeat(filled)}${"░".repeat(empty)}\` ${current}/${max}`;
+  return sharedProgressBar(current, max, size, { showNumbers: true, allowOverflow: false });
 }
 
 function getRankFromLeaderboard(levelsObj, userId) {
@@ -100,9 +99,9 @@ function buildRows(view = "main", page = 1, totalPages = 1, mode = "text") {
 }
 
 function buildRankEmbed(member, rank, level, progressBar, mode = "text") {
-  return new EmbedBuilder()
-    .setTitle(mode === "text" ? "📊 Your Rank" : "🎙️ Your VC Rank")
-  .setColor(mode === "text" ? theme.colors.primary : theme.colors.danger)
+  const embed = new EmbedBuilder()
+    .setTitle(mode === "text" ? `${theme.emojis.rank} Your Rank` : `${theme.emojis.vc} Your VC Rank`)
+    .setColor(mode === "text" ? theme.colors.primary : theme.colors.danger)
     .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
     .addFields(
@@ -111,6 +110,8 @@ function buildRankEmbed(member, rank, level, progressBar, mode = "text") {
       { name: "Progress", value: `${progressBar}`, inline: false },
     )
     .setTimestamp();
+  applyStandardFooter(embed, member.guild, { testingMode: config.testingMode });
+  return embed;
 }
 
 function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 10, mode = "text") {
@@ -146,12 +147,14 @@ function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 
     return `${medal} <@${e.userId}> — $${e.amount.toLocaleString()}`;
   });
   const cashSection = `\n\n🏦 Bank Leaderboard\n${bankLines.length ? bankLines.join("\n") : "No balances yet."}`;
-  return new EmbedBuilder()
-    .setTitle(mode === "text" ? "🏆 Leaderboard" : "🎙️ VC Leaderboard")
-  .setColor(mode === "text" ? theme.colors.warning : theme.colors.danger)
+  const embed = new EmbedBuilder()
+    .setTitle(mode === "text" ? `${theme.emojis.leaderboard} Leaderboard` : `${theme.emojis.vc} VC Leaderboard`)
+    .setColor(mode === "text" ? theme.colors.warning : theme.colors.danger)
     .setDescription((lines.length ? lines.join("\n") + extra : "No data yet.") + cashSection)
-    .setFooter({ text: rank ? `Your rank: #${rank} • Page ${safePage}/${totalPages}` : `Page ${safePage}/${totalPages}` })
     .setTimestamp();
+  const extraFooter = rank ? `Your rank: #${rank}` : null;
+  applyFooterWithPagination(embed, guild, { testingMode: config.testingMode, page: safePage, totalPages, extra: extraFooter });
+  return embed;
 }
 
 async function handleProfileCommand(client, message) {
@@ -185,7 +188,7 @@ async function handleProfileCommand(client, message) {
     .setColor(theme.colors.primary)
     .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-    .setTitle("Your profile")
+    .setTitle(`${theme.emojis.profile} Your Profile`)
     .addFields(
       { name: "Level", value: `\`Lv. ${level}\``, inline: true },
       { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
@@ -197,8 +200,8 @@ async function handleProfileCommand(client, message) {
       { name: "Progress", value: `${progressBar}`, inline: false },
       { name: "Unlocked Perks", value: permsDisplay, inline: false },
     )
-    .setFooter({ text: member.guild.name })
     .setTimestamp();
+  applyStandardFooter(embed, member.guild, { testingMode: config.testingMode });
 
   // Optional: show next unlock preview
   const rewardsMap = mode === "vc" ? (config.vcLevelRewards || {}) : (config.levelRewards || {});
@@ -210,7 +213,7 @@ async function handleProfileCommand(client, message) {
     const roleIds = Array.isArray(roles) ? roles : (roles ? [roles] : []);
     if (roleIds.length) {
       const mentions = roleIds.map(id => `<@&${id}>`).join(", ");
-      embed.addFields({ name: "Next Unlock", value: `Level ${upcoming}: ${mentions}`, inline: false });
+  embed.addFields({ name: `${theme.emojis.action} Next Unlock`, value: `Level ${upcoming}: ${mentions}`, inline: false });
     }
   }
 
@@ -276,7 +279,7 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
         .setColor(m === "text" ? theme.colors.primary : theme.colors.danger)
         .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-        .setTitle(m === "text" ? "Your profile" : "Your VC profile")
+  .setTitle(m === "text" ? `${theme.emojis.profile} Your Profile` : `${theme.emojis.vc} Your VC Profile`)
         .addFields(
           { name: "Level", value: `\`Lv. ${userLvl}\``, inline: true },
           { name: "Rank", value: r ? `#${r}` : "—", inline: true },
@@ -288,8 +291,8 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
           { name: "Progress", value: `${bar}`, inline: false },
           { name: "Unlocked Perks", value: formatPermissionPhrases(collectUserPermissions(member, m)), inline: false },
         )
-        .setFooter({ text: member.guild.name })
         .setTimestamp();
+      applyStandardFooter(pEmbed, member.guild, { testingMode: config.testingMode });
       // Next Unlock for the current mode after toggle
       const rewardsMapToggle = m === "vc" ? (config.vcLevelRewards || {}) : (config.levelRewards || {});
       const nextTier = Object.keys(rewardsMapToggle)
@@ -300,7 +303,7 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
         const ids = Array.isArray(rids) ? rids : (rids ? [rids] : []);
         if (ids.length) {
           const mentions = ids.map(id => `<@&${id}>`).join(", ");
-          pEmbed.addFields({ name: "Next Unlock", value: `Level ${nextTier}: ${mentions}`, inline: false });
+          pEmbed.addFields({ name: `${theme.emojis.action} Next Unlock`, value: `Level ${nextTier}: ${mentions}`, inline: false });
         }
       }
       await interaction.update({ embeds: [pEmbed], components: buildRows("main", 1, 1, m) });
@@ -349,7 +352,7 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
     .setColor(mode === "text" ? theme.colors.primary : theme.colors.danger)
     .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-    .setTitle(mode === "text" ? "Your profile" : "Your VC profile")
+    .setTitle(mode === "text" ? `${theme.emojis.profile} Your Profile` : `${theme.emojis.vc} Your VC Profile`)
     .addFields(
       { name: "Level", value: `\`Lv. ${lvl}\``, inline: true },
       { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
@@ -361,18 +364,18 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
       { name: "Progress", value: `${bar}`, inline: false },
       { name: "Unlocked Perks", value: formatPermissionPhrases(collectUserPermissions(member)), inline: false },
     )
-    .setFooter({ text: member.guild.name })
     .setTimestamp();
+  applyStandardFooter(pEmbed, member.guild, { testingMode: config.testingMode });
   if (upcoming) {
     const roles = rewardsForMode[String(upcoming)];
     const roleIds = Array.isArray(roles) ? roles : (roles ? [roles] : []);
     if (roleIds.length) {
       const mentions = roleIds.map(id => `<@&${id}>`).join(", ");
-      pEmbed.addFields({ name: "Next Unlock", value: `Level ${upcoming}: ${mentions}`, inline: false });
+  pEmbed.addFields({ name: `${theme.emojis.action} Next Unlock`, value: `Level ${upcoming}: ${mentions}`, inline: false });
     }
   }
   session.data.view = "main";
   await interaction.update({ embeds: [pEmbed], components: buildRows("main", 1, 1, mode) });
 });
 
-module.exports = { handleProfileCommand, buildLeaderboardEmbed, buildRows };
+module.exports = { handleProfileCommand, buildLeaderboardEmbed, buildRows, buildRankEmbed };

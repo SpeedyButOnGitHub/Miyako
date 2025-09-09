@@ -5,6 +5,7 @@ const { sendModLog } = require("../../utils/modLogs");
 const { isModerator } = require("./permissions");
 const { config, saveConfig } = require("../../utils/storage");
 const theme = require("../../utils/theme");
+const { applyFooterWithPagination } = require("../../utils/ui");
 
 const PAGE_SIZE = 10; // users per page in dashboard
 const MAX_WARNING_LIST = 6; // entries shown inline in user view
@@ -146,10 +147,10 @@ function buildDashboardEmbed(guild, page) {
 
   const { muteT, kickT } = getThresholds();
   const embed = new EmbedBuilder()
-    .setTitle("⚠️Warning Dashboard")
+    .setTitle(`${theme.emojis.warn} Warning Dashboard`)
     .setColor(theme.colors.primary)
-    .setDescription(lines)
-    .setFooter({ text: `Mute at ${muteT} • Kick at ${kickT} • Page ${curPage}/${totalPages}` });
+    .setDescription(lines);
+  applyFooterWithPagination(embed, guild, { testingMode: config.testingMode, page: curPage, totalPages, extra: `Mute at ${muteT} • Kick at ${kickT}` });
 
   // Per-user select for simpler navigation
   const userOptions = slice.map(x => ({
@@ -197,10 +198,10 @@ function buildUserView(guild, userId, page = 1, opts = {}) {
   const disclaimer = nxt ? `${nxt.remaining} warning${nxt.remaining === 1 ? "" : "s"} remaining until ${nxt.label}` : null;
   const { muteT, kickT } = getThresholds();
   const embed = new EmbedBuilder()
-    .setTitle(`⚠️Warnings — ${memberName}`)
+    .setTitle(`${theme.emojis.warn} Warnings — ${memberName}`)
     .setColor(theme.colors.primary)
-    .setDescription([baseDesc, disclaimer].filter(Boolean).join("\n\n"))
-    .setFooter({ text: `Total: ${total} • Mute at ${muteT} • Kick at ${kickT} • Page ${Math.min(page, totalPages)}/${totalPages}` });
+    .setDescription([baseDesc, disclaimer].filter(Boolean).join("\n\n"));
+  applyFooterWithPagination(embed, guild, { testingMode: config.testingMode, page: Math.min(page, totalPages), totalPages, extra: `Total: ${total} • Mute at ${muteT} • Kick at ${kickT}` });
 
   const rows = [];
   const row = new ActionRowBuilder();

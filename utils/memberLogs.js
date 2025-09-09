@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { config } = require("./storage");
 const theme = require("./theme");
+const { applyStandardFooter } = require("./ui");
 const { MEMBER_LEAVE_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
 
 /**
@@ -23,7 +24,7 @@ async function logMemberLeave(client, member, isTest = false) {
   }
 
   const embed = new EmbedBuilder()
-    .setTitle("Member Left")
+    .setTitle(`${theme.emojis.warn} Member Left`)
     .setColor(theme.colors.warning)
     .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
     .addFields(
@@ -32,6 +33,7 @@ async function logMemberLeave(client, member, isTest = false) {
       { name: "Time in Server", value: duration, inline: true }
     )
     .setTimestamp();
+  applyStandardFooter(embed, member.guild, { testingMode: config.testingMode });
 
   await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
 }

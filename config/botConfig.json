@@ -27,7 +27,7 @@
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
-  "testingMode": true,
+  "testingMode": false,
   "roleLogBlacklist": [
     "1232701768329199666",
     "1232701768341655617",
@@ -96,14 +96,7 @@
         "logMsgId": "1414597754466079004"
       }
     ],
-    "349282473085239298": [
-      {
-        "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757339748962,
-        "logMsgId": "1414610176417337416"
-      }
-    ]
+    "349282473085239298": []
   },
   "testingSeed": {
     "349282473085239298": [

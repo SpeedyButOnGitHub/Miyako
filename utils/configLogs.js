@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { CONFIG_LOG_CHANNEL } = require("./logChannels");
 const theme = require("./theme");
+const { applyStandardFooter } = require("./ui");
 
 /**
  * @param {import('discord.js').Client} client
@@ -16,6 +17,7 @@ async function logConfigChange(client, { user, change }) {
     .setAuthor({ name: user.tag || user.id, iconURL: user.displayAvatarURL ? user.displayAvatarURL({ dynamic: true }) : undefined })
     .setDescription(change)
     .setTimestamp();
+  applyStandardFooter(embed, channel.guild, { testingMode: false });
 
   await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
 }

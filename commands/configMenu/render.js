@@ -5,7 +5,7 @@ const { configCategories } = require("./constants");
 
 function buildRootEmbed() {
   const e = new EmbedBuilder()
-    .setTitle(`⚙️ Configuration`)
+    .setTitle(`${theme.emojis.settings} Configuration`)
     .setColor(theme.colors.primary)
     .setDescription(
       "Select a category to view and manage settings.\n\n" +
@@ -36,7 +36,7 @@ function buildCategorySelect() {
     const btn = new ButtonBuilder()
       .setCustomId(`cfg:cat:${name}`)
       .setLabel(name)
-      .setEmoji(emojiByCat[name] || "⚙️")
+      .setEmoji(emojiByCat[name] || theme.emojis.settings)
       .setStyle(ButtonStyle.Primary);
     if (row.components.length < 5) row.addComponents(btn);
   }
@@ -69,7 +69,7 @@ function buildSettingButtons(categoryName, settingName) {
 function buildCategoryEmbed(categoryName) {
   const cat = configCategories[categoryName];
   const e = new EmbedBuilder()
-    .setTitle(`📁 ${categoryName}`)
+  .setTitle(`${theme.emojis.select} ${categoryName}`)
     .setColor(theme.colors.primary)
     .setDescription(
       typeof cat.description === "function" ? cat.description() : cat.description || ""
@@ -90,7 +90,7 @@ function buildSettingEmbed(categoryName, settingName) {
   const cat = configCategories[categoryName];
   const setting = cat?.settings?.[settingName];
   const e = new EmbedBuilder()
-    .setTitle(`🔧 ${categoryName} • ${setting.getLabel ? setting.getLabel() : settingName}`)
+  .setTitle(`${theme.emojis.edit} ${categoryName} • ${setting.getLabel ? setting.getLabel() : settingName}`)
     .setColor(theme.colors.neutral)
     .setDescription(
       typeof setting.description === "function"
@@ -115,7 +115,7 @@ function buildSettingSelect(categoryName) {
     const btn = new ButtonBuilder()
       .setCustomId(`cfg:set:${categoryName}:${name}`)
       .setLabel(label)
-      .setEmoji("🔧")
+  .setEmoji(theme.emojis.edit)
       .setStyle(ButtonStyle.Primary);
     row.addComponents(btn);
   }
@@ -124,7 +124,7 @@ function buildSettingSelect(categoryName) {
     new ButtonBuilder()
       .setCustomId('cfg:back:root')
       .setLabel('Back')
-      .setEmoji('⬅️')
+  .setEmoji(theme.emojis.back)
       .setStyle(ButtonStyle.Secondary)
   );
   return row;
@@ -143,7 +143,7 @@ function buildSettingRow(categoryName, settingName) {
       new ButtonBuilder()
         .setCustomId(`settingMode_${categoryName}_${settingName}_whitelist`)
         .setLabel('Whitelist')
-        .setEmoji('✅')
+  .setEmoji(theme.emojis.enable)
         .setStyle(wlActive ? ButtonStyle.Success : ButtonStyle.Secondary)
     );
     if (row.components.length < 4) {
@@ -151,7 +151,7 @@ function buildSettingRow(categoryName, settingName) {
         new ButtonBuilder()
           .setCustomId(`settingMode_${categoryName}_${settingName}_blacklist`)
           .setLabel('Blacklist')
-          .setEmoji('🚫')
+          .setEmoji(theme.emojis.disable)
           .setStyle(blActive ? ButtonStyle.Danger : ButtonStyle.Secondary)
       );
     }
@@ -164,7 +164,7 @@ function buildSettingRow(categoryName, settingName) {
       new ButtonBuilder()
         .setCustomId(`config:${categoryName}:${settingName}:${btn.id}`)
         .setLabel(btn.label)
-        .setEmoji(btn.emoji || undefined)
+  .setEmoji(btn.emoji || undefined)
         .setStyle(btn.style)
     );
   }
@@ -172,7 +172,7 @@ function buildSettingRow(categoryName, settingName) {
     new ButtonBuilder()
       .setCustomId(`cfg:back:${categoryName}`)
       .setLabel('Back')
-      .setEmoji('⬅️')
+  .setEmoji(theme.emojis.back)
       .setStyle(ButtonStyle.Secondary)
   );
   return row;
@@ -205,19 +205,19 @@ function renderSettingEmbed(categoryName, settingKey) {
   const titleEmoji =
     categoryName === "Leveling"
       ? settingKey.toLowerCase().includes("channel")
-        ? "🗺️"
+        ? theme.emojis.select
         : settingKey.toLowerCase().includes("multiplier")
-        ? "🧠"
+        ? theme.emojis.counter
         : settingKey.toLowerCase().includes("reward")
         ? "🎁"
-        : "📈"
+        : theme.emojis.rank
       : categoryName === "Sniping"
       ? settingKey.toLowerCase().includes("channel")
         ? "🔭"
-        : "🔧"
+        : theme.emojis.edit
       : categoryName === "Economy"
-      ? "💰"
-      : "🛡️";
+      ? theme.emojis.cash
+      : theme.emojis.moderator;
   const prettyTitle = `${titleEmoji} ${categoryName} — ${keyLabel}`;
   const color =
     categoryName === "Leveling"
