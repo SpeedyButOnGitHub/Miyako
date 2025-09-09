@@ -1,5 +1,6 @@
 const { ButtonBuilder, ButtonStyle, EmbedBuilder, ActionRowBuilder } = require('discord.js');
 const theme = require('./theme');
+const { createEmbed } = require('./embeds');
 
 function btn(id, label, style = ButtonStyle.Secondary, emoji, disabled = false) {
   const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
@@ -21,7 +22,7 @@ function backButton(id = 'back', label = 'Back') {
 }
 
 function primaryEmbed(title, description) {
-  return new EmbedBuilder().setTitle(title).setDescription(description || '').setColor(theme.colors.primary);
+  return createEmbed({ title, description: description || '', color: theme.colors.primary });
 }
 
 function sectionField(name, value, inline = false) {

@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const CASH_FILE = path.resolve(__dirname, "../config/cash.json");
+const { enqueueWrite } = require('./writeQueue');
 
 let cash = {};
 try {
@@ -21,15 +22,8 @@ try {
   }
 } catch { testingCash = {}; }
 
-let saveTimer = null;
 function scheduleSave() {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      fs.writeFileSync(CASH_FILE, JSON.stringify(cash, null, 2));
-    } catch {}
-  }, 1000);
-  if (typeof saveTimer.unref === "function") saveTimer.unref();
+  enqueueWrite(CASH_FILE, () => JSON.stringify(cash, null, 2));
 }
 
 function getCash(userId) {
@@ -69,13 +63,13 @@ function addTestingCash(userId, delta) {
   const cur = getTestingCash(userId);
   const next = Math.max(0, cur + Math.floor(Number(delta) || 0));
   testingCash[userId] = { amount: next };
-  try { fs.writeFileSync(TEST_CASH_FILE, JSON.stringify(testingCash, null, 2)); } catch {}
+  try { enqueueWrite(TEST_CASH_FILE, () => JSON.stringify(testingCash, null, 2)); } catch {}
   return next;
 }
 
 function clearTestingCash() {
   testingCash = {};
-  try { fs.writeFileSync(TEST_CASH_FILE, JSON.stringify(testingCash, null, 2)); } catch {}
+  try { enqueueWrite(TEST_CASH_FILE, () => JSON.stringify(testingCash, null, 2)); } catch {}
 }
 
 module.exports = {

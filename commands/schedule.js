@@ -1,13 +1,13 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require("discord.js");
-const { addSchedule, getSchedules, removeSchedule, getSchedule, updateSchedule } = require("../utils/scheduleStorage"); // kept for compatibility (not UI-exposed now)
-const { getEvents, getEvent, addEvent, updateEvent, removeEvent } = require("../utils/eventsStorage");
-const { computeNextRun } = require("../utils/scheduler");
+// Migrated to scheduleService abstraction (removes direct coupling to storage utils)
+const { getEvents, getEvent, addEvent, updateEvent, removeEvent } = require("../services/scheduleService");
 const { OWNER_ID } = require("./moderation/permissions");
 const theme = require("../utils/theme");
 const ActiveMenus = require("../utils/activeMenus");
 const { applyFooterWithPagination } = require("../utils/ui");
 const { config } = require('../utils/storage');
 const { ms } = require('../utils/time');
+const { createEmbed, safeAddField } = require('../utils/embeds');
 
 // --- Duration Parsing Helpers ---
 // Accept forms:
@@ -63,10 +63,11 @@ function summarizeEvent(ev) {
 
 function buildMainEmbed(guild) {
   const evs = getEvents();
-  const embed = new EmbedBuilder()
-  .setTitle(`${theme.emojis.toggle || '🗓️'} Events Manager`)
-  .setColor(theme.colors.primary)
-  .setDescription(evs.length ? evs.map(summarizeEvent).join("\n\n") : "*No events defined yet.*");
+  const embed = createEmbed({
+    title: `${theme.emojis.toggle || '🗓️'} Events Manager`,
+    description: evs.length ? evs.map(summarizeEvent).join("\n\n") : "*No events defined yet.*",
+    color: theme.colors.primary
+  });
   applyFooterWithPagination(embed, guild, { page: 1, totalPages: 1, extra: `${evs.length} event${evs.length === 1 ? '' : 's'}` });
   return embed;
 }
@@ -88,19 +89,18 @@ function buildDetailEmbed(guild, ev) {
       msgPreview = 'JSON payload';
     }
   }
-  const embed = new EmbedBuilder()
-    .setTitle(`${ev.enabled ? theme.emojis.enable : theme.emojis.disable} ${ev.name}`)
-    .setColor(ev.enabled ? theme.colors.success : theme.colors.danger)
-    .setDescription(ev.description || "No description provided.")
-    .addFields(
-      { name: "Status", value: ev.enabled ? "Enabled" : "Disabled", inline: true },
-      { name: "Type", value: ev.type || "multi-daily", inline: true },
-      { name: "Channel", value: ev.channelId ? `<#${ev.channelId}>` : "(none)", inline: true },
-      { name: "Times", value: times, inline: false },
-      { name: "Days", value: days, inline: false },
-      { name: "Message", value: msgPreview }
-    );
-  applyFooterWithPagination(embed, guild, { page: 1, totalPages: 1, extra: `Events Manager` });
+  const embed = createEmbed({
+    title: `${ev.enabled ? theme.emojis.enable : theme.emojis.disable} ${ev.name}`,
+    description: ev.description || 'No description provided.',
+    color: ev.enabled ? theme.colors.success : theme.colors.danger
+  });
+  safeAddField(embed, 'Status', ev.enabled ? 'Enabled' : 'Disabled', true);
+  safeAddField(embed, 'Type', ev.type || 'multi-daily', true);
+  safeAddField(embed, 'Channel', ev.channelId ? `<#${ev.channelId}>` : '(none)', true);
+  safeAddField(embed, 'Times', times);
+  safeAddField(embed, 'Days', days);
+  safeAddField(embed, 'Message', msgPreview);
+  applyFooterWithPagination(embed, guild, { page: 1, totalPages: 1, extra: 'Events Manager' });
   return embed;
 }
 
@@ -137,20 +137,19 @@ function detailRows(ev) {
 // ---- Automated Messages (per-event) ----
 
 function buildNotifsEmbed(guild, ev) {
-  const embed = new EmbedBuilder()
-    .setTitle(`${theme.emojis.bell || '🔔'} Auto Messages — ${ev.name}`)
-    .setColor(theme.colors.primary)
-    .setDescription('Configure automatic messages sent relative to each event time.')
-    .addFields(
-      { name: 'Event Times', value: (ev.times||[]).join(', ') || '(none)', inline: true },
-      { name: 'Days', value: (ev.days||[]).map(d=>DAY_NAMES[d]||d).join(', ') || 'All', inline: true },
-      { name: 'Total', value: String((ev.autoMessages||[]).length), inline: true }
-    );
+  const embed = createEmbed({
+    title: `${theme.emojis.bell || '🔔'} Auto Messages — ${ev.name}`,
+    description: 'Configure automatic messages sent relative to each event time.',
+    color: theme.colors.primary
+  });
+  safeAddField(embed, 'Event Times', (ev.times||[]).join(', ') || '(none)', true);
+  safeAddField(embed, 'Days', (ev.days||[]).map(d=>DAY_NAMES[d]||d).join(', ') || 'All', true);
+  safeAddField(embed, 'Total', String((ev.autoMessages||[]).length), true);
   const list = (ev.autoMessages||[]);
   if (list.length) {
     const lines = list.slice(0,15).map(m => {
-  const status = m.enabled ? (theme.emojis.enable||'✅') : (theme.emojis.disable||'❌');
-  const off = humanizeMinutes(m.offsetMinutes);
+      const status = m.enabled ? (theme.emojis.enable||'✅') : (theme.emojis.disable||'❌');
+      const off = humanizeMinutes(m.offsetMinutes);
       let preview = '';
       if (m.messageJSON) {
         if (m.messageJSON.content) preview = m.messageJSON.content.slice(0,60);
@@ -159,13 +158,13 @@ function buildNotifsEmbed(guild, ev) {
       } else {
         preview = (m.message||'').replace(/\n/g,' ').slice(0,60) || '(empty)';
       }
-  const chanNote = m.channelId && m.channelId !== ev.channelId ? ` <#${m.channelId}>` : '';
-  const clock = m.isClockIn ? ' ⏱️' : '';
-  return `${status} [${off}]${clock}${chanNote} ${preview}`;
+      const chanNote = m.channelId && m.channelId !== ev.channelId ? ` <#${m.channelId}>` : '';
+      const clock = m.isClockIn ? ' ⏱️' : '';
+      return `${status} [${off}]${clock}${chanNote} ${preview}`;
     }).join('\n');
-    embed.addFields({ name: 'Messages', value: lines });
+    safeAddField(embed, 'Messages', lines);
   } else {
-    embed.addFields({ name: 'Messages', value: '*None defined yet.*' });
+    safeAddField(embed, 'Messages', '*None defined yet.*');
   }
   applyFooterWithPagination(embed, guild, { page:1, totalPages:1, extra: 'Auto Messages' });
   return embed;
@@ -188,33 +187,19 @@ function notifSelectRows(ev) {
 }
 
 function buildNotifDetailEmbed(guild, ev, notif) {
-  const embed = new EmbedBuilder()
-    .setTitle(`${notif.enabled ? theme.emojis.enable : theme.emojis.disable} Auto Message #${notif.id}`)
-    .setColor(notif.enabled ? theme.colors.success : theme.colors.danger)
-  .setDescription(`Relative send: **${humanizeMinutes(notif.offsetMinutes)}**\nEvent: **${ev.name}**`)
-    .addFields(
-  { name: 'Offset', value: notif.offsetMinutes===0?'0 (start)':`${humanizeMinutes(notif.offsetMinutes)}`, inline: true },
-      { name: 'Enabled', value: notif.enabled? 'Yes':'No', inline: true },
-  { name: 'Channel', value: notif.channelId ? `<#${notif.channelId}>` + (notif.channelId===ev.channelId ? ' (event)' : '') : `<#${ev.channelId}> (event)`, inline: true },
-      { name: 'Clock-In', value: notif.isClockIn ? 'Yes' : 'No', inline: true },
-      { name: 'Preview', value: (()=>{ if (notif.messageJSON){ if (notif.messageJSON.content) return notif.messageJSON.content.slice(0,200)||'(empty)'; if (Array.isArray(notif.messageJSON.embeds)&&notif.messageJSON.embeds.length) return (notif.messageJSON.embeds[0].title||notif.messageJSON.embeds[0].description||'(embed)').toString().slice(0,200); return 'JSON'; } return (notif.message||'').slice(0,200)||'(empty)';})() }
-    );
+  const embed = createEmbed({
+    title: `${notif.enabled ? theme.emojis.enable : theme.emojis.disable} Auto Message #${notif.id}`,
+    description: `Relative send: **${humanizeMinutes(notif.offsetMinutes)}**\nEvent: **${ev.name}**`,
+    color: notif.enabled ? theme.colors.success : theme.colors.danger
+  });
+  safeAddField(embed, 'Offset', notif.offsetMinutes===0?'0 (start)':`${humanizeMinutes(notif.offsetMinutes)}`, true);
+  safeAddField(embed, 'Enabled', notif.enabled? 'Yes':'No', true);
+  safeAddField(embed, 'Channel', notif.channelId ? `<#${notif.channelId}>` + (notif.channelId===ev.channelId ? ' (event)' : '') : `<#${ev.channelId}> (event)`, true);
+  safeAddField(embed, 'Clock-In', notif.isClockIn ? 'Yes' : 'No', true);
+  const previewVal = (()=>{ if (notif.messageJSON){ if (notif.messageJSON.content) return notif.messageJSON.content.slice(0,200)||'(empty)'; if (Array.isArray(notif.messageJSON.embeds)&&notif.messageJSON.embeds.length) return (notif.messageJSON.embeds[0].title||notif.messageJSON.embeds[0].description||'(embed)').toString().slice(0,200); return 'JSON'; } return (notif.message||'').slice(0,200)||'(empty)';})();
+  safeAddField(embed, 'Preview', previewVal);
   applyFooterWithPagination(embed, guild, { page:1, totalPages:1, extra:'Auto Msg Detail' });
   return embed;
-}
-
-function notifDetailRows(ev, notif) {
-  // Discord allows max 5 components per ActionRow. Split into two rows (5 + Back)
-  const row1 = new ActionRowBuilder().addComponents(
-  new ButtonBuilder().setCustomId(`event_notif_toggle_${ev.id}_${notif.id}`).setLabel(notif.enabled? 'Disable':'Enable').setStyle(notif.enabled?ButtonStyle.Danger:ButtonStyle.Success).setEmoji(notif.enabled?theme.emojis.disable:theme.emojis.enable),
-    new ButtonBuilder().setCustomId(`event_notif_trigger_${ev.id}_${notif.id}`).setLabel('Trigger').setStyle(ButtonStyle.Primary).setEmoji('⚡'),
-    new ButtonBuilder().setCustomId(`event_notif_edit_${ev.id}_${notif.id}`).setLabel('Edit').setStyle(ButtonStyle.Primary).setEmoji(theme.emojis.edit||'✏️'),
-    new ButtonBuilder().setCustomId(`event_notif_delete_${ev.id}_${notif.id}`).setLabel('Delete').setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.delete)
-  );
-  const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`event_notif_back_${ev.id}`).setLabel('Back').setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.back)
-  );
-  return [row1, row2];
 }
 
 // Helper: create or update anchor message automatically
@@ -287,7 +272,8 @@ async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
       if (!payload.embeds) payload.embeds = [];
       const hasImage = payload.embeds.some(e => (e.data?.image?.url || e.image?.url) === imageUrl);
       if (!hasImage && payload.embeds.length < 10) {
-        const imgEmbed = new EmbedBuilder().setColor(theme.colors.primary).setImage(imageUrl);
+  const { createEmbed } = require('../utils/embeds');
+  const imgEmbed = createEmbed({ color: theme.colors.primary }).setImage(imageUrl);
         payload.embeds.push(imgEmbed);
       }
     }
@@ -868,7 +854,7 @@ async function handleEventNotificationModal(interaction) {
           // refresh auto msgs manager
           await mgrMsg.edit({ embeds:[buildNotifsEmbed(interaction.guild, updatedEv)], components: notifManagerRows(updatedEv) }).catch(()=>{});
         } else if (mgrMsg.components.some(r=>r.components.some(c=>c.customId===`events_toggle_${updatedEv.id}`))) {
-          await mgrMsg.edit({ embeds:[buildDetailEmbed(interaction.guild, updatedEv)], components: detailRows(updatedEv) }).catch(()=>{});
+          await mgrMsg.edit({ embeds:[buildDetailEmbed(interaction.guild, updatedEv)], components: detailRows(updatedEv) }).catch(() => {});
         }
       }
     } catch {}

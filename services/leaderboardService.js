@@ -1,29 +1,43 @@
-// Shared leaderboard builders extracted from profile command for reuse
-const { EmbedBuilder } = require('discord.js');
-const theme = require('./theme');
-const { applyFooterWithPagination } = require('./ui');
-const { createEmbed } = require('./embeds');
+// leaderboardService: caches sorted level leaderboards (text + VC) for short TTL to reduce sort cost
+// Provides buildLeaderboardEmbed(guild, viewerId, page, pageSize, mode)
+// Mode: 'text' | 'vc'
 
-function computeEntries(levelsObj = {}) {
-  return Object.entries(levelsObj).map(([userId, data]) => ({
+const { createEmbed } = require('../utils/embeds');
+const theme = require('../utils/theme');
+const { applyFooterWithPagination } = require('../utils/ui');
+const { levels, vcLevels } = require('./levelingService');
+const { getTopBank } = require('../utils/bank');
+
+const CACHE_TTL_MS = 5000; // 5s window; lightweight, avoids explicit invalidation wiring
+const caches = { text: { expires: 0, entries: [] }, vc: { expires: 0, entries: [] } };
+
+function buildEntries(mode) {
+  const src = mode === 'vc' ? vcLevels : levels;
+  return Object.entries(src || {}).map(([userId, data]) => ({
     userId,
     xp: data?.xp || 0,
-    level: data?.level || 0,
-  }));
+    level: data?.level || 0
+  })).sort((a,b) => (b.level - a.level) || (b.xp - a.xp));
 }
 
-function sortEntries(entries) {
-  return entries.sort((a, b) => (b.level - a.level) || (b.xp - a.xp));
+function getEntries(mode = 'text') {
+  const key = mode === 'vc' ? 'vc' : 'text';
+  const now = Date.now();
+  const cache = caches[key];
+  if (cache.expires < now) {
+    cache.entries = buildEntries(key === 'vc' ? 'vc' : 'text');
+    cache.expires = now + CACHE_TTL_MS;
+  }
+  return cache.entries;
 }
 
-function computeRank(levelsObj, viewerId) {
-  const entries = sortEntries(computeEntries(levelsObj));
+function computeRank(mode, viewerId) {
+  const entries = getEntries(mode);
   const idx = entries.findIndex(e => String(e.userId) === String(viewerId));
   return idx === -1 ? null : idx + 1;
 }
 
 function buildBankSection() {
-  const { getTopBank } = require('./bank');
   const topBank = getTopBank(10) || [];
   const bankLines = topBank.map((e, i) => {
     const n = i + 1;
@@ -33,8 +47,8 @@ function buildBankSection() {
   return `\n\n${theme.emojis.bank} Bank Leaderboard\n${bankLines.length ? bankLines.join('\n') : 'No balances yet.'}`;
 }
 
-function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 10, mode = 'text') {
-  const entries = sortEntries(computeEntries(levelsObj));
+function buildLeaderboardEmbed(guild, viewerId, page = 1, pageSize = 10, mode = 'text') {
+  const entries = getEntries(mode);
   const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
   const safePage = Math.min(totalPages, Math.max(1, Math.floor(page)));
   const start = (safePage - 1) * pageSize;
@@ -46,18 +60,18 @@ function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 
     const line = `${medal} <@${e.userId}> — Lv. ${e.level}`;
     return isYou ? `**${line} ← You**` : line;
   });
-  const rank = computeRank(levelsObj, viewerId);
+  const rank = computeRank(mode, viewerId);
   const viewerOnPage = pageEntries.some(e => String(e.userId) === String(viewerId));
   const extraLine = !viewerOnPage && rank ? `\n— —\nYou: **#${rank}** <@${viewerId}>` : '';
   const bankSection = buildBankSection();
   const embed = createEmbed({
-    title: mode === 'text' ? `${theme.emojis.leaderboard} Leaderboard` : `${theme.emojis.vc} VC Leaderboard`,
+    title: mode === 'vc' ? `${theme.emojis.vc} VC Leaderboard` : `${theme.emojis.leaderboard} Leaderboard`,
     description: (lines.length ? lines.join('\n') + extraLine : 'No data yet.') + bankSection,
-    color: mode === 'text' ? theme.colors.warning : theme.colors.danger
+    color: mode === 'vc' ? theme.colors.danger : theme.colors.warning
   });
   const extraFooter = rank ? `Your rank: #${rank}` : null;
   applyFooterWithPagination(embed, guild, { testingMode: false, page: safePage, totalPages, extra: extraFooter });
   return embed;
 }
 
-module.exports = { buildLeaderboardEmbed, buildBankSection, computeRank };
+module.exports = { getEntries, computeRank, buildLeaderboardEmbed };

@@ -1,7 +1,8 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const ms = require("ms");
 const { config } = require("./storage");
 const theme = require("./theme");
+const { createEmbed } = require('./embeds');
 const { MOD_ACTION_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
 const { applyStandardFooter } = require("./ui");
 
@@ -94,16 +95,18 @@ async function sendModLog(
     ? userObj.displayAvatarURL({ dynamic: true })
     : undefined;
 
-  const embed = new EmbedBuilder()
-    .setColor(color)
-    .setAuthor({ name: modTag, iconURL: modUser?.displayAvatarURL ? modUser.displayAvatarURL({ dynamic: true }) : undefined })
-    .setTitle(targetTag)
-    .setDescription([descParts.join("\n\n"), bottomParts.length ? bottomParts.join("\n\n") : null].filter(Boolean).join("\n\n"))
-    .addFields(
-      { name: `${theme.emojis.action} Action`, value: `**${actionTitle}**`, inline: true },
-      { name: `${theme.emojis.target} Target`, value: `<@${targetId}>`, inline: true },
-      { name: `${theme.emojis.moderator} Moderator`, value: `<@${modId}>`, inline: true }
-    );
+  const embed = createEmbed({
+    color,
+    title: targetTag,
+    description: [descParts.join("\n\n"), bottomParts.length ? bottomParts.join("\n\n") : null].filter(Boolean).join("\n\n"),
+    timestamp: false
+  }).setAuthor({ name: modTag, iconURL: modUser?.displayAvatarURL ? modUser.displayAvatarURL({ dynamic: true }) : undefined });
+  // keep explicit addFields order to preserve layout
+  embed.addFields(
+    { name: `${theme.emojis.action} Action`, value: `**${actionTitle}**`, inline: true },
+    { name: `${theme.emojis.target} Target`, value: `<@${targetId}>`, inline: true },
+    { name: `${theme.emojis.moderator} Moderator`, value: `<@${modId}>`, inline: true }
+  );
 
   // Always prefer a footer over timestamp; include emojis
   if (footerRemaining) {

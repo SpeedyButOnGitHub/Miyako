@@ -1,56 +1,8 @@
-const { EmbedBuilder } = require("discord.js");
-const fs = require("fs");
-const { CONFIG_LOG_CHANNEL } = require("./logChannels");
-const BOT_STATUS_FILE = "./config/botStatus.json";
+// Backwards-compatible thin wrappers over the new status service.
+const service = require('../services/statusService');
 
-async function sendBotStatusMessage(client) {
-  let lastOnline = 0;
-  if (fs.existsSync(BOT_STATUS_FILE)) {
-    try {
-      const status = JSON.parse(fs.readFileSync(BOT_STATUS_FILE, "utf8"));
-      lastOnline = status.lastOnline || 0;
-    } catch {}
-  }
-  const now = Date.now();
-  const diff = now - lastOnline;
-  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
-  if (channel) {
-    const restarted = diff >= 5 * 60 * 1000;
-    const embed = new EmbedBuilder()
-      .setTitle(restarted ? "🟢 Restarted" : "🟢 Online")
-      .setColor(0x55ff55)
-      .setDescription(restarted ? "Miyako has restarted and is now online!" : "Miyako is now online!")
-      .setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` })
-      .setTimestamp();
-    await channel.send({ embeds: [embed] }).catch(() => {});
-  }
-  try { fs.writeFileSync(BOT_STATUS_FILE, JSON.stringify({ lastOnline: now }, null, 2)); } catch {}
-}
+async function sendBotStatusMessage(client) { return service.postStartup(client); }
+async function sendBotShutdownMessage(client) { return service.postShutdown(client); }
+async function setStatusChannelName(client, online) { return service.updateStatusChannelName(client, online); }
 
-async function sendBotShutdownMessage(client) {
-  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
-  if (channel) {
-    const embed = new EmbedBuilder()
-      .setTitle("🔴 Shutting Down")
-      .setColor(0xff0000)
-      .setDescription("Miyako is shutting down <:dead:1414023466243330108>.")
-      .setFooter({ text: `Timestamp: ${new Date().toLocaleString()}` })
-      .setTimestamp();
-    await channel.send({ embeds: [embed] }).catch(() => {});
-  }
-}
-
-async function setStatusChannelName(client, online) {
-  const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
-  if (!channel || typeof channel.setName !== "function") return;
-  const name = online
-    ? "🟢︱𝙼𝚒𝚢𝚊𝚔𝚘𝚜-𝙲𝚑𝚊𝚖𝚋𝚎𝚛"
-    : "🔴︱𝙼𝚒𝚢𝚊𝚔𝚘𝚜-𝙲𝚑𝚊𝚖𝚋𝚎𝚛";
-  await channel.setName(name).catch(() => {});
-}
-
-module.exports = {
-  sendBotStatusMessage,
-  sendBotShutdownMessage,
-  setStatusChannelName
-};
+module.exports = { sendBotStatusMessage, sendBotShutdownMessage, setStatusChannelName };

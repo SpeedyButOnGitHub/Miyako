@@ -3,8 +3,9 @@ const { getEvents, updateEvent } = require("./eventsStorage");
 const { applyTimestampPlaceholders } = require('./timestampPlaceholders');
 const { config } = require('./storage');
 const ms = require("ms");
-const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const theme = require('./theme');
+const { createEmbed } = require('./embeds');
 
 /**
  * Schedule object shape (stored in schedules.json):
@@ -260,10 +261,12 @@ function startScheduler(client, opts = {}) {
                           // Light sanitization of role/user mentions in testing
                           baseText = baseText.replace(/<@&?\d+>/g, match => `\`${match}\``);
                         }
-                        const embed = new EmbedBuilder()
-                          .setTitle(`🕒 Staff Clock-In — ${ev.name}`)
-                          .setColor(theme.colors?.primary || 0x5865F2)
-                          .setDescription(`${baseText}\n\nSelect a position from the menu below. One slot per staff (auto-updates).`);
+                        const embed = createEmbed({
+                          title: `🕒 Staff Clock-In — ${ev.name}`,
+                          color: theme.colors?.primary || 0x5865F2,
+                          description: `${baseText}\n\nSelect a position from the menu below. One slot per staff (auto-updates).`,
+                          timestamp: false
+                        });
                         for (const p of POSITIONS) {
                           const arr = state.positions[p.key];
                           const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';

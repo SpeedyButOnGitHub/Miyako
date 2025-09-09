@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { enqueueWrite } = require('./writeQueue');
 
 const VC_LEVELS_FILE = path.resolve(__dirname, "../config/vcLevels.json");
 
@@ -14,12 +15,14 @@ try {
   vcLevels = {};
 }
 
+let pendingSave = false;
 function saveVCLevels() {
-  try {
-    const dir = path.dirname(VC_LEVELS_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(VC_LEVELS_FILE, JSON.stringify(vcLevels, null, 2));
-  } catch {}
+  if (pendingSave) return;
+  pendingSave = true;
+  enqueueWrite(VC_LEVELS_FILE, () => {
+    pendingSave = false;
+    return JSON.stringify(vcLevels, null, 2);
+  }, { delay: 250 });
 }
 
 function getVCXP(userId) {
@@ -44,6 +47,7 @@ function addVCXP(userId, amount) {
   const oldLevel = cur.level || 0;
   if (newLevel !== cur.level) cur.level = newLevel;
   vcLevels[userId] = cur;
+  saveVCLevels();
   return newLevel > oldLevel ? newLevel : 0;
 }
 

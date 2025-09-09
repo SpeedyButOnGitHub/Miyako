@@ -2,6 +2,7 @@ const { config, saveConfig } = require("./storage");
 const { sendBotShutdownMessage, setStatusChannelName } = require("./botStatus");
 const { recordShutdown } = require("./shutdownState");
 const { logError } = require("./errorUtil");
+const { flushAll: flushPendingWrites } = require('./writeQueue');
 
 
 module.exports = function(client) {
@@ -17,6 +18,8 @@ module.exports = function(client) {
           await setStatusChannelName(client, false);
           await sendBotShutdownMessage(client);
         }
+        // Ensure any debounced file writes are flushed
+        flushPendingWrites();
       } catch (err) {
         logError('shutdown', err);
       } finally { process.exit(0); }
@@ -31,6 +34,7 @@ module.exports = function(client) {
         await setStatusChannelName(client, false);
         await sendBotShutdownMessage(client);
       }
+      flushPendingWrites();
     } catch (e) { logError('uncaughtException:handler', e); } finally { process.exit(1); }
   });
 

@@ -847,18 +847,20 @@ function attachInteractionEvents(client) {
         try {
           const { EmbedBuilder } = require('discord.js');
           const theme = require('../utils/theme');
+          const { createEmbed, safeAddField } = require('../utils/embeds');
           const POSITIONS = ['instance_manager','manager','bouncer','bartender','backup','maybe'];
           // Standardized header; ignore stored message for uniformity
           const base = `🕒 Staff Clock-In — ${ev.name}`;
-          const embed = new EmbedBuilder()
-            .setTitle(`🕒 Staff Clock-In — ${ev.name}`)
-            .setColor(theme.colors?.primary || 0x5865F2)
-            .setDescription(`${base}\n\nSelect a position below. One slot per staff; re-select to move.`);
+          const embed = createEmbed({
+            title: `🕒 Staff Clock-In — ${ev.name}`,
+            description: `${base}\n\nSelect a position below. One slot per staff; re-select to move.`,
+            color: theme.colors?.primary || 0x5865F2
+          });
           for (const k of POSITIONS) {
             const arr = state.positions[k] || [];
             const label = POS_META[k].label;
             const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-            embed.addFields({ name: `${label} (${arr.length}/${POS_META[k].max})`, value: value.substring(0,1024), inline: true });
+            safeAddField(embed, `${label} (${arr.length}/${POS_META[k].max})`, value.substring(0,1024), true);
           }
           for (const mid of state.messageIds || []) {
             try {

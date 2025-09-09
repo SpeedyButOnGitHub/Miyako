@@ -1,12 +1,16 @@
 {
   "scripts": {
-  "smoke": "node ./scripts/smoke-load.js",
-  "start": "node index.js",
-  "import-levels": "node ./scripts/import-levels.js"
+    "smoke": "node ./scripts/smoke-load.js",
+    "start": "node index.js",
+    "import-levels": "node ./scripts/import-levels.js",
+    "test": "jest --runInBand"
   },
   "dependencies": {
     "discord.js": "^14.22.1",
     "dotenv": "^17.2.2",
     "ms": "^2.1.3"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
   }
 }

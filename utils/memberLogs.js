@@ -1,9 +1,9 @@
-const { EmbedBuilder } = require("discord.js");
 const { config } = require("./storage");
 const theme = require("./theme");
 const { applyStandardFooter } = require("./ui");
 const { MEMBER_LEAVE_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
 const { logError } = require("./errorUtil");
+const { createEmbed, safeAddField } = require('./embeds');
 
 /**
  * Logs when a member leaves the guild.
@@ -25,16 +25,13 @@ async function logMemberLeave(client, member, isTest = false) {
     duration = `${days}d ${hours}h ${mins}m`;
   }
 
-  const embed = new EmbedBuilder()
-    .setTitle(`${theme.emojis.warn} Member Left`)
-    .setColor(theme.colors.warning)
-    .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
-    .addFields(
-      { name: "Member", value: `<@${member.id}>`, inline: true },
-      { name: "Joined", value: joinedAt ? `<t:${Math.floor(joinedAt / 1000)}:R>` : "Unknown", inline: true },
-      { name: "Time in Server", value: duration, inline: true }
-    )
-    .setTimestamp();
+  const embed = createEmbed({
+    title: `${theme.emojis.warn} Member Left`,
+    color: theme.colors.warning
+  }).setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) });
+  safeAddField(embed, "Member", `<@${member.id}>`, true);
+  safeAddField(embed, "Joined", joinedAt ? `<t:${Math.floor(joinedAt / 1000)}:R>` : "Unknown", true);
+  safeAddField(embed, "Time in Server", duration, true);
   applyStandardFooter(embed, member.guild, { testingMode: config.testingMode });
 
   try { await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }); } catch (e) { logError('memberLogs:send', e); }

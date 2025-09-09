@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { enqueueWrite } = require('./writeQueue');
 
 const LEVELS_FILE = path.resolve(__dirname, "../config/levels.json");
 
@@ -13,12 +14,14 @@ try {
   levels = {};
 }
 
+let pendingSave = false;
 function saveLevels() {
-  try {
-    const dir = path.dirname(LEVELS_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(LEVELS_FILE, JSON.stringify(levels, null, 2));
-  } catch {}
+  if (pendingSave) return; // coalesce rapid calls
+  pendingSave = true;
+  enqueueWrite(LEVELS_FILE, () => {
+    pendingSave = false;
+    return JSON.stringify(levels, null, 2);
+  }, { delay: 250 });
 }
 
 function getXP(userId) {
@@ -48,6 +51,7 @@ function addXP(userId, amount) {
   cur.level = newLevel;
   levels[userId] = cur;
 
+  if (newLevel !== oldLevel) saveLevels(); else saveLevels(); // always schedule save (coalesced)
   return newLevel > oldLevel ? newLevel : 0;
 }
 

@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { EmbedBuilder } = require("discord.js");
+const { createEmbed } = require('./embeds');
 
 const SNAPSHOT_FILE = path.resolve(__dirname, "../config/changelogSnapshot.json");
 
@@ -107,10 +107,10 @@ function formatBytes(n) {
 function buildChangelogEmbed(result) {
   const { added, removed, modified } = result;
   const total = added.length + removed.length + modified.length;
-  const embed = new EmbedBuilder()
-    .setTitle("📜 Changelog since last start")
-    .setColor(0x00b894)
-    .setTimestamp();
+  const embed = createEmbed({
+    title: "📜 Changelog since last start",
+    color: 0x00b894
+  });
 
   if (total === 0) {
     embed.setDescription("No code changes detected.");

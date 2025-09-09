@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { createEmbed } = require('../utils/embeds');
 const theme = require("../utils/theme");
 const { applyFooterWithPagination, paginationRow } = require("../utils/ui");
 const ActiveMenus = require("../utils/activeMenus");
@@ -42,11 +43,11 @@ function buildEmbed(guild, pageItems, page, totalPages, totalFiles, totalLines) 
   const desc = pageItems
     .map((it, idx) => `**${(page * 10) + idx + 1}.** ${it.file} — ${it.lines.toLocaleString()} line${it.lines === 1 ? "" : "s"}`)
     .join("\n");
-  const embed = new EmbedBuilder()
-    .setTitle("📜 Scripts Leaderboard")
-    .setColor(theme.colors.primary)
-    .setDescription(desc || "*No .js files found*")
-    .setTimestamp();
+  const embed = createEmbed({
+    title: '📜 Scripts Leaderboard',
+    description: desc || '*No .js files found*',
+    color: theme.colors.primary
+  });
   applyFooterWithPagination(embed, guild, { page: page + 1, totalPages, extra: `${totalFiles} files • ${totalLines.toLocaleString()} lines` });
   return embed;
 }

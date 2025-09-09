@@ -51,6 +51,8 @@ const client = new Client({
 });
 
 const { runHealthChecks, formatHealthLines } = require('./utils/health');
+const { CONFIG_LOG_CHANNEL } = require('./utils/logChannels');
+const { createEmbed, safeAddField } = require('./utils/embeds');
 
 async function sendBotStatusMessage() {
   let lastOnline = 0;
@@ -66,11 +68,13 @@ async function sendBotStatusMessage() {
   const title = isColdStart ? "🟢 Miyako is Online" : "🔄 Miyako Restarted";
     const color = isColdStart ? 0x5865F2 : 0xFFD700;
 
-  const embed = new EmbedBuilder()
-      .setTitle(title)
-      .setColor(color)
-  .setDescription(isColdStart ? "All systems are up. Here's what changed since last run:" : `Restart complete. ${lastOfflineDurationMs!=null ? `Offline for ${Math.max(0, Math.round(lastOfflineDurationMs/1000))}s.` : ""} Here's what changed since last run:`)
-      .setTimestamp();
+  const embed = createEmbed({
+    title,
+    description: isColdStart
+      ? "All systems are up. Here's what changed since last run:"
+      : `Restart complete. ${lastOfflineDurationMs!=null ? `Offline for ${Math.max(0, Math.round(lastOfflineDurationMs/1000))}s.` : ""} Here's what changed since last run:`,
+    color
+  });
 
     // Build changelog overview + store details for button expansion
     let changelogSession = null;
@@ -84,10 +88,10 @@ async function sendBotStatusMessage() {
       try { fs.writeFileSync(snapshotFile, JSON.stringify({ createdAt: Date.now(), files: curr }, null, 2)); } catch {}
       const total = result.added.length + result.removed.length + result.modified.length;
       if (total === 0) {
-        embed.addFields({ name: "Changelog Overview", value: "No changes have been made since last restart." });
+  safeAddField(embed, "Changelog Overview", "No changes have been made since last restart.");
       } else {
         const summary = `Files changed: ${total} (➕ ${result.added.length}, ✖️ ${result.removed.length}, 🔧 ${result.modified.length})`;
-        embed.addFields({ name: "Changelog Overview", value: summary });
+  safeAddField(embed, "Changelog Overview", summary);
         // Prepare detailed lines (full lists capped)
         const detailLines = [];
         for (const it of result.added) detailLines.push(`➕ ${it.path}`);
@@ -99,7 +103,7 @@ async function sendBotStatusMessage() {
         changelogSession = { summary, detailLines };
       }
     } catch (e) {
-      embed.addFields({ name: "Changelog Overview", value: "No changes have been made since last restart." });
+  safeAddField(embed, "Changelog Overview", "No changes have been made since last restart.");
     }
 
     // Run health checks (events + staff team) and append compact status block at top of embed
@@ -110,7 +114,7 @@ async function sendBotStatusMessage() {
         embed.spliceFields(0, 0, { name: 'Health', value: lines });
       }
     } catch (e) {
-      embed.addFields({ name: 'Health', value: '✖️ Health checks failed: ' + e.message.slice(0, 200) });
+      safeAddField(embed, 'Health', '✖️ Health checks failed: ' + e.message.slice(0, 200));
     }
 
     // Components: Details button only if we have detail lines
@@ -164,9 +168,11 @@ client.once("ready", async () => {
       if (issues.length) {
         console.warn(`[config] ${issues.length} issue(s):`);
         for (const i of issues) console.warn(' -', i);
-        const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(()=>null);
-        if (channel) {
-          channel.send({ content: `⚠️ Config validation found ${issues.length} issue(s):\n` + issues.map(i=>`• ${i}`).join('\n') }).catch(()=>{});
+        if (CONFIG_LOG_CHANNEL) {
+          const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(()=>null);
+          if (channel) {
+            channel.send({ content: `⚠️ Config validation found ${issues.length} issue(s):\n` + issues.map(i=>`• ${i}`).join('\n') }).catch(()=>{});
+          }
         }
       } else {
         console.log('[config] validation passed');

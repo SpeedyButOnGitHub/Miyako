@@ -1,5 +1,6 @@
 const { config } = require("../utils/storage");
 const { EmbedBuilder } = require("discord.js");
+const { createEmbed } = require('../utils/embeds');
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
 const fs = require("fs/promises");
 const SNIPES_FILE = "./config/snipes.json";
@@ -153,11 +154,10 @@ async function handleSnipeCommands(client, message, command, args) {
       return message.reply(`${EMOJI_ERROR} No message has been deleted in the past 2 hours.`);
     }
 
-    const embed = new EmbedBuilder()
-      .setAuthor({ name: snipe.nickname, iconURL: snipe.avatarURL })
-      .setDescription(snipe.content || "*No content (attachment or embed only)*")
-      .setColor(0x5865F2)
-      .setFooter({ text: formatTodayTime(snipe.timestamp) });
+    const embed = createEmbed({
+      description: snipe.content || '*No content (attachment or embed only)*',
+      color: 0x5865F2
+    }).setAuthor({ name: snipe.nickname, iconURL: snipe.avatarURL }).setFooter({ text: formatTodayTime(snipe.timestamp) });
 
     if (snipe.attachments && snipe.attachments.length > 0) {
       embed.setImage(snipe.attachments[0]);

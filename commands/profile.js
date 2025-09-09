@@ -1,14 +1,22 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { getXP, getLevel, levels } = require("../utils/levels");
-const { getVCXP, getVCLevel, vcLevels } = require("../utils/vcLevels");
-const { getUserModifier } = require("../utils/leveling");
+const { createEmbed, safeAddField } = require('../utils/embeds');
+// Service layer imports (replace direct utils access)
+const { 
+  getUserLevelData, 
+  getUserModifier, 
+  levels: textLevelsData, 
+  vcLevels: vcLevelsData,
+  getXP, getLevel, getVCXP, getVCLevel
+} = require("../services/levelingService");
+const { bank: bankService, cash: cashService } = require('../services/economyService');
 const { config } = require("../utils/storage");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
 const { progressBar: sharedProgressBar, applyStandardFooter, applyFooterWithPagination, paginationRow } = require("../utils/ui");
-const { getCash, formatCash } = require("../utils/cash");
-const { buildLeaderboardEmbed: sharedLeaderboardEmbed } = require("../utils/leaderboards");
-const { getBank, getBaseLimit } = require("../utils/bank");
+const { formatCash } = require("../utils/cash");
+// Use cached leaderboard service instead of raw util leaderboard builder
+const { buildLeaderboardEmbed: sharedLeaderboardEmbed } = require("../services/leaderboardService");
+const { getBaseLimit } = require("../utils/bank"); // getBank now via bankService
 
 // Map configured level reward roles to human-friendly labels
 const PERMISSION_ROLE_LABELS = {
@@ -97,17 +105,14 @@ function buildRows(view = "main", page = 1, totalPages = 1, mode = "text") {
 }
 
 function buildRankEmbed(member, rank, level, progressBar, mode = "text") {
-  const embed = new EmbedBuilder()
-    .setTitle(mode === "text" ? `${theme.emojis.rank} Your Rank` : `${theme.emojis.vc} Your VC Rank`)
-    .setColor(mode === "text" ? theme.colors.primary : theme.colors.danger)
-    .setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
-    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-    .addFields(
-      { name: "Level", value: `\`Lv. ${level}\``, inline: true },
-      { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
-      { name: "Progress", value: `${progressBar}`, inline: false },
-    )
-    .setTimestamp();
+  const embed = createEmbed({
+    title: mode === 'text' ? `${theme.emojis.rank} Your Rank` : `${theme.emojis.vc} Your VC Rank`,
+    color: mode === 'text' ? theme.colors.primary : theme.colors.danger
+  }).setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
+    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }));
+  safeAddField(embed, 'Level', `\`Lv. ${level}\``, true);
+  safeAddField(embed, 'Rank', rank ? `#${rank}` : '—', true);
+  safeAddField(embed, 'Progress', `${progressBar}`, false);
   applyStandardFooter(embed, member.guild, { testingMode: config.testingMode });
   return embed;
 }
@@ -122,8 +127,7 @@ async function handleProfileCommand(client, message) {
 
   const userId = member.id;
   const mode = "text"; // initial
-  const xp = getXP(userId);
-  const level = getLevel(userId);
+  const { xp, level } = getUserLevelData(userId, 'text');
   const nextLevel = level + 1;
   const xpForNextLevel = getLevelXP(nextLevel);
   const xpForCurrentLevel = getLevelXP(level);
@@ -135,31 +139,25 @@ async function handleProfileCommand(client, message) {
   const effective = Math.max(0, modifier);
 
   // Determine rank position from levels.json data
-  const levels = require("../utils/levels").levels; // Adjusted to match original context
-  const rank = getRankFromLeaderboard(levels, userId);
+  const rank = getRankFromLeaderboard(textLevelsData, userId);
 
   const userPerms = collectUserPermissions(member, mode);
   const permsDisplay = formatPermissionPhrases(userPerms);
 
-  const bank = getBank(userId) || 0;
+  const bank = bankService.getBank(userId) || 0;
   const base = getBaseLimit();
-  const embed = new EmbedBuilder()
-    .setColor(theme.colors.primary)
-    .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
-    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-    .setTitle(`${theme.emojis.profile} Your Profile`)
-    .addFields(
-      { name: "Level", value: `\`Lv. ${level}\``, inline: true },
-      { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
-  { name: "XP Modifier", value: `x${effective.toFixed(2)}`, inline: true },
-  { name: "Money", value: `$${(getCash(userId)||0).toLocaleString()}` , inline: true },
-  { name: "Bank", value: `$${bank.toLocaleString()}/$${base.toLocaleString()}`, inline: true },
-    )
-    .addFields(
-      { name: "Progress", value: `${progressBar}`, inline: false },
-      { name: "Unlocked Perks", value: permsDisplay, inline: false },
-    )
-    .setTimestamp();
+  const embed = createEmbed({
+    title: `${theme.emojis.profile} Your Profile`,
+    color: theme.colors.primary
+  }).setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
+    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }));
+  safeAddField(embed, 'Level', `\`Lv. ${level}\``, true);
+  safeAddField(embed, 'Rank', rank ? `#${rank}` : '—', true);
+  safeAddField(embed, 'XP Modifier', `x${effective.toFixed(2)}`, true);
+  safeAddField(embed, 'Money', `$${(cashService.getCash(userId)||0).toLocaleString()}`, true);
+  safeAddField(embed, 'Bank', `$${bank.toLocaleString()}/$${base.toLocaleString()}`, true);
+  safeAddField(embed, 'Progress', `${progressBar}`);
+  safeAddField(embed, 'Unlocked Perks', permsDisplay);
   applyStandardFooter(embed, member.guild, { testingMode: config.testingMode });
 
   // Optional: show next unlock preview
@@ -234,23 +232,18 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
       const eff = Math.max(0, +(userMod * globalMod).toFixed(2));
   const bankNow = getBank(uid) || 0;
   const baseNow = getBaseLimit();
-  const pEmbed = new EmbedBuilder()
-        .setColor(m === "text" ? theme.colors.primary : theme.colors.danger)
-        .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
-        .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-  .setTitle(m === "text" ? `${theme.emojis.profile} Your Profile` : `${theme.emojis.vc} Your VC Profile`)
-        .addFields(
-          { name: "Level", value: `\`Lv. ${userLvl}\``, inline: true },
-          { name: "Rank", value: r ? `#${r}` : "—", inline: true },
-          { name: m === "text" ? "XP Modifier" : "VC XP Modifier", value: `x${eff.toFixed(2)}`, inline: true },
-          { name: "Money", value: `$${(getCash(uid)||0).toLocaleString()}` , inline: true },
-          { name: "Bank", value: `$${bankNow.toLocaleString()}/$${baseNow.toLocaleString()}`, inline: true },
-        )
-        .addFields(
-          { name: "Progress", value: `${bar}`, inline: false },
-          { name: "Unlocked Perks", value: formatPermissionPhrases(collectUserPermissions(member, m)), inline: false },
-        )
-        .setTimestamp();
+  const pEmbed = createEmbed({
+    title: m === 'text' ? `${theme.emojis.profile} Your Profile` : `${theme.emojis.vc} Your VC Profile`,
+    color: m === 'text' ? theme.colors.primary : theme.colors.danger
+  }).setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
+    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }));
+  safeAddField(pEmbed, 'Level', `\`Lv. ${userLvl}\``, true);
+  safeAddField(pEmbed, 'Rank', r ? `#${r}` : '—', true);
+  safeAddField(pEmbed, m === 'text' ? 'XP Modifier' : 'VC XP Modifier', `x${eff.toFixed(2)}`, true);
+  safeAddField(pEmbed, 'Money', `$${(getCash(uid)||0).toLocaleString()}`, true);
+  safeAddField(pEmbed, 'Bank', `$${bankNow.toLocaleString()}/$${baseNow.toLocaleString()}`, true);
+  safeAddField(pEmbed, 'Progress', `${bar}`);
+  safeAddField(pEmbed, 'Unlocked Perks', formatPermissionPhrases(collectUserPermissions(member, m)));
       applyStandardFooter(pEmbed, member.guild, { testingMode: config.testingMode });
       // Next Unlock for the current mode after toggle
       const rewardsMapToggle = m === "vc" ? (config.vcLevelRewards || {}) : (config.levelRewards || {});
@@ -305,25 +298,20 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
   const upcoming = Object.keys(rewardsForMode || {})
     .map(n => Number(n)).filter(n => Number.isFinite(n) && n > lvl)
     .sort((a,b) => a-b)[0];
-  const bank0 = getBank(uid) || 0;
+  const bank0 = bankService.getBank(uid) || 0;
   const base0 = getBaseLimit();
-  const pEmbed = new EmbedBuilder()
-    .setColor(mode === "text" ? theme.colors.primary : theme.colors.danger)
-    .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
-    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-    .setTitle(mode === "text" ? `${theme.emojis.profile} Your Profile` : `${theme.emojis.vc} Your VC Profile`)
-    .addFields(
-      { name: "Level", value: `\`Lv. ${lvl}\``, inline: true },
-      { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
-  { name: "XP Modifier", value: `x${eff.toFixed(2)}`, inline: true },
-  { name: "Money", value: `$${(getCash(uid)||0).toLocaleString()}` , inline: true },
-  { name: "Bank", value: `$${bank0.toLocaleString()}/$${base0.toLocaleString()}`, inline: true },
-    )
-    .addFields(
-      { name: "Progress", value: `${bar}`, inline: false },
-      { name: "Unlocked Perks", value: formatPermissionPhrases(collectUserPermissions(member)), inline: false },
-    )
-    .setTimestamp();
+  const pEmbed = createEmbed({
+    title: mode === 'text' ? `${theme.emojis.profile} Your Profile` : `${theme.emojis.vc} Your VC Profile`,
+    color: mode === 'text' ? theme.colors.primary : theme.colors.danger
+  }).setAuthor({ name: member.user.tag, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
+    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }));
+  safeAddField(pEmbed, 'Level', `\`Lv. ${lvl}\``, true);
+  safeAddField(pEmbed, 'Rank', rank ? `#${rank}` : '—', true);
+  safeAddField(pEmbed, 'XP Modifier', `x${eff.toFixed(2)}`, true);
+  safeAddField(pEmbed, 'Money', `$${(cashService.getCash(uid)||0).toLocaleString()}`, true);
+  safeAddField(pEmbed, 'Bank', `$${bank0.toLocaleString()}/$${base0.toLocaleString()}`, true);
+  safeAddField(pEmbed, 'Progress', `${bar}`);
+  safeAddField(pEmbed, 'Unlocked Perks', formatPermissionPhrases(collectUserPermissions(member)));
   applyStandardFooter(pEmbed, member.guild, { testingMode: config.testingMode });
   if (upcoming) {
     const roles = rewardsForMode[String(upcoming)];

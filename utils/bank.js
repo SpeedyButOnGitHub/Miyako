@@ -4,6 +4,7 @@ const { getCash, addCash, getTestingCash, addTestingCash } = require("./cash");
 const { config } = require("./storage");
 
 const BANK_FILE = path.resolve(__dirname, "../config/bank.json");
+const { enqueueWrite } = require('./writeQueue');
 
 // Persistent bank balances
 let bank = {};
@@ -24,13 +25,8 @@ try {
   bank = {};
 }
 
-let saveTimer = null;
 function scheduleSave() {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { fs.writeFileSync(BANK_FILE, JSON.stringify(bank, null, 2)); } catch {}
-  }, 200);
-  if (typeof saveTimer?.unref === "function") saveTimer.unref();
+  enqueueWrite(BANK_FILE, () => JSON.stringify(bank, null, 2), { delay: 200 });
 }
 
 function getBaseLimit() {
@@ -56,7 +52,7 @@ function setBank(userId, amount) {
   if (config.testingMode) {
     testingBank[userId] = { amount: n };
   // Persist testing overlay immediately (separate quick write)
-  try { fs.writeFileSync(TEST_BANK_FILE, JSON.stringify(testingBank, null, 2)); } catch {}
+  try { enqueueWrite(TEST_BANK_FILE, () => JSON.stringify(testingBank, null, 2)); } catch {}
     return n;
   }
   bank[userId] = n;
