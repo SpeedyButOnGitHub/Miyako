@@ -32,6 +32,24 @@ async function runHealthChecks(client) {
           const msg = await channel.messages.fetch(ev.anchorMessageId).catch(()=>null);
           if (!msg) throw new Error('message missing');
 
+          // Validate notification button for Midnight Bar; if missing attempt repair
+          let buttonHealthy = true;
+          if (/Midnight Bar/i.test(ev.name || '')) {
+            const expectedId = `event_notify_${ev.id}`;
+            const hasButton = Array.isArray(msg.components) && msg.components.some(r => r.components?.some?.(c => c.customId === expectedId));
+            if (!hasButton) {
+              buttonHealthy = false;
+              try {
+                await ensureAnchor(client, ev); // will enforce button
+                const repaired = await channel.messages.fetch(ev.anchorMessageId).catch(()=>null);
+                if (repaired) {
+                  const repairedHas = Array.isArray(repaired.components) && repaired.components.some(r => r.components?.some?.(c => c.customId === expectedId));
+                  buttonHealthy = repairedHas;
+                }
+              } catch { /* ignore repair errors */ }
+            }
+          }
+
           // Auto-fix outdated timestamps for Midnight Bar style message
           try {
             if (/Midnight Bar/i.test(ev.name || '') && ev.ranges && Array.isArray(ev.ranges) && ev.ranges.length) {
@@ -76,7 +94,7 @@ async function runHealthChecks(client) {
               }
             }
           } catch (tsErr) { /* ignore timestamp fix errors */ }
-          results.push({ kind: 'event', id: ev.id, name: ev.name, ok: true, url: `https://discord.com/channels/${msg.guildId}/${msg.channelId}/${msg.id}` });
+          results.push({ kind: 'event', id: ev.id, name: ev.name, ok: buttonHealthy, url: buttonHealthy ? `https://discord.com/channels/${msg.guildId}/${msg.channelId}/${msg.id}` : null, error: buttonHealthy ? undefined : 'notification button missing' });
         } catch (e) {
           results.push({ kind: 'event', id: ev.id, name: ev.name, ok: false, error: e.message });
         }

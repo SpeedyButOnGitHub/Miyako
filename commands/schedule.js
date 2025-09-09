@@ -101,6 +101,22 @@ async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
   if (basePayloadOverride && basePayloadOverride.content) baseContent = basePayloadOverride.content;
   const payload = ev.messageJSON ? { ...ev.messageJSON, content: baseContent } : { content: baseContent };
   if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
+  // Inject / enforce notification signup button for Midnight Bar
+  let expectedButtonId = null;
+  try {
+    if (/Midnight Bar/i.test(ev.name || '')) {
+      const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+      expectedButtonId = `event_notify_${ev.id}`;
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(expectedButtonId)
+          .setLabel('Sign up for notifications')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('🔔')
+      );
+      payload.components = [row];
+    }
+  } catch {}
   let msg = null;
   if (ev.anchorMessageId) {
     msg = await channel.messages.fetch(ev.anchorMessageId).catch(()=>null);
@@ -111,11 +127,16 @@ async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
       updateEvent(ev.id, { anchorChannelId: channel.id, anchorMessageId: msg.id, dynamicBaseContent: baseContent });
     }
   } else {
-    // Edit existing anchor if content changed or explicit override
-    if (basePayloadOverride || (payload.content && payload.content !== msg.content)) {
+    // Decide if we must edit: content changed, override provided, or required button missing
+    let needsEdit = false;
+    if (basePayloadOverride || (payload.content && payload.content !== msg.content)) needsEdit = true;
+    if (expectedButtonId) {
+      const hasButton = Array.isArray(msg.components) && msg.components.some(r => r.components?.some?.(c => c.customId === expectedButtonId));
+      if (!hasButton) needsEdit = true;
+    }
+    if (needsEdit) {
       await msg.edit(payload).catch(()=>{});
     }
-    // Ensure dynamicBaseContent stored
     if (!ev.dynamicBaseContent) updateEvent(ev.id, { dynamicBaseContent: baseContent });
   }
   return msg;

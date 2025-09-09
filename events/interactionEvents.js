@@ -686,6 +686,39 @@ function attachInteractionEvents(client) {
         return;
       }
 
+      // Event notification signup button (role toggle)
+      if (interaction.isButton() && interaction.customId.startsWith('event_notify_')) {
+        const NOTIFY_ROLE_ID = '1380303846877696153';
+        const member = interaction.member;
+        if (!member) { await interaction.reply({ content: 'Could not resolve member.', ephemeral: true }).catch(()=>{}); return; }
+        const hasRole = member.roles.cache.has(NOTIFY_ROLE_ID);
+        try {
+          if (hasRole) {
+            await member.roles.remove(NOTIFY_ROLE_ID, 'Toggle event notification subscription');
+            await interaction.reply({ content: `Removed role: <@&${NOTIFY_ROLE_ID}>. You will no longer receive notifications for this event.`, ephemeral: true }).catch(()=>{});
+          } else {
+            await member.roles.add(NOTIFY_ROLE_ID, 'Toggle event notification subscription');
+            await interaction.reply({ content: `Granted role: <@&${NOTIFY_ROLE_ID}>. You will now be notified whenever this event starts.`, ephemeral: true }).catch(()=>{});
+          }
+          // Try to update button label to reflect state (optional)
+          try {
+            const rows = interaction.message.components.map(r => ({
+              type: 1,
+              components: r.components.map(c => {
+                if (c.customId === interaction.customId) {
+                  return { ...c.data, label: hasRole ? 'Sign up for notifications' : 'Unsubscribe notifications' };
+                }
+                return c;
+              })
+            }));
+            await interaction.message.edit({ components: rows }).catch(()=>{});
+          } catch {}
+        } catch (e) {
+          await interaction.reply({ content: 'Failed to toggle role: '+ (e.message||e), ephemeral: true }).catch(()=>{});
+        }
+        return;
+      }
+
       // Snipe config modal submit (add/remove channel)
       if (
         interaction.type === InteractionType.ModalSubmit &&

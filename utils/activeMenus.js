@@ -125,12 +125,14 @@ async function processInteraction(interaction) {
 
   const sess = sessions.get(messageId);
   if (!sess) {
-    // If message is older than 5 minutes, disable it on-demand
-    const createdAt = interaction.message.createdTimestamp || 0;
-    if (createdAt && Date.now() - createdAt > 5 * 60 * 1000) {
-      try { await interaction.update({ components: timeoutRow() }); } catch {}
-      return { handled: true };
+    // Exemption: allow certain global/permanent buttons to function forever without being force-disabled
+    // Currently needed for event notification signup buttons (custom_id starts with 'event_notify_').
+    if (interaction.isButton && interaction.isButton() && interaction.customId && interaction.customId.startsWith('event_notify_')) {
+      return { handled: false }; // let upstream interaction handler process it; do NOT timeout
     }
+    // If message is older than 5 minutes AND was originally a managed session, we would normally disable it.
+    // Since we don't have a session record, conservatively leave it alone to avoid breaking long-lived utility buttons.
+    // (Previous behavior force-disabled ANY unknown older message.)
     return { handled: false };
   }
 
