@@ -12,6 +12,14 @@ const { createEmbed, safeAddField } = require('../utils/embeds');
 // --- Duration Parsing Helpers ---
 // Accept forms:
 //  - HH:MM (24h) => concrete time of day
+// Utility: standardize anchor content for bar/opening style events (Midnight Bar pattern reuse)
+function formatBarStyleAnchor(ev, nextEpoch) {
+  return [
+    `# The ${ev.name} is opening: <t:${nextEpoch}:R>`,
+    '',
+    ev.description ? ev.description : 'Stay tuned for special drops and bonuses.'
+  ].join('\n');
+}
 //  - HH:MM-HH:MM => range with start/end
 //  - natural duration strings for offsets before event (e.g. 15m, 1h, 2h30m, 90m)
 //  - For times field we still keep HH:MM or HH:MM-HH:MM; we extend offsets & editing convenience

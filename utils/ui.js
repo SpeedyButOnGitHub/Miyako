@@ -186,3 +186,19 @@ function buildSettingEmbedUnified({ title, description, current, toggleKey, last
 }
 
 module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow, closeRow, semanticButton, buildNavRow, buildToggleRow, buildDestructiveRow, toTitleCase, applyToggleVisual, getToggleVisual, registerToggle, getToggleState, buildSettingEmbedUnified };
+// Diff-aware message updater to avoid redundant edits (performance + rate limit friendliness)
+async function diffEditMessage(target, { embeds, components, content }) {
+  try {
+    const current = target.embeds || [];
+    const curComps = target.components || [];
+    const sameEmbeds = JSON.stringify((embeds||[]).map(e=>({ t:e.data?.title, d:e.data?.description, c:e.data?.color }))) === JSON.stringify(current.map(e=>({ t:e.data?.title, d:e.data?.description, c:e.data?.color })));
+    const norm = rows => (rows||[]).map(r => (r.components||[]).map(c => ({ id:c.customId, dis:c.data?.disabled, style:c.data?.style, lbl:c.data?.label })).slice(0,25));
+    const sameComponents = JSON.stringify(norm(components)) === JSON.stringify(norm(curComps));
+    const sameContent = (content ?? target.content) === target.content;
+    if (sameEmbeds && sameComponents && sameContent) return false; // no-op
+    await target.edit({ embeds, components, content });
+    return true;
+  } catch { return false; }
+}
+
+module.exports.diffEditMessage = diffEditMessage;

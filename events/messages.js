@@ -10,6 +10,7 @@ const { handleRankCommand } = require("../commands/profile");
 const { handleTestCommand } = require("../commands/test");
 const { handleLeaderboardCommand } = require("../commands/leaderboard");
 const { handleProfileCommand } = require("../commands/profile");
+const { handleDiagnosticsCommand } = require("../commands/diagnostics");
 const { handleLeveling } = require("../utils/leveling");
 const { handleScheduleCommand } = require("../commands/schedule");
 const { handleScriptsCommand } = require("../commands/scripts");
@@ -150,29 +151,7 @@ function attachMessageEvents(client) {
       } else if (command === "balance" || command === "bal") {
         await handleBalanceCommand(client, message);
       } else if (command === "diag" || command === "diagnostics") {
-        const sessions = snapshotSessions();
-        const lines = [];
-        lines.push(`Sessions: ${sessions.length}`);
-        if (sessions.length) {
-          lines.push(...sessions.slice(0,10).map(s=>`• ${s.type} ${s.id} ${(s.expiresIn/1000).toFixed(0)}s`));
-        }
-        lines.push(`Levels: ${Object.keys(levels).length}`);
-        lines.push(`VC Levels: ${Object.keys(vcLevels).length}`);
-        try { const top = getTopCash(3); lines.push(`Top cash: ${top.map(t=>t.userId+':'+t.amount).join(', ')||'none'}`); } catch {}
-        try {
-          const { getWriteQueueMetrics } = require('../utils/writeQueue');
-          const m = getWriteQueueMetrics();
-          lines.push(`WriteQ enq:${m.enqueued} flushed:${m.flushed} pending:${m.pending}`);
-          if (m.lastFlushAt) lines.push(`Last flush ${(Date.now()-m.lastFlushAt)/1000|0}s ago`);
-        } catch {}
-        try {
-          const fs = require('fs');
-          if (fs.existsSync('./config/process-heartbeat.json')) {
-            const hb = JSON.parse(fs.readFileSync('./config/process-heartbeat.json','utf8'));
-            if (hb.ts) lines.push(`Heartbeat age ${(Date.now()-hb.ts)/1000|0}s`);
-          }
-        } catch {}
-        await message.reply({ content: '🩺 Diagnostics\n'+lines.join('\n'), allowedMentions: { repliedUser: false } }).catch(()=>{});
+        await handleDiagnosticsCommand(client, message);
   } else if (command === 'errors' || command === 'err') {
         if (message.author.id !== process.env.OWNER_ID) return;
         // Accept patterns: .errors, .errors 25, .errors embed 25, .errors 25 embed
