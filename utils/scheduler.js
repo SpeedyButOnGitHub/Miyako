@@ -396,6 +396,31 @@ function startScheduler(client, opts = {}) {
             }
           } catch (e) { /* ignore anchor update errors */ }
         }
+        // Periodic prune of stale clock-in message IDs (deleted messages)
+        try {
+          if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds)) {
+            const pruneInterval = 5 * 60 * 1000; // 5m
+            const nowTs = Date.now();
+            if (!ev.__clockIn.lastPruneTs || (nowTs - ev.__clockIn.lastPruneTs) > pruneInterval) {
+              const channel = ev.channelId ? await client.channels.fetch(ev.channelId).catch(()=>null) : null;
+              if (channel && channel.messages) {
+                const kept = [];
+                for (const mid of ev.__clockIn.messageIds.slice(-10)) { // only check recent subset
+                  const exists = await channel.messages.fetch(mid).then(()=>true).catch(()=>false);
+                  if (exists) kept.push(mid);
+                }
+                if (kept.length !== ev.__clockIn.messageIds.length) {
+                  ev.__clockIn.messageIds = kept;
+                  ev.__clockIn.lastPruneTs = nowTs;
+                  updateEvent(ev.id, { __clockIn: ev.__clockIn });
+                } else {
+                  ev.__clockIn.lastPruneTs = nowTs;
+                  updateEvent(ev.id, { __clockIn: ev.__clockIn });
+                }
+              }
+            }
+          }
+        } catch {}
       }
     } catch (e) { /* ignore event errors */ }
   }, tickInterval);

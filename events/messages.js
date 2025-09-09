@@ -21,6 +21,7 @@ const { config } = require("../utils/storage");
 const { handleCashCommand } = require("../commands/cash");
 const { handleBalanceCommand } = require("../commands/balance");
 const { handleMetricsCommand } = require("../commands/metrics");
+const { handleClockInStateCommand } = require("../commands/clockin");
 const { markCommand } = require('../services/metricsService');
 const { checkPolicy } = require('../utils/policy');
 const theme = require("../utils/theme");
@@ -172,6 +173,8 @@ function attachMessageEvents(client) {
         await handleDiagnosticsCommand(client, message); markCommand();
       } else if (command === 'metrics') {
         await handleMetricsCommand(client, message); markCommand();
+  } else if (command === 'clockinstate') {
+        await handleClockInStateCommand(client, message); markCommand();
   } else if (command === 'errors' || command === 'err') {
         if (message.author.id !== process.env.OWNER_ID) return;
         // Accept patterns: .errors, .errors 25, .errors embed 25, .errors 25 embed

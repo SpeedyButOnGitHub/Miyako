@@ -2,9 +2,11 @@
   "scripts": {
     "smoke": "node ./scripts/smoke-load.js",
     "start": "node index.js",
+    "start:bg": "node ./scripts/startBot.js",
+    "stop": "node ./scripts/stopBot.js",
     "import-levels": "node ./scripts/import-levels.js",
-  "test": "jest --runInBand",
-  "migrate:clockin": "node ./scripts/migrate-clockin.js"
+    "test": "jest --runInBand",
+    "migrate:clockin": "node ./scripts/migrate-clockin.js"
   },
   "dependencies": {
     "discord.js": "^14.22.1",

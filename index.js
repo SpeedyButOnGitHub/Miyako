@@ -1,5 +1,8 @@
 // Early crash reporter (must be first)
 require('./utils/crashReporter').initEarly();
+// Prevent multiple concurrent bot instances (esp. if accidentally started twice)
+try { require('./utils/singleton').ensureSingleton(); } catch {}
+try { process.title = 'MiyakoBot'; } catch {}
 require("dotenv/config");
 // (ephemeralShim removed; all interactions now use flags:1<<6 directly)
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
