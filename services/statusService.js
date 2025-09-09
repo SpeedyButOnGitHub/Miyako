@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createEmbed } = require('../utils/embeds');
+const { getRecentErrors, clearErrorLog } = require('../utils/errorUtil');
 const { CONFIG_LOG_CHANNEL } = require('../utils/logChannels');
 
 const BOT_STATUS_FILE = path.resolve(__dirname, '../config/botStatus.json');
@@ -29,12 +30,17 @@ async function postStartup(client, { channelId = CONFIG_LOG_CHANNEL } = {}) {
   const diff = now - last;
   const restarted = diff >= 5 * 60 * 1000;
   if (channel) {
+    // Attach recent error summary (last 5) if any stored
+    const recent = getRecentErrors(5);
+    const summary = recent.length ? '\n\nRecent Errors:\n' + recent.map(e => `• [${e.scope}] ${e.message.split('\n')[0].slice(0,120)}`).join('\n') : '';
     const embed = createEmbed({
       title: restarted ? '🟢 Restarted' : '🟢 Online',
-      description: restarted ? 'Miyako has restarted and is now online!' : 'Miyako is now online!',
+      description: (restarted ? 'Miyako has restarted and is now online!' : 'Miyako is now online!') + summary,
       color: restarted ? 0x55ff55 : 0x55ff55
     });
     await channel.send({ embeds: [embed] }).catch(()=>{});
+    // Clear stored errors unless retention flag file is present (simple env-based toggle in future)
+    clearErrorLog();
   }
   writeLastOnline(now);
   return { lastOnline: last, diff };

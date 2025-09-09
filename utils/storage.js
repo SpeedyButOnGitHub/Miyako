@@ -35,7 +35,10 @@ const defaultConfig = {
     minAmount: 25,
     maxAmount: 125,
     lifetimeMs: 60 * 1000,
-  }
+  },
+  maxPurgeLimit: 100,
+  blacklistedChannels: [],
+  moderatorLogChannelId: null
 };
 
 function ensureDir() {
@@ -60,6 +63,9 @@ function validateConfig(cfg) {
   if (!Array.isArray(cfg.levelingChannelList)) cfg.levelingChannelList = [];
   if (!Array.isArray(cfg.roleXPBlacklist)) cfg.roleXPBlacklist = [];
   if (typeof cfg.globalXPMultiplier !== "number" || !Number.isFinite(cfg.globalXPMultiplier)) cfg.globalXPMultiplier = 1.0;
+  if (typeof cfg.maxPurgeLimit !== 'number' || cfg.maxPurgeLimit <= 0) cfg.maxPurgeLimit = 100;
+  if (!Array.isArray(cfg.blacklistedChannels)) cfg.blacklistedChannels = [];
+  if (cfg.moderatorLogChannelId && typeof cfg.moderatorLogChannelId !== 'string') cfg.moderatorLogChannelId = String(cfg.moderatorLogChannelId);
 
   // Sanitize levelRewards to { "level": [roleIds] }
   const cleanedRewards = {};

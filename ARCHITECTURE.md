@@ -44,7 +44,9 @@ All embeds originate via `utils/embeds.js` (`createEmbed`, `successEmbed`, etc.)
 - Snapshot diffing for leaderboards if generating large paginated variants for external export.
 
 ## Error Handling
-- Central utility: `utils/errorUtil.js` (extend with structured logging if needed).
+- Central utility: `utils/errorUtil.js`.
+- Errors (console, uncaughtException, unhandledRejection, explicit logError calls) are captured and appended to `config/errorLog.json` (rotating; max ~500 kept).
+- On startup a summary of the latest errors (up to 5) is appended to the status/startup embed; log then cleared (toggle via future retention flag if needed).
 
 ## Deployment Notes
 - Graceful shutdown flushes pending queued writes (`writeQueue.flushAll`) before exit, then emits shutdown message via status service.

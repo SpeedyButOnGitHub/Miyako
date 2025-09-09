@@ -1,7 +1,77 @@
-// Centralized error handling helpers
+// Centralized error handling helpers with persistence for next-run diagnostics.
+const fs = require('fs');
+const path = require('path');
+
+const ERROR_LOG_FILE = path.resolve(__dirname, '../config/errorLog.json');
+const MAX_ERRORS = 100; // retention cap
+let inMemoryErrors = [];
+let originalConsoleError = null; // set by index.js wrapper
+
+function loadExisting() {
+  try {
+    if (!fs.existsSync(ERROR_LOG_FILE)) return;
+    const raw = fs.readFileSync(ERROR_LOG_FILE, 'utf8');
+    const parsed = JSON.parse(raw || '[]');
+    if (!Array.isArray(parsed)) return;
+    // Drop any historical spam from console scope, retain only last MAX_ERRORS of other scopes
+    inMemoryErrors = parsed.filter(e => e && e.scope !== 'console').slice(-MAX_ERRORS);
+  } catch { /* ignore */ }
+}
+
+loadExisting();
+
+function persist() {
+  try {
+    fs.writeFileSync(ERROR_LOG_FILE, JSON.stringify(inMemoryErrors.slice(-MAX_ERRORS), null, 2));
+  } catch { /* ignore */ }
+}
+
+function formatError(err) {
+  if (err && err.stack) return err.stack;
+  if (typeof err === 'object') {
+    try { return JSON.stringify(err); } catch { return String(err); }
+  }
+  return String(err);
+}
+
+function appendEntry(scope, msg) {
+  // Skip console scope to prevent runaway growth from console overrides
+  if (scope === 'console') return null;
+  const entry = { ts: Date.now(), scope, message: msg };
+  inMemoryErrors.push(entry);
+  if (inMemoryErrors.length > MAX_ERRORS) {
+    inMemoryErrors = inMemoryErrors.slice(-MAX_ERRORS);
+  }
+  persist();
+  return entry;
+}
+
 function logError(scope, err) {
-  const msg = err && err.stack ? err.stack : String(err);
-  console.error(`[${scope}]`, msg);
+  const msg = formatError(err);
+  // Use original console.error if available to avoid recursion
+  if (originalConsoleError) {
+    originalConsoleError(`[${scope}]`, msg);
+  } else {
+    try { process.stderr.write(`[${scope}] ${msg}\n`); } catch {}
+  }
+  appendEntry(scope, msg);
+}
+
+// Called by console.error wrapper to record without re-emitting to console (already printed)
+function recordExternalError(scope, errLike) {
+  const msg = formatError(errLike);
+  appendEntry(scope, msg);
+}
+
+function setOriginalConsoleError(fn) { originalConsoleError = fn; }
+
+function getRecentErrors(limit = 50) {
+  return inMemoryErrors.slice(-limit);
+}
+
+function clearErrorLog() {
+  inMemoryErrors = [];
+  persist();
 }
 
 function safeReply(target, content, opts = {}) {
@@ -13,4 +83,4 @@ function safeReply(target, content, opts = {}) {
   } catch {}
 }
 
-module.exports = { logError, safeReply };
+module.exports = { logError, recordExternalError, setOriginalConsoleError, safeReply, getRecentErrors, clearErrorLog };

@@ -87,16 +87,22 @@
     "maxAmount": 125,
     "lifetimeMs": 60000
   },
+  "maxPurgeLimit": 100,
+  "blacklistedChannels": [],
+  "moderatorLogChannelId": null,
   "testingWarnings": {
-    "432610292342587392": [
+    "349282473085239298": [
       {
         "moderator": "349282473085239298",
-        "reason": "No reason provided",
-        "date": 1757336786236,
-        "logMsgId": "1414597754466079004"
+        "reason": "Rude language",
+        "date": 1756861900370
+      },
+      {
+        "moderator": "349282473085239298",
+        "reason": "Rude language",
+        "date": 1757260817382
       }
-    ],
-    "349282473085239298": []
+    ]
   },
   "testingSeed": {
     "349282473085239298": [

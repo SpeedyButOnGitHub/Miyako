@@ -1,0 +1,47 @@
+[
+  {
+    "ts": 1757448252154,
+    "scope": "warning",
+    "message": "DeprecationWarning: The ready event has been renamed to clientReady to distinguish it from the gateway READY event and will only emit under that name in v15. Please use clientReady instead.\n    at WebSocketManager.triggerClientReady (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketManager.js:389:15)\n    at WebSocketManager.checkShardsReady (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketManager.js:368:10)\n    at WebSocketShard.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketManager.js:198:16)\n    at WebSocketShard.emit (node:events:519:28)\n    at WebSocketShard.checkReady (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketShard.js:184:12)\n    at WebSocketShard.gotGuild (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketShard.js:158:10)\n    at WebSocketManager.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketManager.js:238:15)\n    at WebSocketManager.emit (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\@vladfrangu\\async_event_emitter\\dist\\index.cjs:287:31)\n    at WebSocketShard.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\@discordjs\\ws\\dist\\index.js:1190:51)\n    at WebSocketShard.emit (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\@vladfrangu\\async_event_emitter\\dist\\index.cjs:287:31)"
+  },
+  {
+    "ts": 1757449148112,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757449230405,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757450127037,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ButtonInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\events\\interactionEvents.js:699:31)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+  },
+  {
+    "ts": 1757450127037,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ButtonInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\events\\interactionEvents.js:699:31)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+  },
+  {
+    "ts": 1757450220165,
+    "scope": "fatal",
+    "message": "signal:SIGINT"
+  },
+  {
+    "ts": 1757450489135,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ButtonInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at handleButton (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\commands\\configMenu\\handlers.js:186:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+  },
+  {
+    "ts": 1757450489135,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ButtonInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at handleButton (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\commands\\configMenu\\handlers.js:186:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+  },
+  {
+    "ts": 1757450513369,
+    "scope": "fatal",
+    "message": "signal:SIGINT"
+  }
+]

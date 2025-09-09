@@ -1,3 +1,5 @@
+// Early crash reporter (must be first)
+require('./utils/crashReporter').initEarly();
 require("dotenv/config");
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const fs = require("fs");
@@ -49,6 +51,21 @@ const client = new Client({
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
+
+// --- Global error capture layer (non-recursive) ---
+try {
+  const { recordExternalError, setOriginalConsoleError } = require('./utils/errorUtil');
+  const origConsoleError = console.error;
+  setOriginalConsoleError(origConsoleError);
+  console.error = function(...args) {
+    try { recordExternalError('console', args.length === 1 ? args[0] : args.map(a=> (a && a.stack) ? a.stack : String(a)).join(' ')); } catch { /* ignore */ }
+    return origConsoleError.apply(this, args);
+  };
+  process.on('warning', (w) => recordExternalError('warning', w));
+} catch { /* ignore capture setup errors */ }
+
+// Attach client to crashReporter for graceful shutdown details
+try { require('./utils/crashReporter').attachClient(client); } catch {}
 
 const { runHealthChecks, formatHealthLines } = require('./utils/health');
 const { CONFIG_LOG_CHANNEL } = require('./utils/logChannels');
@@ -155,13 +172,14 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
   });
 }
 
-client.once("ready", async () => {
+// Use 'clientReady' instead of deprecated 'ready' (v15 will remove 'ready')
+client.once("clientReady", async () => {
   config.testingMode = false; saveConfig();
   console.log(`✅ Logged in as ${client.user.tag}`);
   await sendBotStatusMessage();
   await setStatusChannelName(true);
 
-    // Config validation report
+    // Config validation report (deduplicated per boot)
     try {
       const guild = client.guilds.cache.first();
       const issues = validateConfig(guild);
@@ -171,7 +189,15 @@ client.once("ready", async () => {
         if (CONFIG_LOG_CHANNEL) {
           const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(()=>null);
           if (channel) {
-            channel.send({ content: `⚠️ Config validation found ${issues.length} issue(s):\n` + issues.map(i=>`• ${i}`).join('\n') }).catch(()=>{});
+            const hash = require('crypto').createHash('sha1').update(issues.join('|')).digest('hex');
+            const stampFile = path.resolve(__dirname, './config/.lastConfigIssuesHash');
+            let prev = null; try { if (fs.existsSync(stampFile)) prev = fs.readFileSync(stampFile,'utf8').trim(); } catch {}
+            if (prev !== hash) {
+              channel.send({ content: `⚠️ Config validation found ${issues.length} issue(s):\n` + issues.map(i=>`• ${i}`).join('\n') }).catch(()=>{});
+              try { fs.writeFileSync(stampFile, hash); } catch {}
+            } else {
+              console.log('[config] issues unchanged since last boot; not re-sent');
+            }
           }
         }
       } else {

@@ -1,0 +1,97 @@
+// Robust early crash reporter to guarantee logging of fatal conditions.
+// Attach this BEFORE other heavy requires so uncaught exceptions during module load are captured.
+const fs = require('fs');
+const path = require('path');
+const { logError } = require('./errorUtil');
+
+const ERROR_LOG_FILE = path.resolve(__dirname, '../config/errorLog.json');
+const CRASH_LATEST_FILE = path.resolve(__dirname, '../config/crash-latest.json');
+let attached = false;
+let clientRef = null;
+let fatalHandled = false;
+let heartbeatTimer = null;
+
+function safeWrite(file, data) {
+  try { fs.writeFileSync(file, data); } catch { /* ignore */ }
+}
+
+function appendEmergency(entry) {
+  // Fallback append-only line file if main JSON write somehow fails
+  const emergencyFile = path.resolve(__dirname, '../config/error-emergency.log');
+  try { fs.appendFileSync(emergencyFile, JSON.stringify(entry) + '\n'); } catch { /* ignore */ }
+}
+
+async function gracefulShutdown(reason, err) {
+  if (fatalHandled) return; // ensure single execution
+  fatalHandled = true;
+  const entry = {
+    ts: Date.now(),
+    scope: 'fatal',
+    reason,
+    message: err && (err.stack || err.message || String(err))
+  };
+  // Write dedicated crash snapshot (overwrites)
+  safeWrite(CRASH_LATEST_FILE, JSON.stringify(entry, null, 2));
+  // Also ensure it is in the rolling log
+  try { logError('fatal', err || reason); } catch { appendEmergency(entry); }
+
+  // Attempt polite shutdown tasks only if we have a client and it's ready
+  try {
+    if (clientRef && clientRef.isReady && clientRef.isReady()) {
+      const { setStatusChannelName, sendBotShutdownMessage } = require('./botStatus');
+      await setStatusChannelName(clientRef, false);
+      await sendBotShutdownMessage(clientRef);
+    }
+  } catch (e) {
+    try { logError('fatal:shutdown', e); } catch { appendEmergency({ ts: Date.now(), scope: 'fatal:shutdown', message: String(e) }); }
+  }
+  // Force exit (skip during Jest tests to avoid interfering with test runner)
+  if (!process.env.JEST_WORKER_ID) process.exit(1);
+}
+
+function onUncaught(err) { gracefulShutdown('uncaughtException', err); }
+function onUnhandled(reason) { gracefulShutdown('unhandledRejection', reason); }
+function onSignal(sig) { gracefulShutdown(`signal:${sig}`); }
+
+function initEarly() {
+  if (attached) return;
+  attached = true;
+
+  // Placeholder crash snapshot so absence itself is meaningful later
+  if (!fs.existsSync(CRASH_LATEST_FILE)) {
+    safeWrite(CRASH_LATEST_FILE, JSON.stringify({ ts: Date.now(), status: 'init', note: 'process started' }, null, 2));
+  }
+
+  process.on('uncaughtException', onUncaught);
+  process.on('unhandledRejection', onUnhandled);
+  for (const sig of ['SIGINT','SIGTERM','SIGQUIT']) {
+    try { process.on(sig, () => onSignal(sig)); } catch { /* ignore */ }
+  }
+  process.on('warning', (w) => { try { logError('warning', w); } catch {} });
+  process.on('exit', (code) => {
+    if (!fatalHandled) {
+      if (code !== 0) {
+        // treat abnormal exit as fatal without stack
+        try { logError('fatal:exit', `abnormal exit code ${code}`); } catch {}
+        safeWrite(CRASH_LATEST_FILE, JSON.stringify({ ts: Date.now(), scope: 'fatal', reason: 'abnormal-exit', code }, null, 2));
+      } else {
+        try { logError('exit', `process exiting with code ${code}`); } catch {}
+      }
+    }
+  });
+
+  // Lightweight heartbeat every 60s so we can detect hung process vs crash by timestamp
+  heartbeatTimer = setInterval(() => {
+    try {
+      const hbFile = path.resolve(__dirname, '../config/process-heartbeat.json');
+      safeWrite(hbFile, JSON.stringify({ ts: Date.now() }, null, 2));
+    } catch {}
+  }, 60000);
+  if (heartbeatTimer.unref) heartbeatTimer.unref();
+}
+
+function attachClient(client) {
+  clientRef = client;
+}
+
+module.exports = { initEarly, attachClient };

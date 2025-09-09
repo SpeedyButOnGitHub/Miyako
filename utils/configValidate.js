@@ -21,8 +21,11 @@ function validateConfig(guild) {
   }
   // Level rewards shape
   if (config.levelRewards && typeof config.levelRewards === 'object') {
-    for (const [lvl, roleId] of Object.entries(config.levelRewards)) {
-      if (!guild.roles.cache.has(roleId)) issues.push(`Level reward role missing (level ${lvl} -> ${roleId})`);
+    for (const [lvl, roleIds] of Object.entries(config.levelRewards)) {
+      const arr = Array.isArray(roleIds) ? roleIds : (roleIds ? [roleIds] : []);
+      for (const rid of arr) {
+        if (!guild.roles.cache.has(rid)) issues.push(`Level reward role missing (level ${lvl} -> ${rid})`);
+      }
     }
   }
   // Modes

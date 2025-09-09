@@ -33,7 +33,7 @@ function attachInteractionEvents(client) {
         // Reply ephemerally with the balance embed/buttons
         const { buildBalancePayload } = require("../commands/balance");
         const payload = buildBalancePayload(interaction.user.id);
-        await interaction.reply({ ...payload, ephemeral: true }).catch(() => {});
+  await interaction.reply({ ...payload, flags: 1<<6 }).catch(() => {});
         return;
       }
 
@@ -65,9 +65,9 @@ function attachInteractionEvents(client) {
         if (!submitted) return;
         const raw = submitted.fields.getTextInputValue("amount");
         const amt = Math.max(0, Math.floor(Number((raw||"").replace(/[^0-9]/g, "")) || 0));
-        if (amt <= 0) { await submitted.reply({ content: "❌ Enter a positive amount.", ephemeral: true }); return; }
+  if (amt <= 0) { await submitted.reply({ content: "❌ Enter a positive amount.", flags: 1<<6 }); return; }
         const q = quoteDeposit(interaction.user.id, amt);
-        if (!q.ok) { await submitted.reply({ content: "❌ Invalid amount.", ephemeral: true }); return; }
+  if (!q.ok) { await submitted.reply({ content: "❌ Invalid amount.", flags: 1<<6 }); return; }
         const taxPct = q.deposit > 0 ? (q.tax / q.deposit) * 100 : 0;
         let warningLine = "";
         if (q.requiresConfirmation) {
@@ -82,7 +82,7 @@ function attachInteractionEvents(client) {
           new ButtonBuilder().setCustomId(`bank:confirm:toLimit:${rootMsgId}`).setLabel("To Limit").setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
         );
-        await submitted.reply({ content, components: [row], ephemeral: true }).catch(() => {});
+  await submitted.reply({ content, components: [row], flags: 1<<6 }).catch(() => {});
         return;
       }
 
@@ -92,7 +92,7 @@ function attachInteractionEvents(client) {
         const base = getBaseLimit();
         const maxAff = computeMaxAffordableDeposit(interaction.user.id);
         if (maxAff.deposit <= 0) {
-          await interaction.reply({ content: "Nothing to deposit.", ephemeral: true }).catch(()=>{});
+          await interaction.reply({ content: "Nothing to deposit.", flags: 1<<6 }).catch(()=>{});
           return;
         }
         const taxPct = maxAff.deposit > 0 ? (maxAff.tax / maxAff.deposit) * 100 : 0;
@@ -105,7 +105,7 @@ function attachInteractionEvents(client) {
           new ButtonBuilder().setCustomId(`bank:confirm:toLimit:${rootMsgId}`).setLabel("To Limit").setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
         );
-        await interaction.reply({ content, components: [row], ephemeral: true }).catch(()=>{});
+  await interaction.reply({ content, components: [row], flags: 1<<6 }).catch(()=>{});
         return;
       }
 
@@ -120,28 +120,28 @@ function attachInteractionEvents(client) {
         if (!submitted) return;
         const raw = submitted.fields.getTextInputValue("amount");
         const amt = Math.max(0, Math.floor(Number((raw||"").replace(/[^0-9]/g, ""))||0));
-        if (amt<=0) { await submitted.reply({ content: "❌ Enter a positive amount.", ephemeral:true }); return; }
-        if (amt > getBank(interaction.user.id)) { await submitted.reply({ content: "❌ You don't have that much in the bank.", ephemeral:true }); return; }
+  if (amt<=0) { await submitted.reply({ content: "❌ Enter a positive amount.", flags:1<<6 }); return; }
+  if (amt > getBank(interaction.user.id)) { await submitted.reply({ content: "❌ You don't have that much in the bank.", flags:1<<6 }); return; }
         const content = `Confirm withdrawing $${amt.toLocaleString()}?`;
         const rootMsgId = interaction.message?.id;
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`bank:withdraw:confirm:${amt}:${rootMsgId}`).setLabel("Confirm").setStyle(ButtonStyle.Success),
           new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
         );
-        await submitted.reply({ content, components:[row], ephemeral:true }).catch(()=>{});
+  await submitted.reply({ content, components:[row], flags:1<<6 }).catch(()=>{});
         return;
       }
 
       // Withdraw Max (no penalty) -> confirm
       if (interaction.isButton() && interaction.customId === "bank:withdraw:max") {
         const bankBal = getBank(interaction.user.id);
-        if (bankBal <= 0) { await interaction.reply({ content: "Bank is empty.", ephemeral:true }).catch(()=>{}); return; }
+  if (bankBal <= 0) { await interaction.reply({ content: "Bank is empty.", flags:1<<6 }).catch(()=>{}); return; }
         const rootMsgId = interaction.message?.id;
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId(`bank:withdraw:confirm:${bankBal}:${rootMsgId}`).setLabel("Confirm Withdraw All").setStyle(ButtonStyle.Danger),
           new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
         );
-        await interaction.reply({ content: `Withdraw all $${bankBal.toLocaleString()}?`, components:[row], ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content: `Withdraw all $${bankBal.toLocaleString()}?`, components:[row], flags:1<<6 }).catch(()=>{});
         return;
       }
 
@@ -152,17 +152,17 @@ function attachInteractionEvents(client) {
         const base = getBaseLimit();
         const bankBal = getBank(interaction.user.id);
         if (bankBal >= base) {
-          await interaction.reply({ content: "Already at or above the daily limit.", ephemeral:true }).catch(()=>{});
+          await interaction.reply({ content: "Already at or above the daily limit.", flags:1<<6 }).catch(()=>{});
           return;
         }
         const needed = base - bankBal;
         const q = quoteDeposit(interaction.user.id, needed);
-        if (!q.ok) { await interaction.reply({ content: "❌ Could not compute required amount.", ephemeral:true }).catch(()=>{}); return; }
+  if (!q.ok) { await interaction.reply({ content: "❌ Could not compute required amount.", flags:1<<6 }).catch(()=>{}); return; }
   const res = depositToBank(interaction.user.id, q.deposit, { allowAboveLimit:true });
-        if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Deposit failed"}`, ephemeral:true }).catch(()=>{}); return; }
+  if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Deposit failed"}`, flags:1<<6 }).catch(()=>{}); return; }
   addProgress(interaction.user.id, res.moved || 0);
   const pct = res.moved ? ((res.tax || 0) / res.moved) * 100 : 0;
-  await interaction.reply({ content: `✅ Deposited $${res.moved.toLocaleString()} to reach the daily limit.${res.tax?` Tax $${res.tax.toLocaleString()} (${pct.toFixed(1)}%)`:''}`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content: `✅ Deposited $${res.moved.toLocaleString()} to reach the daily limit.${res.tax?` Tax $${res.tax.toLocaleString()} (${pct.toFixed(1)}%)`:''}`, flags:1<<6 }).catch(()=>{});
         // Revert original menu (if we have the id) back to root balance
         if (rootId) {
           try {
@@ -182,9 +182,9 @@ function attachInteractionEvents(client) {
         const total = Number(parts[4])|| (depositAmt+tax);
         const rootId = parts[5];
         const res = depositToBank(interaction.user.id, depositAmt, { allowAboveLimit:true });
-        if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Deposit failed"}`, ephemeral:true }).catch(()=>{}); return; }
+  if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Deposit failed"}`, flags:1<<6 }).catch(()=>{}); return; }
         addProgress(interaction.user.id, res.moved || 0);
-        await interaction.reply({ content: `✅ Deposited $${res.moved.toLocaleString()}${tax?` (Tax $${tax.toLocaleString()})`:""}.`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content: `✅ Deposited $${res.moved.toLocaleString()}${tax?` (Tax $${tax.toLocaleString()})`:""}.`, flags:1<<6 }).catch(()=>{});
         // Revert original menu back to balance root if we know it
         if (rootId) {
           try {
@@ -202,8 +202,8 @@ function attachInteractionEvents(client) {
         const amt = Number(parts[3])||0;
         const rootId = parts[4];
         const res = withdrawFromBank(interaction.user.id, amt);
-        if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Withdraw failed"}`, ephemeral:true }).catch(()=>{}); return; }
-        await interaction.reply({ content: `✅ Withdrew $${res.moved.toLocaleString()}.`, ephemeral:true }).catch(()=>{});
+  if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Withdraw failed"}`, flags:1<<6 }).catch(()=>{}); return; }
+  await interaction.reply({ content: `✅ Withdrew $${res.moved.toLocaleString()}.`, flags:1<<6 }).catch(()=>{});
         // Revert to root balance menu (withdraw does not affect progress)
         if (rootId) {
           try {
