@@ -17,6 +17,18 @@ module.exports = {
     target: "🎯",
     moderator: "🛡️",
     counter: "🧮",
-    id: "🆔",
+  id: "🆔",
+  create: "➕",
+  delete: "🗑️",
+  back: "⬅️",
+  select: "🎯",
+  times: "🕒",
+  days: "📅",
+  message: "📝",
+  enable: "✅",
+  disable: "🛑",
+  toggle: "🔁",
+  settings: "⚙️",
+  edit: "✏️"
   }
 };

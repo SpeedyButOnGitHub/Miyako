@@ -11,33 +11,32 @@ const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 function buildEventsMainEmbed() {
   const evs = getEvents();
-  const embed = new EmbedBuilder()
+  const lines = evs.map(e => {
+    const times = (e.times || []).join(", ") || "–";
+    const days = (e.days || []).map(d => DAY_NAMES[d] || d).join(" ") || "All";
+    return `${e.enabled ? "✅" : "❌"} **${e.name}** • Times: \`${times}\` • Days: \`${days}\` • ID: \`${e.id}\``;
+  });
+  return new EmbedBuilder()
     .setTitle("🎉 Events Manager")
     .setColor(theme.colors?.primary || 0x5865F2)
-    .setDescription("Create, delete, and customize multi-time events.");
-  const body = evs.length ? evs.map(e => {
-    const times = (e.times||[]).join(", ") || "(no times)";
-    const days = (e.days||[]).map(d=>DAY_NAMES[d]||d).join(" ") || "(all?)";
-    return `${e.enabled?"🟢":"🔴"} **${e.name}** (ID ${e.id})\n• Times: ${times}\n• Days: ${days}`;
-  }).join("\n\n") : "*No events defined*";
-  embed.setDescription(body + "\n\nUse the buttons below.");
-  return embed;
+    .setDescription(lines.length ? lines.join("\n") : "*No events defined yet.*")
+    .setFooter({ text: `${evs.length} event${evs.length === 1 ? '' : 's'} total • Use buttons below` });
 }
 
 function buildEventDetailEmbed(ev) {
-  const times = (ev.times||[]).length ? ev.times.join(", ") : "(none)";
-  const days = (ev.days||[]).length ? ev.days.map(d=>DAY_NAMES[d]||d).join(", ") : "(none)";
+  const times = (ev.times || []).length ? ev.times.join(", ") : "(none)";
+  const days = (ev.days || []).length ? ev.days.map(d => DAY_NAMES[d] || d).join(", ") : "(none)";
   return new EmbedBuilder()
-    .setTitle(`${ev.enabled?"🟢":"🔴"} ${ev.name}`)
-    .setColor(ev.enabled ? (theme.colors?.success || 0x00ff00) : (theme.colors?.danger || 0xff5555))
-    .setDescription(ev.description || "No description.")
+    .setTitle(`${ev.enabled ? "✅" : "❌"} ${ev.name}`)
+    .setColor(ev.enabled ? (theme.colors?.success || 0x2ecc71) : (theme.colors?.danger || 0xe74c3c))
+    .setDescription(ev.description || "No description provided.")
     .addFields(
-      { name: "Channel", value: ev.channelId ? `<#${ev.channelId}>` : "(none)", inline: true },
+      { name: "Status", value: ev.enabled ? "Enabled" : "Disabled", inline: true },
       { name: "Type", value: ev.type || "multi-daily", inline: true },
-      { name: "Enabled", value: ev.enabled ? "Yes" : "No", inline: true },
+      { name: "Channel", value: ev.channelId ? `<#${ev.channelId}>` : "(none)", inline: true },
       { name: "Times", value: times, inline: false },
       { name: "Days", value: days, inline: false },
-      { name: "Message", value: ev.message ? (ev.message.length>200 ? ev.message.slice(0,197)+"..." : ev.message) : "(none)" }
+      { name: "Message", value: ev.message ? (ev.message.length > 300 ? ev.message.slice(0, 297) + "..." : ev.message) : "(none)" }
     )
     .setFooter({ text: `Event ID ${ev.id}` });
 }
@@ -73,7 +72,7 @@ async function handleScheduleCommand(client, message) {
       const id = interaction.customId;
       if (id === "ev_create") {
         const modal = new ModalBuilder()
-          .setCustomId("event_create_modal")
+          .setCustomId(`event_create_modal_${replyMsg.id}`)
           .setTitle("Create Event")
           .addComponents(
             new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("name").setLabel("Name").setStyle(TextInputStyle.Short).setRequired(true)),
@@ -110,7 +109,7 @@ async function handleScheduleCommand(client, message) {
         }
         const rowSel = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder().setCustomId("ev_delete_select").setPlaceholder("Select event to delete").addOptions(
-            evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(" ").slice(0,100), emoji: "�️" }))
+            evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(" ").slice(0,100), emoji: "🗑️" }))
           )
         );
         const rowBack = new ActionRowBuilder().addComponents(
@@ -132,14 +131,14 @@ async function handleScheduleCommand(client, message) {
         if (!ev) { await interaction.reply({ content: "Event missing.", ephemeral: true }); return; }
         const updated = updateEvent(eid, { enabled: !ev.enabled });
         await interaction.deferUpdate();
-        const detailRows = buildDetailRows(updated.id);
+        const detailRows = buildDetailRows(updated);
         await replyMsg.edit({ embeds: [buildEventDetailEmbed(updated)], components: detailRows });
         return;
       }
       if (id.startsWith("ev_edit_times_")) {
         const eid = id.split("_").pop();
         const ev = getEvent(eid); if (!ev) { await interaction.reply({ content: "Event missing.", ephemeral:true }); return; }
-        const modal = new ModalBuilder().setCustomId(`event_times_modal_${eid}`).setTitle("Edit Times").addComponents(
+        const modal = new ModalBuilder().setCustomId(`event_times_modal_${eid}_${replyMsg.id}`).setTitle("Edit Times").addComponents(
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("times").setLabel("Times (HH:MM,comma)").setStyle(TextInputStyle.Paragraph).setRequired(true).setValue((ev.times||[]).join(",")))
         );
         await interaction.showModal(modal); return;
@@ -147,7 +146,7 @@ async function handleScheduleCommand(client, message) {
       if (id.startsWith("ev_edit_days_")) {
         const eid = id.split("_").pop();
         const ev = getEvent(eid); if (!ev) { await interaction.reply({ content: "Event missing.", ephemeral:true }); return; }
-        const modal = new ModalBuilder().setCustomId(`event_days_modal_${eid}`).setTitle("Edit Days").addComponents(
+        const modal = new ModalBuilder().setCustomId(`event_days_modal_${eid}_${replyMsg.id}`).setTitle("Edit Days").addComponents(
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("days").setLabel("Days (Sun,Mon,...)").setStyle(TextInputStyle.Short).setRequired(true).setValue((ev.days||[]).map(d=>DAY_NAMES[d]||d).join(",")))
         );
         await interaction.showModal(modal); return;
@@ -155,7 +154,7 @@ async function handleScheduleCommand(client, message) {
       if (id.startsWith("ev_edit_msg_")) {
         const eid = id.split("_").pop();
         const ev = getEvent(eid); if (!ev) { await interaction.reply({ content: "Event missing.", ephemeral:true }); return; }
-        const modal = new ModalBuilder().setCustomId(`event_msg_modal_${eid}`).setTitle("Edit Message").addComponents(
+        const modal = new ModalBuilder().setCustomId(`event_msg_modal_${eid}_${replyMsg.id}`).setTitle("Edit Message").addComponents(
           new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("message").setLabel("Message Content").setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(ev.message || ""))
         );
         await interaction.showModal(modal); return;
@@ -180,8 +179,8 @@ async function handleScheduleCommand(client, message) {
         if (!ev) { await interaction.reply({ content: "Event not found.", ephemeral: true }); return; }
         currentEventId = eid; mode = "detail";
         await interaction.deferUpdate();
-        const detailRows = buildDetailRows(eid);
-        await replyMsg.edit({ embeds: [buildEventDetailEmbed(ev)], components: detailRows });
+  const detailRows = buildDetailRows(ev);
+  await replyMsg.edit({ embeds: [buildEventDetailEmbed(ev)], components: detailRows });
         return;
       }
       if (id === "ev_delete_select") {
@@ -281,15 +280,17 @@ async function handleScheduleModal(interaction) {
 // Handle Event creation modal (called from interactionEvents if imported, or extend export usage)
 async function handleEventCreateModal(interaction) {
   if (!interaction.isModalSubmit()) return;
-  if (interaction.customId !== "event_create_modal") return;
+  if (!interaction.customId.startsWith("event_create_modal")) return;
+  const mm = interaction.customId.match(/^event_create_modal_(\d+)/);
+  const managerMessageId = mm ? mm[1] : null;
   const name = interaction.fields.getTextInputValue("name").trim();
   let channelId = interaction.fields.getTextInputValue("channel").trim().replace(/[<#>]/g, "");
   const timesRaw = interaction.fields.getTextInputValue("times").trim();
   const daysRaw = interaction.fields.getTextInputValue("days").trim();
   const message = interaction.fields.getTextInputValue("message").trim();
-  const times = timesRaw.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
+  const times = timesRaw.split(/[\,\s]+/).map(t => t.trim()).filter(Boolean);
   const dayMap = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
-  const days = daysRaw.split(/[,\s]+/).map(d => d.trim().toLowerCase()).filter(Boolean).map(d => dayMap[d]).filter(d => d !== undefined);
+  const days = daysRaw.split(/[\,\s]+/).map(d => d.trim().toLowerCase()).filter(Boolean).map(d => dayMap[d]).filter(d => d !== undefined);
   if (!days.length) { await interaction.reply({ content: "❌ Invalid days.", ephemeral: true }); return; }
   if (!times.length) { await interaction.reply({ content: "❌ Provide at least one time.", ephemeral: true }); return; }
   const ev = addEvent({
@@ -304,18 +305,36 @@ async function handleEventCreateModal(interaction) {
     color: 0x00aa00
   });
   await interaction.reply({ content: `✅ Event ${ev.name} created with ${ev.times.length} time(s).`, ephemeral: true });
+  if (managerMessageId) {
+    try {
+      const mgrMsg = await interaction.channel.messages.fetch(managerMessageId);
+      if (mgrMsg) {
+        const evs = getEvents();
+        await mgrMsg.edit({ embeds: [buildEventsMainEmbed()], components: [
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("ev_create").setLabel("Create").setStyle(ButtonStyle.Success).setEmoji("➕"),
+            new ButtonBuilder().setCustomId("ev_delete_mode").setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
+            new ButtonBuilder().setCustomId("ev_select_mode").setLabel("Select").setStyle(ButtonStyle.Primary).setEmoji("🎯").setDisabled(!evs.length)
+          )
+        ] });
+      }
+    } catch {}
+  }
 }
 
-function buildDetailRows(eventId) {
+function buildDetailRows(ev) {
+  const toggleLabel = ev.enabled ? "Disable" : "Enable";
+  const toggleStyle = ev.enabled ? ButtonStyle.Danger : ButtonStyle.Success;
+  const toggleEmoji = ev.enabled ? "🛑" : "✅";
   return [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`ev_toggle_${eventId}`).setLabel("Toggle").setStyle(ButtonStyle.Secondary).setEmoji("🔁"),
-      new ButtonBuilder().setCustomId(`ev_edit_times_${eventId}`).setLabel("Times").setStyle(ButtonStyle.Primary).setEmoji("🕒"),
-      new ButtonBuilder().setCustomId(`ev_edit_days_${eventId}`).setLabel("Days").setStyle(ButtonStyle.Primary).setEmoji("📅")
+      new ButtonBuilder().setCustomId(`ev_toggle_${ev.id}`).setLabel(toggleLabel).setStyle(toggleStyle).setEmoji(toggleEmoji),
+      new ButtonBuilder().setCustomId(`ev_edit_times_${ev.id}`).setLabel("Times").setStyle(ButtonStyle.Primary).setEmoji("🕒"),
+      new ButtonBuilder().setCustomId(`ev_edit_days_${ev.id}`).setLabel("Days").setStyle(ButtonStyle.Primary).setEmoji("📅")
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`ev_edit_msg_${eventId}`).setLabel("Message").setStyle(ButtonStyle.Secondary).setEmoji("📝"),
-      new ButtonBuilder().setCustomId(`ev_delete_${eventId}`).setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
+      new ButtonBuilder().setCustomId(`ev_edit_msg_${ev.id}`).setLabel("Message").setStyle(ButtonStyle.Secondary).setEmoji("📝"),
+      new ButtonBuilder().setCustomId(`ev_delete_${ev.id}`).setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
       new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
     )
   ];
@@ -324,26 +343,50 @@ function buildDetailRows(eventId) {
 async function handleEventEditModal(interaction) {
   if (!interaction.isModalSubmit()) return;
   if (!/^event_(times|days|msg)_modal_/.test(interaction.customId)) return;
-  const [, kind,, id] = interaction.customId.split(/_|modal_/).filter(Boolean); // crude parse
-  const ev = getEvent(id);
+  // pattern: event_<kind>_modal_<eventId>[_<managerMessageId>]
+  const parts = interaction.customId.split("_");
+  const eventId = parts[3];
+  const managerMessageId = parts[4] || null;
+  const ev = getEvent(eventId);
   if (!ev) { await interaction.reply({ content: "Event not found.", ephemeral:true }); return; }
+  let updatedEv = null;
   if (interaction.customId.startsWith("event_times_modal_")) {
     const raw = interaction.fields.getTextInputValue("times");
-    const times = raw.split(/[,\s]+/).map(t=>t.trim()).filter(Boolean);
+    const times = raw.split(/[\,\s]+/).map(t=>t.trim()).filter(Boolean);
     if (!times.length) { await interaction.reply({ content: "❌ Provide times.", ephemeral:true }); return; }
-    updateEvent(ev.id, { times });
+    updatedEv = updateEvent(ev.id, { times });
     await interaction.reply({ content: "✅ Times updated.", ephemeral:true });
   } else if (interaction.customId.startsWith("event_days_modal_")) {
     const raw = interaction.fields.getTextInputValue("days");
     const dayMap = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
-    const days = raw.split(/[,\s]+/).map(d=>d.trim().toLowerCase()).filter(Boolean).map(d=>dayMap[d]).filter(d=>d!==undefined);
+    const days = raw.split(/[\,\s]+/).map(d=>d.trim().toLowerCase()).filter(Boolean).map(d=>dayMap[d]).filter(d=>d!==undefined);
     if (!days.length) { await interaction.reply({ content: "❌ Invalid days.", ephemeral:true }); return; }
-    updateEvent(ev.id, { days });
+    updatedEv = updateEvent(ev.id, { days });
     await interaction.reply({ content: "✅ Days updated.", ephemeral:true });
   } else if (interaction.customId.startsWith("event_msg_modal_")) {
     const messageContent = interaction.fields.getTextInputValue("message");
-    updateEvent(ev.id, { message: messageContent });
+    updatedEv = updateEvent(ev.id, { message: messageContent });
     await interaction.reply({ content: "✅ Message updated.", ephemeral:true });
+  }
+  if (managerMessageId && updatedEv) {
+    try {
+      const mgrMsg = await interaction.channel.messages.fetch(managerMessageId);
+      if (mgrMsg) {
+        const hasDetail = mgrMsg.components.some(r => r.components.some(c => c.customId === `ev_toggle_${updatedEv.id}`));
+        if (hasDetail) {
+          await mgrMsg.edit({ embeds: [buildEventDetailEmbed(updatedEv)], components: buildDetailRows(updatedEv) });
+        } else if (mgrMsg.components.some(r => r.components.some(c => c.customId === 'ev_create'))) {
+          const evs = getEvents();
+            await mgrMsg.edit({ embeds: [buildEventsMainEmbed()], components: [
+              new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId("ev_create").setLabel("Create").setStyle(ButtonStyle.Success).setEmoji("➕"),
+                new ButtonBuilder().setCustomId("ev_delete_mode").setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
+                new ButtonBuilder().setCustomId("ev_select_mode").setLabel("Select").setStyle(ButtonStyle.Primary).setEmoji("🎯").setDisabled(!evs.length)
+              )
+            ] });
+        }
+      }
+    } catch {}
   }
 }
 
