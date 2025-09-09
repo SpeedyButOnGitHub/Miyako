@@ -15,6 +15,7 @@ const { addProgress } = require("../utils/depositProgress");
 const { depositToBank, withdrawFromBank, amountToNextThreshold, quoteDeposit, getBank, getBaseLimit, computeMaxAffordableDeposit, computeTaxForDeposit } = require("../utils/bank");
 const { getCash, getTestingCash } = require("../utils/cash");
 const theme = require("../utils/theme");
+const { semanticButton } = require("../utils/ui");
 
 // Pending Kick/Ban confirmations: key = `${userId}:${action}:${moderatorId}` -> { reason: string|null, originChannelId?:string, originMessageId?:string }
 const pendingPunishments = new Map();
@@ -78,9 +79,9 @@ function attachInteractionEvents(client) {
         const content = `Confirm depositing **$${q.deposit.toLocaleString()}**?${warningLine}`;
         const rootMsgId = interaction.message?.id; // original menu message id
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`bank:confirm:${q.deposit}:${q.tax}:${q.totalCost}:${rootMsgId}`).setLabel("Confirm").setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId(`bank:confirm:toLimit:${rootMsgId}`).setLabel("To Limit").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+          semanticButton('success', { id: `bank:confirm:${q.deposit}:${q.tax}:${q.totalCost}:${rootMsgId}`, label: 'Confirm' }),
+          semanticButton('primary', { id: `bank:confirm:toLimit:${rootMsgId}`, label: 'To Limit' }),
+          semanticButton('nav', { id: 'bank:decline', label: 'Cancel' })
         );
   await submitted.reply({ content, components: [row], flags: 1<<6 }).catch(() => {});
         return;
@@ -101,9 +102,9 @@ function attachInteractionEvents(client) {
         const content = `Confirm Deposit Max: **$${maxAff.deposit.toLocaleString()}**?${warn}`;
         const rootMsgId = interaction.message?.id;
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`bank:confirm:${maxAff.deposit}:${maxAff.tax}:${maxAff.totalCost}:${rootMsgId}`).setLabel("Confirm Max").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`bank:confirm:toLimit:${rootMsgId}`).setLabel("To Limit").setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+          semanticButton('danger', { id: `bank:confirm:${maxAff.deposit}:${maxAff.tax}:${maxAff.totalCost}:${rootMsgId}`, label: 'Confirm Max' }),
+          semanticButton('primary', { id: `bank:confirm:toLimit:${rootMsgId}`, label: 'To Limit' }),
+          semanticButton('nav', { id: 'bank:decline', label: 'Cancel' })
         );
   await interaction.reply({ content, components: [row], flags: 1<<6 }).catch(()=>{});
         return;
@@ -125,8 +126,8 @@ function attachInteractionEvents(client) {
         const content = `Confirm withdrawing $${amt.toLocaleString()}?`;
         const rootMsgId = interaction.message?.id;
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`bank:withdraw:confirm:${amt}:${rootMsgId}`).setLabel("Confirm").setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+          semanticButton('success', { id: `bank:withdraw:confirm:${amt}:${rootMsgId}`, label: 'Confirm' }),
+          semanticButton('nav', { id: 'bank:decline', label: 'Cancel' })
         );
   await submitted.reply({ content, components:[row], flags:1<<6 }).catch(()=>{});
         return;
@@ -138,8 +139,8 @@ function attachInteractionEvents(client) {
   if (bankBal <= 0) { await interaction.reply({ content: "Bank is empty.", flags:1<<6 }).catch(()=>{}); return; }
         const rootMsgId = interaction.message?.id;
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`bank:withdraw:confirm:${bankBal}:${rootMsgId}`).setLabel("Confirm Withdraw All").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+          semanticButton('danger', { id: `bank:withdraw:confirm:${bankBal}:${rootMsgId}`, label: 'Confirm Withdraw All' }),
+          semanticButton('nav', { id: 'bank:decline', label: 'Cancel' })
         );
   await interaction.reply({ content: `Withdraw all $${bankBal.toLocaleString()}?`, components:[row], flags:1<<6 }).catch(()=>{});
         return;
@@ -315,12 +316,13 @@ function attachInteractionEvents(client) {
         const saveStore = () => { try { saveConfig(); } catch {} };
 
         // Helpers to build and swap rows on the original message
-        const buildTopRow = () => new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId(`modact:menu:warnings:${uid}`).setLabel("Warnings").setStyle(ButtonStyle.Secondary).setEmoji("⚠️"),
-          new ButtonBuilder().setCustomId(`modact:menu:mute:${uid}`).setLabel("Mute").setStyle(ButtonStyle.Secondary).setEmoji("⏰"),
-          new ButtonBuilder().setCustomId(`modact:init:kick:${uid}`).setLabel("Kick").setStyle(ButtonStyle.Secondary).setEmoji("👢"),
-          new ButtonBuilder().setCustomId(`modact:init:ban:${uid}`).setLabel("Ban").setStyle(ButtonStyle.Danger).setEmoji("🔨")
-        );
+          const { semanticButton } = require('../utils/ui');
+          const buildTopRow = () => new ActionRowBuilder().addComponents(
+            semanticButton('nav', { id: `modact:menu:warnings:${uid}`, label: 'Warnings', emoji: '⚠️' }),
+            semanticButton('nav', { id: `modact:menu:mute:${uid}`, label: 'Mute', emoji: '⏰' }),
+            semanticButton('nav', { id: `modact:init:kick:${uid}`, label: 'Kick', emoji: '👢' }),
+            semanticButton('danger', { id: `modact:init:ban:${uid}`, label: 'Ban', emoji: '🔨' })
+          );
         const swapRows = async (rows) => {
           await interaction.deferUpdate().catch(() => {});
           try { await interaction.message.edit({ components: rows }); } catch {}
@@ -370,7 +372,7 @@ function attachInteractionEvents(client) {
         if (kind === "init" && (flowAction === "kick" || flowAction === "ban")) {
           const guard = canActKickBan(flowAction);
           if (!guard.ok) {
-            await interaction.reply({ content: guard.msg, ephemeral: true }).catch(() => {});
+            await interaction.reply({ content: guard.msg, flags: 1<<6 }).catch(() => {});
             return;
           }
           // Prompt optional reason
@@ -400,7 +402,7 @@ function attachInteractionEvents(client) {
             new ButtonBuilder().setCustomId(`modact:cancel:${flowAction}:${uid}`).setLabel("Cancel").setStyle(ButtonStyle.Danger),
             new ButtonBuilder().setCustomId(`modact:changeReason:${flowAction}:${uid}`).setLabel("Change Reason").setStyle(ButtonStyle.Primary)
           );
-          await submitted.reply({ content, components: [row], ephemeral: true }).catch(() => {});
+          await submitted.reply({ content, components: [row], flags: 1<<6 }).catch(() => {});
           return;
         }
 
@@ -408,7 +410,7 @@ function attachInteractionEvents(client) {
           const key = `${uid}:${flowAction}:${interaction.user.id}`;
           const state = pendingPunishments.get(key) || { reason: null };
           if (kind === "cancel") {
-            await interaction.reply({ content: `${EMOJI_SUCCESS} ${flowAction === "kick" ? "Kick" : "Ban"} cancelled.`, ephemeral: true }).catch(() => {});
+            await interaction.reply({ content: `${EMOJI_SUCCESS} ${flowAction === "kick" ? "Kick" : "Ban"} cancelled.`, flags: 1<<6 }).catch(() => {});
             pendingPunishments.delete(key);
             // restore original message buttons to top row
             try {
@@ -443,14 +445,14 @@ function attachInteractionEvents(client) {
                 new ButtonBuilder().setCustomId(`modact:cancel:${flowAction}:${uid}`).setLabel("Cancel").setStyle(ButtonStyle.Danger),
                 new ButtonBuilder().setCustomId(`modact:changeReason:${flowAction}:${uid}`).setLabel("Change Reason").setStyle(ButtonStyle.Primary)
               );
-              await submitted.reply({ content, components: [row], ephemeral: true }).catch(() => {});
+              await submitted.reply({ content, components: [row], flags: 1<<6 }).catch(() => {});
             }
             return;
           }
           if (kind === "confirm") {
             const guard = canActKickBan(flowAction);
             if (!guard.ok) {
-              await interaction.reply({ content: guard.msg, ephemeral: true }).catch(() => {});
+              await interaction.reply({ content: guard.msg, flags: 1<<6 }).catch(() => {});
               pendingPunishments.delete(key);
               // restore original message buttons to top row
               try {
@@ -458,11 +460,12 @@ function attachInteractionEvents(client) {
                   const channel = await client.channels.fetch(state.originChannelId).catch(() => null);
                   const msg = await channel?.messages?.fetch?.(state.originMessageId).catch(() => null);
                   if (msg) {
+                    const { semanticButton } = require('../utils/ui');
                     const buildTopRow = () => new ActionRowBuilder().addComponents(
-                      new ButtonBuilder().setCustomId(`modact:menu:warnings:${uid}`).setLabel("Warnings").setStyle(ButtonStyle.Secondary).setEmoji("⚠️"),
-                      new ButtonBuilder().setCustomId(`modact:menu:mute:${uid}`).setLabel("Mute").setStyle(ButtonStyle.Secondary).setEmoji("⏰"),
-                      new ButtonBuilder().setCustomId(`modact:init:kick:${uid}`).setLabel("Kick").setStyle(ButtonStyle.Secondary).setEmoji("👢"),
-                      new ButtonBuilder().setCustomId(`modact:init:ban:${uid}`).setLabel("Ban").setStyle(ButtonStyle.Danger).setEmoji("🔨")
+                      semanticButton('nav', { id: `modact:menu:warnings:${uid}`, label: 'Warnings', emoji: '⚠️' }),
+                      semanticButton('nav', { id: `modact:menu:mute:${uid}`, label: 'Mute', emoji: '⏰' }),
+                      semanticButton('nav', { id: `modact:init:kick:${uid}`, label: 'Kick', emoji: '👢' }),
+                      semanticButton('danger', { id: `modact:init:ban:${uid}`, label: 'Ban', emoji: '🔨' })
                     );
                     await msg.edit({ components: [buildTopRow()] }).catch(() => {});
                   }
@@ -483,7 +486,7 @@ function attachInteractionEvents(client) {
             await sendUserDM(targetMember || targetUser, flowAction === "kick" ? "kicked" : "banned", null, reason);
             await sendModLog(client, targetMember || targetUser, interaction.user, flowAction === "kick" ? "kicked" : "banned", reason, true, null, null);
             pendingPunishments.delete(key);
-            await interaction.reply({ content: `${EMOJI_SUCCESS} ${flowAction === "kick" ? "Kick" : "Ban"} issued${isTesting ? " (testing)" : ""}.`, ephemeral: true }).catch(() => {});
+            await interaction.reply({ content: `${EMOJI_SUCCESS} ${flowAction === "kick" ? "Kick" : "Ban"} issued${isTesting ? " (testing)" : ""}.`, flags: 1<<6 }).catch(() => {});
             // restore original message buttons to top row
             try {
               if (state.originChannelId && state.originMessageId) {
@@ -641,7 +644,7 @@ function attachInteractionEvents(client) {
         }
 
         // Unknown/modact fallthrough
-        await interaction.reply({ content: `${EMOJI_ERROR} Unknown action.`, ephemeral: true }).catch(() => {});
+  await interaction.reply({ content: `${EMOJI_ERROR} Unknown action.`, flags: 1<<6 }).catch(() => {});
         return;
       }
 
@@ -650,7 +653,7 @@ function attachInteractionEvents(client) {
         const member = interaction.member;
         const hasRole = member.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
         if (!hasRole) {
-          await interaction.reply({ content: "You are not allowed to use this", ephemeral: true });
+          await interaction.reply({ content: "You are not allowed to use this", flags: 1<<6 });
           return;
         }
         await interaction.showModal(
@@ -675,7 +678,7 @@ function attachInteractionEvents(client) {
         const member = interaction.member;
         const hasRole = member.roles.cache.some(role => ALLOWED_ROLES.includes(role.id));
         if (!hasRole) {
-          await interaction.reply({ content: "You are not allowed to use this.", ephemeral: true });
+          await interaction.reply({ content: "You are not allowed to use this.", flags: 1<<6 });
           return;
         }
         const messageContent = interaction.fields.getTextInputValue("chatbox_input");
@@ -683,7 +686,7 @@ function attachInteractionEvents(client) {
         if (channel) {
           await channel.send({ content: `💬 **Staff Chatbox Message from <@${member.id}>:**\n${messageContent}` });
         }
-        await interaction.reply({ content: "Your message has been sent!", ephemeral: true });
+  await interaction.reply({ content: "Your message has been sent!", flags: 1<<6 });
         return;
       }
 
@@ -691,19 +694,19 @@ function attachInteractionEvents(client) {
       if (interaction.isButton() && interaction.customId.startsWith('event_notify_')) {
         const NOTIFY_ROLE_ID = '1380303846877696153';
         const member = interaction.member;
-        if (!member) { await interaction.reply({ content: 'Could not resolve member.', ephemeral: true }).catch(()=>{}); return; }
+  if (!member) { await interaction.reply({ content: 'Could not resolve member.', flags: 1<<6 }).catch(()=>{}); return; }
         const hasRole = member.roles.cache.has(NOTIFY_ROLE_ID);
         try {
           if (hasRole) {
             await member.roles.remove(NOTIFY_ROLE_ID, 'Toggle event notification subscription');
-            await interaction.reply({ content: `Removed role: <@&${NOTIFY_ROLE_ID}>. You will no longer receive notifications for this event.`, ephemeral: true }).catch(()=>{});
+            await interaction.reply({ content: `Removed role: <@&${NOTIFY_ROLE_ID}>. You will no longer receive notifications for this event.`, flags: 1<<6 }).catch(()=>{});
           } else {
             await member.roles.add(NOTIFY_ROLE_ID, 'Toggle event notification subscription');
-            await interaction.reply({ content: `Granted role: <@&${NOTIFY_ROLE_ID}>. You will now be notified whenever this event starts.`, ephemeral: true }).catch(()=>{});
+            await interaction.reply({ content: `Granted role: <@&${NOTIFY_ROLE_ID}>. You will now be notified whenever this event starts.`, flags: 1<<6 }).catch(()=>{});
           }
           // Removed dynamic label toggle per request: keep the button text constant for all users.
         } catch (e) {
-          await interaction.reply({ content: 'Failed to toggle role: '+ (e.message||e), ephemeral: true }).catch(()=>{});
+          await interaction.reply({ content: 'Failed to toggle role: '+ (e.message||e), flags: 1<<6 }).catch(()=>{});
         }
         return;
       }
@@ -723,7 +726,7 @@ function attachInteractionEvents(client) {
         const channelId = (raw || "").replace(/[^0-9]/g, "");
         const channel = interaction.guild?.channels?.cache?.get(channelId);
         if (!channel) {
-          await interaction.reply({ content: `${EMOJI_ERROR} Invalid or unknown channel.`, ephemeral: true });
+          await interaction.reply({ content: `${EMOJI_ERROR} Invalid or unknown channel.`, flags: 1<<6 });
           return;
         }
 
@@ -734,20 +737,20 @@ function attachInteractionEvents(client) {
             if (!config.snipingWhitelist.includes(channel.id)) {
               config.snipingWhitelist.push(channel.id);
               saveConfig();
-              await interaction.reply({ content: `${EMOJI_SUCCESS} Added <#${channel.id}> to whitelist.`, ephemeral: true });
+              await interaction.reply({ content: `${EMOJI_SUCCESS} Added <#${channel.id}> to whitelist.`, flags: 1<<6 });
             } else {
-              await interaction.reply({ content: `${EMOJI_ERROR} Channel already in whitelist.`, ephemeral: true });
+              await interaction.reply({ content: `${EMOJI_ERROR} Channel already in whitelist.`, flags: 1<<6 });
             }
           } else if (action === "removeChannel") {
             if (Array.isArray(config.snipingWhitelist) && config.snipingWhitelist.includes(channel.id)) {
               config.snipingWhitelist = config.snipingWhitelist.filter(id => id !== channel.id);
               saveConfig();
-              await interaction.reply({ content: `${EMOJI_SUCCESS} Removed <#${channel.id}> from whitelist.`, ephemeral: true });
+              await interaction.reply({ content: `${EMOJI_SUCCESS} Removed <#${channel.id}> from whitelist.`, flags: 1<<6 });
             } else {
-              await interaction.reply({ content: `${EMOJI_ERROR} Channel not in whitelist.`, ephemeral: true });
+              await interaction.reply({ content: `${EMOJI_ERROR} Channel not in whitelist.`, flags: 1<<6 });
             }
           } else {
-            await interaction.reply({ content: `${EMOJI_ERROR} Unknown action.`, ephemeral: true });
+            await interaction.reply({ content: `${EMOJI_ERROR} Unknown action.`, flags: 1<<6 });
           }
         } else {
           // blacklist mode uses snipingChannelList
@@ -756,20 +759,20 @@ function attachInteractionEvents(client) {
             if (!config.snipingChannelList.includes(channel.id)) {
               config.snipingChannelList.push(channel.id);
               saveConfig();
-              await interaction.reply({ content: `${EMOJI_SUCCESS} Added <#${channel.id}> to blacklist.`, ephemeral: true });
+              await interaction.reply({ content: `${EMOJI_SUCCESS} Added <#${channel.id}> to blacklist.`, flags: 1<<6 });
             } else {
-              await interaction.reply({ content: `${EMOJI_ERROR} Channel already in blacklist.`, ephemeral: true });
+              await interaction.reply({ content: `${EMOJI_ERROR} Channel already in blacklist.`, flags: 1<<6 });
             }
           } else if (action === "removeChannel") {
             if (Array.isArray(config.snipingChannelList) && config.snipingChannelList.includes(channel.id)) {
               config.snipingChannelList = config.snipingChannelList.filter(id => id !== channel.id);
               saveConfig();
-              await interaction.reply({ content: `${EMOJI_SUCCESS} Removed <#${channel.id}> from blacklist.`, ephemeral: true });
+              await interaction.reply({ content: `${EMOJI_SUCCESS} Removed <#${channel.id}> from blacklist.`, flags: 1<<6 });
             } else {
-              await interaction.reply({ content: `${EMOJI_ERROR} Channel not in blacklist.`, ephemeral: true });
+              await interaction.reply({ content: `${EMOJI_ERROR} Channel not in blacklist.`, flags: 1<<6 });
             }
           } else {
-            await interaction.reply({ content: `${EMOJI_ERROR} Unknown action.`, ephemeral: true });
+            await interaction.reply({ content: `${EMOJI_ERROR} Unknown action.`, flags: 1<<6 });
           }
         }
         // Try to refresh the original config menu message embed if visible
@@ -876,7 +879,7 @@ function attachInteractionEvents(client) {
     } catch (err) {
       console.error("[Interaction Error]", err);
       if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: `An error occurred.\n${err.message || err}`, ephemeral: true }).catch(() => {});
+  await interaction.reply({ content: `An error occurred.\n${err.message || err}`, flags: 1<<6 }).catch(() => {});
       }
     }
   });

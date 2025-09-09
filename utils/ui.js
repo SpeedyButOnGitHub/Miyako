@@ -2,6 +2,43 @@ const { ButtonBuilder, ButtonStyle, EmbedBuilder, ActionRowBuilder } = require('
 const theme = require('./theme');
 const { createEmbed } = require('./embeds');
 
+// Semantic button helpers (navigation, toggle, confirm, danger, disabled display)
+function semanticButton(kind, { id, label, emoji, active = false, enabled = true } = {}) {
+  let style = ButtonStyle.Secondary;
+  switch (kind) {
+    case 'nav':
+      style = active ? ButtonStyle.Primary : ButtonStyle.Secondary; break;
+    case 'confirm':
+    case 'success':
+      style = ButtonStyle.Success; break;
+    case 'danger':
+      style = ButtonStyle.Danger; break;
+    case 'toggle':
+      style = active ? ButtonStyle.Success : ButtonStyle.Secondary; break;
+    case 'destructive':
+      style = ButtonStyle.Danger; break;
+    case 'primary':
+      style = ButtonStyle.Primary; break;
+    default:
+      style = ButtonStyle.Secondary;
+  }
+  const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
+  if (emoji) b.setEmoji(emoji);
+  if (!enabled) b.setDisabled(true);
+  return b;
+}
+
+// Row builders for consistent ordering (navigation | pagination | destructive)
+function buildNavRow(buttons) {
+  const row = new ActionRowBuilder();
+  for (const b of buttons) row.addComponents(b);
+  return row;
+}
+
+function buildToggleRow(toggles) { return buildNavRow(toggles); }
+
+function buildDestructiveRow(buttons) { return buildNavRow(buttons); }
+
 function btn(id, label, style = ButtonStyle.Secondary, emoji, disabled = false) {
   const b = new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
   if (emoji) b.setEmoji(emoji);
@@ -83,4 +120,4 @@ function closeRow(id = 'close_menu', label = 'Close') {
   );
 }
 
-module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow, closeRow };
+module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow, closeRow, semanticButton, buildNavRow, buildToggleRow, buildDestructiveRow };

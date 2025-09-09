@@ -3,7 +3,7 @@ const { isModerator } = require("./moderation/index");
 const { OWNER_ID } = require("./moderation/permissions");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
-const { applyStandardFooter } = require("../utils/ui");
+const { applyStandardFooter, semanticButton } = require("../utils/ui");
 
 // Categorized help with interactive buttons (compact mode removed per request).
 const HELP_CATEGORIES = [
@@ -77,27 +77,22 @@ function buildRows(categories, current) {
   const firstCats = visible.slice(0,2);
   const firstRow = new ActionRowBuilder();
   // All button
-  firstRow.addComponents(new ButtonBuilder()
-    .setCustomId('helpv2:all')
-    .setLabel('All')
-    .setStyle(current==='all'?ButtonStyle.Primary:ButtonStyle.Secondary));
+  firstRow.addComponents(
+    semanticButton('nav', { id: 'helpv2:all', label: 'All', active: current==='all' })
+  );
   for (const cat of firstCats) {
-    firstRow.addComponents(new ButtonBuilder()
-      .setCustomId(`helpv2:${cat.id}`)
-      .setLabel(cat.label)
-      .setEmoji(cat.emoji||undefined)
-      .setStyle(cat.id===current?ButtonStyle.Primary:ButtonStyle.Secondary));
+    firstRow.addComponents(
+      semanticButton('nav', { id: `helpv2:${cat.id}`, label: cat.label, emoji: cat.emoji, active: cat.id===current })
+    );
   }
   rows.push(firstRow);
   const remaining = visible.slice(2);
   for (let i=0;i<remaining.length;i+=3) {
     const row = new ActionRowBuilder();
     for (const cat of remaining.slice(i,i+3)) {
-      row.addComponents(new ButtonBuilder()
-        .setCustomId(`helpv2:${cat.id}`)
-        .setLabel(cat.label)
-        .setEmoji(cat.emoji||undefined)
-        .setStyle(cat.id===current?ButtonStyle.Primary:ButtonStyle.Secondary));
+      row.addComponents(
+        semanticButton('nav', { id: `helpv2:${cat.id}`, label: cat.label, emoji: cat.emoji, active: cat.id===current })
+      );
     }
     rows.push(row);
     if (rows.length >= 5) break; // Discord limit
@@ -119,7 +114,7 @@ async function handleHelpCommand(client, message) {
 ActiveMenus.registerHandler('helpv2', async (interaction, session) => {
   if (!interaction.isButton()) return;
   if (interaction.user.id !== session.userId) {
-    return interaction.reply({ content: 'Not your session.', ephemeral: true }).catch(()=>{});
+  return interaction.reply({ content: 'Not your session.', flags: 1<<6 }).catch(()=>{});
   }
   const member = interaction.guild?.members?.cache?.get(interaction.user.id) || interaction.member;
   const cats = filterCategories(member);

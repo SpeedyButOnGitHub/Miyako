@@ -5,6 +5,7 @@ const path = require('path');
 const ERROR_LOG_FILE = path.resolve(__dirname, '../config/errorLog.json');
 const MAX_ERRORS = 100; // retention cap
 let inMemoryErrors = [];
+const errorListeners = [];
 let originalConsoleError = null; // set by index.js wrapper
 
 function loadExisting() {
@@ -54,7 +55,12 @@ function logError(scope, err) {
   } else {
     try { process.stderr.write(`[${scope}] ${msg}\n`); } catch {}
   }
-  appendEntry(scope, msg);
+  const entry = appendEntry(scope, msg);
+  if (entry) {
+    for (const fn of errorListeners) {
+      try { fn(entry); } catch { /* listener errors ignored */ }
+    }
+  }
 }
 
 // Called by console.error wrapper to record without re-emitting to console (already printed)
@@ -64,6 +70,8 @@ function recordExternalError(scope, errLike) {
 }
 
 function setOriginalConsoleError(fn) { originalConsoleError = fn; }
+
+function registerErrorListener(fn) { if (typeof fn === 'function') errorListeners.push(fn); }
 
 function getRecentErrors(limit = 50) {
   return inMemoryErrors.slice(-limit);
@@ -83,4 +91,4 @@ function safeReply(target, content, opts = {}) {
   } catch {}
 }
 
-module.exports = { logError, recordExternalError, setOriginalConsoleError, safeReply, getRecentErrors, clearErrorLog };
+module.exports = { logError, recordExternalError, setOriginalConsoleError, safeReply, getRecentErrors, clearErrorLog, registerErrorListener };

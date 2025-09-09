@@ -241,7 +241,7 @@ try {
   ActiveMenus.registerHandler('errors', async (interaction, session) => {
     if (!interaction.isButton()) return;
     if (interaction.user.id !== session.userId) {
-      return interaction.reply({ content: 'Not your session.', ephemeral: true }).catch(()=>{});
+  return interaction.reply({ content: 'Not your session.', flags: 1<<6 }).catch(()=>{});
     }
     const { customId } = interaction;
     const { getRecentErrors } = require('../utils/errorUtil');
@@ -281,7 +281,7 @@ try {
   ActiveMenus.registerHandler('purgeConfirm', async (interaction, session) => {
     if (!interaction.isButton()) return;
     if (interaction.user.id !== session.userId) {
-      return interaction.reply({ content: 'Not your confirmation.', ephemeral: true }).catch(()=>{});
+  return interaction.reply({ content: 'Not your confirmation.', flags: 1<<6 }).catch(()=>{});
     }
     const { customId } = interaction;
     if (customId === 'purge_cancel') {

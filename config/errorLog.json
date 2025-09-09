@@ -58,5 +58,25 @@
     "ts": 1757451807165,
     "scope": "exit",
     "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757452664809,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ModalSubmitInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at C:\\Users\\tevme\\Documents\\Projects\\Miyako\\commands\\test.js:142:23\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Object.processInteraction (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\activeMenus.js:182:3)\n    at async Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\events\\interactionEvents.js:27:21)"
+  },
+  {
+    "ts": 1757452664810,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ModalSubmitInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at C:\\Users\\tevme\\Documents\\Projects\\Miyako\\commands\\test.js:142:23\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Object.processInteraction (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\activeMenus.js:182:3)\n    at async Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\events\\interactionEvents.js:27:21)"
+  },
+  {
+    "ts": 1757453295781,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757453322200,
+    "scope": "exit",
+    "message": "process exiting with code 0"
   }
 ]

@@ -1,4 +1,5 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, EmbedBuilder } = require("discord.js");
+const { semanticButton, buildNavRow } = require('../utils/ui');
 // Jest placeholder (ignored at runtime). Keeps test suite from failing on empty file import.
 if (process.env.JEST_WORKER_ID !== undefined) {
   describe('test command placeholder', () => {
@@ -31,12 +32,12 @@ function buildRootEmbed() {
 }
 
 function rootRows() {
-  return [ new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('test_general').setLabel('General').setEmoji('🧰').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('test_events').setLabel('Events').setEmoji('🎟️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('test_toggle').setLabel(config.testingMode ? 'Disable' : 'Enable').setEmoji('🧪').setStyle(config.testingMode ? ButtonStyle.Danger : ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('test_close').setLabel('Close').setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.close || '✖')
-  )];
+  return [ buildNavRow([
+    semanticButton('primary', { id: 'test_general', label: 'General', emoji: '🧰' }),
+    semanticButton('primary', { id: 'test_events', label: 'Events', emoji: '🎟️' }),
+    semanticButton(config.testingMode ? 'danger' : 'success', { id: 'test_toggle', label: config.testingMode ? 'Disable' : 'Enable', emoji: '🧪' }),
+    semanticButton('danger', { id: 'test_close', label: 'Close', emoji: theme.emojis.close || '✖' })
+  ]) ];
 }
 
 function buildEventsEmbed() {
@@ -46,11 +47,11 @@ function buildEventsEmbed() {
 }
 
 function eventsRows() {
-  return [ new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('test_events_economy').setLabel('Economy').setEmoji('💰').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('test_back_root').setLabel('Back').setEmoji('⬅️').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('test_close').setLabel('Close').setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.close || '✖')
-  )];
+  return [ buildNavRow([
+    semanticButton('primary', { id: 'test_events_economy', label: 'Economy', emoji: '💰' }),
+    semanticButton('nav', { id: 'test_back_root', label: 'Back', emoji: '⬅️' }),
+    semanticButton('danger', { id: 'test_close', label: 'Close', emoji: theme.emojis.close || '✖' })
+  ]) ];
 }
 
 function buildEconomyEmbed() {
@@ -65,12 +66,12 @@ function buildEconomyEmbed() {
 }
 
 function economyRows() {
-  return [ new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('test_econ_spawn').setLabel('Spawn Test Drop').setEmoji('🪙').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('test_econ_clear').setLabel('Clear Test Balances').setEmoji('🧹').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('test_back_events').setLabel('Back').setEmoji('⬅️').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('test_close').setLabel('Close').setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.close || '✖')
-  )];
+  return [ buildNavRow([
+    semanticButton('primary', { id: 'test_econ_spawn', label: 'Spawn Test Drop', emoji: '🪙' }),
+    semanticButton('nav', { id: 'test_econ_clear', label: 'Clear Test Balances', emoji: '🧹' }),
+    semanticButton('nav', { id: 'test_back_events', label: 'Back', emoji: '⬅️' }),
+    semanticButton('danger', { id: 'test_close', label: 'Close', emoji: theme.emojis.close || '✖' })
+  ]) ];
 }
 
 async function handleTestCommand(client, message) {
@@ -80,13 +81,13 @@ async function handleTestCommand(client, message) {
 }
 
 ActiveMenus.registerHandler('testmenu', async (interaction, session) => {
-  if (interaction.user.id !== session.userId) return interaction.reply({ content: 'Not your session.', ephemeral: true });
+  if (interaction.user.id !== session.userId) return interaction.reply({ content: 'Not your session.', flags: 1<<6 });
   const id = interaction.customId;
   const data = session.data || {}; // { view }
 
   if (id === 'test_close') {
     try { await interaction.message.edit({ components: [] }); } catch {}
-    if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: 'Closed.', ephemeral: true });
+  if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: 'Closed.', flags: 1<<6 });
     return;
   }
   if (id === 'test_toggle') {
@@ -96,9 +97,10 @@ ActiveMenus.registerHandler('testmenu', async (interaction, session) => {
   if (id === 'test_general') {
     data.view = 'general';
   const embed = createEmbed({ title: '🧰 Test: General', description: 'Placeholder for general test utilities.', color: theme.colors.neutral });
-    return interaction.update({ embeds: [embed], components: [ new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('test_back_root').setLabel('Back').setEmoji('⬅️').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('test_close').setLabel('Close').setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.close || '✖') ) ] });
+    return interaction.update({ embeds: [embed], components: [ buildNavRow([
+      semanticButton('nav', { id: 'test_back_root', label: 'Back', emoji: '⬅️' }),
+      semanticButton('danger', { id: 'test_close', label: 'Close', emoji: theme.emojis.close || '✖' })
+    ]) ] });
   }
   if (id === 'test_events') {
     data.view = 'events';
@@ -117,7 +119,7 @@ ActiveMenus.registerHandler('testmenu', async (interaction, session) => {
     return interaction.update({ embeds: [buildEconomyEmbed()], components: economyRows() });
   }
   if (id === 'test_econ_spawn') {
-    if (!config.testingMode) return interaction.reply({ content: 'Enable Testing Mode first.', ephemeral: true });
+  if (!config.testingMode) return interaction.reply({ content: 'Enable Testing Mode first.', flags: 1<<6 });
     const modalId = `test_spawn_${Date.now()}`;
     const modal = new ModalBuilder().setCustomId(modalId).setTitle('Spawn Test Cash Drop').addComponents(
       new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('amount').setLabel('Amount (optional)').setStyle(TextInputStyle.Short).setRequired(false))
@@ -139,7 +141,7 @@ ActiveMenus.registerHandler('testmenu', async (interaction, session) => {
         embed.setFooter({ text: 'First correct message wins (testing).' });
         await channel.send({ embeds: [embed] }).catch(() => {});
       }
-      await submitted.reply({ content: `Spawned a test drop of ${drop.amount} in <#${TEST_LOG_CHANNEL}>.`, ephemeral: true });
+  await submitted.reply({ content: `Spawned a test drop of ${drop.amount} in <#${TEST_LOG_CHANNEL}>.`, flags: 1<<6 });
       try { await interaction.message.edit({ embeds: [buildEconomyEmbed()], components: economyRows() }); } catch {}
     } catch {}
     return;

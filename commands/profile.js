@@ -184,7 +184,7 @@ const { levels: levelsObj } = require("../utils/levels");
 ActiveMenus.registerHandler("profile", async (interaction, session) => {
   const member = interaction.member;
   if (!member || (session.userId && member.id !== session.userId)) {
-    try { await interaction.reply({ content: "Only the original user can use this menu.", ephemeral: true }); } catch {}
+  try { await interaction.reply({ content: "Only the original user can use this menu.", flags: 1<<6 }); } catch {}
     return;
   }
   const uid = member.id;

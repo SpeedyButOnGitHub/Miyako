@@ -1,7 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require("discord.js");
 const { createEmbed, safeAddField } = require('../utils/embeds');
 const theme = require("../utils/theme");
-const { progressBar: sharedProgressBar, applyStandardFooter } = require("../utils/ui");
+const { progressBar: sharedProgressBar, applyStandardFooter, semanticButton, buildNavRow } = require("../utils/ui");
 const { cash: cashUtils } = require("../services/economyService");
 const { bank: bankUtils } = require("../services/economyService");
 const { getUserModifier } = require("../services/levelingService");
@@ -45,11 +45,10 @@ function buildBalancePayload(userId) {
   applyStandardFooter(embed, null, { testingMode: config.testingMode });
   embed.setFooter({ text: `Deposit to grow your bank${config.testingMode ? ' • Testing Mode' : ''}. Taxes apply above the limit.` });
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("bank:menu:deposit").setLabel("Deposit").setEmoji(theme.emojis.deposit).setStyle(ButtonStyle.Secondary),
-    // Withdraw button requested blue (Primary)
-    new ButtonBuilder().setCustomId("bank:menu:withdraw").setLabel("Withdraw").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Primary)
-  );
+  const row = buildNavRow([
+    semanticButton('nav', { id: 'bank:menu:deposit', label: 'Deposit', emoji: theme.emojis.deposit }),
+    semanticButton('primary', { id: 'bank:menu:withdraw', label: 'Withdraw', emoji: theme.emojis.withdraw })
+  ]);
   return { embeds: [embed], components: [row] };
 }
 
@@ -83,12 +82,11 @@ function buildDepositMenuPayload(userId) {
   });
   applyStandardFooter(embed, null, { testingMode: config.testingMode });
   embed.setFooter({ text: `Choose Deposit Amount or Deposit Max. Back returns to Wallet.${config.testingMode ? ' • Testing Mode' : ''}` });
-  const row = new ActionRowBuilder().addComponents(
-    // Simplify labels & make gray per theme; remove pencil/edit emoji
-    new ButtonBuilder().setCustomId("bank:deposit:amount").setLabel("Deposit").setEmoji(theme.emojis.deposit).setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("bank:deposit:max").setLabel("Deposit Max").setEmoji(theme.emojis.deposit).setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("bank:back").setLabel("Back").setEmoji(theme.emojis.back).setStyle(ButtonStyle.Secondary)
-  );
+  const row = buildNavRow([
+    semanticButton('nav', { id: 'bank:deposit:amount', label: 'Deposit', emoji: theme.emojis.deposit }),
+    semanticButton('nav', { id: 'bank:deposit:max', label: 'Deposit Max', emoji: theme.emojis.deposit }),
+    semanticButton('nav', { id: 'bank:back', label: 'Back', emoji: theme.emojis.back })
+  ]);
   return { embeds: [embed], components: [row] };
 }
 
@@ -108,11 +106,11 @@ function buildWithdrawMenuPayload(userId) {
   });
   applyStandardFooter(embed, null, { testingMode: config.testingMode });
   embed.setFooter({ text: `Choose Withdraw Amount or Withdraw Max. Back returns to Wallet.${config.testingMode ? ' • Testing Mode' : ''}` });
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("bank:withdraw:amount").setLabel("Withdraw Amount").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("bank:withdraw:max").setLabel("Withdraw Max").setEmoji(theme.emojis.withdraw).setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("bank:back").setLabel("Back").setEmoji(theme.emojis.back).setStyle(ButtonStyle.Secondary)
-  );
+  const row = buildNavRow([
+    semanticButton('nav', { id: 'bank:withdraw:amount', label: 'Withdraw Amount', emoji: theme.emojis.withdraw }),
+    semanticButton('nav', { id: 'bank:withdraw:max', label: 'Withdraw Max', emoji: theme.emojis.withdraw }),
+    semanticButton('nav', { id: 'bank:back', label: 'Back', emoji: theme.emojis.back })
+  ]);
   return { embeds: [embed], components: [row] };
 }
 

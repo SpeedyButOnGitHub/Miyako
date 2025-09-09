@@ -361,7 +361,7 @@ async function handleWarningButtons(client, interaction) {
         const view = buildUserView(interaction.guild, userId, 1);
         // Update the message and send a hidden confirmation
         await interaction.update({ embeds: [view.embed], components: view.rows }).catch(() => {});
-        try { await interaction.followUp({ content: `${EMOJI_SUCCESS} Removed ${count} warning${count === 1 ? "" : "s"}.`, ephemeral: true }); } catch {}
+  try { await interaction.followUp({ content: `${EMOJI_SUCCESS} Removed ${count} warning${count === 1 ? "" : "s"}.`, flags: 1<<6 }); } catch {}
         return;
       }
       return;
@@ -407,12 +407,12 @@ async function handleWarningButtons(client, interaction) {
         const view = buildUserView(interaction.guild, userId, 1);
         if (interaction.message && interaction.message.edit) {
           await interaction.message.edit({ embeds: [view.embed], components: view.rows }).catch(() => {});
-          await interaction.reply({ content: `${EMOJI_SUCCESS} Warning added.`, ephemeral: true });
+          await interaction.reply({ content: `${EMOJI_SUCCESS} Warning added.`, flags: 1<<6 });
         } else {
-          await interaction.reply({ embeds: [view.embed], components: view.rows, ephemeral: true });
+          await interaction.reply({ embeds: [view.embed], components: view.rows, flags: 1<<6 });
         }
       } catch {
-        await interaction.reply({ content: `${EMOJI_SUCCESS} Warning added.`, ephemeral: true }).catch(() => {});
+  await interaction.reply({ content: `${EMOJI_SUCCESS} Warning added.`, flags: 1<<6 }).catch(() => {});
       }
       return;
     }
@@ -420,7 +420,7 @@ async function handleWarningButtons(client, interaction) {
     console.error("[Warnings Interaction Error]", err);
     try {
       if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: `An error occurred. ${err.message || err}`, ephemeral: true });
+  await interaction.reply({ content: `An error occurred. ${err.message || err}`, flags: 1<<6 });
       }
     } catch {}
   }

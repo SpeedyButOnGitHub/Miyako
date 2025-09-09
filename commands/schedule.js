@@ -4,7 +4,7 @@ const { getEvents, getEvent, addEvent, updateEvent, removeEvent } = require("../
 const { OWNER_ID } = require("./moderation/permissions");
 const theme = require("../utils/theme");
 const ActiveMenus = require("../utils/activeMenus");
-const { applyFooterWithPagination } = require("../utils/ui");
+const { applyFooterWithPagination, semanticButton, buildNavRow } = require("../utils/ui");
 const { config } = require('../utils/storage');
 const { ms } = require('../utils/time');
 const { createEmbed, safeAddField } = require('../utils/embeds');
@@ -107,11 +107,11 @@ function buildDetailEmbed(guild, ev) {
 function mainRows() {
   const evs = getEvents();
   // Order: Create, Delete, Select (no Close button per request)
-  return [ new ActionRowBuilder().addComponents(
-  new ButtonBuilder().setCustomId("events_create").setLabel("Create").setEmoji(theme.emojis.create).setStyle(ButtonStyle.Success),
-  new ButtonBuilder().setCustomId("events_delete_mode").setLabel("Delete").setEmoji(theme.emojis.delete).setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId("events_select_mode").setLabel("Select").setEmoji(theme.emojis.events).setStyle(ButtonStyle.Primary).setDisabled(!evs.length)
-  )];
+  return [ buildNavRow([
+    semanticButton('success', { id: 'events_create', label: 'Create', emoji: theme.emojis.create }),
+    semanticButton('danger', { id: 'events_delete_mode', label: 'Delete', emoji: theme.emojis.delete }),
+    semanticButton('primary', { id: 'events_select_mode', label: 'Select', emoji: theme.emojis.events, enabled: !!evs.length })
+  ]) ];
 }
 
 function buildSelectRows(kind) {
@@ -119,19 +119,21 @@ function buildSelectRows(kind) {
   const options = evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(' ').slice(0,100), emoji: kind === 'delete' ? theme.emojis.delete : (e.enabled?theme.emojis.enable:theme.emojis.disable) }));
   return [
     new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`events_${kind === 'delete' ? 'delete' : 'select'}`).setPlaceholder(kind==='delete'? 'Select event to delete' : 'Select event...').addOptions(options)),
-    new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('events_back').setLabel('Back').setEmoji(theme.emojis.back).setStyle(ButtonStyle.Secondary))
+    buildNavRow([
+      semanticButton('nav', { id: 'events_back', label: 'Back', emoji: theme.emojis.back })
+    ])
   ];
 }
 
 function detailRows(ev) {
-  // Simplified: Toggle / Edit / Delete / Back
-  return [ new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`events_toggle_${ev.id}`).setLabel(ev.enabled? 'Disable':'Enable').setStyle(ev.enabled?ButtonStyle.Danger:ButtonStyle.Success).setEmoji(ev.enabled?theme.emojis.disable:theme.emojis.enable),
-    new ButtonBuilder().setCustomId(`events_edit_${ev.id}`).setLabel('Edit').setStyle(ButtonStyle.Primary).setEmoji(theme.emojis.edit || theme.emojis.message || '✏️'),
-    new ButtonBuilder().setCustomId(`events_notifs_${ev.id}`).setLabel('Auto Msgs').setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.bell || '🔔'),
-    new ButtonBuilder().setCustomId(`events_delete_${ev.id}`).setLabel('Delete').setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.delete),
-    new ButtonBuilder().setCustomId('events_back').setLabel('Back').setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.back)
-  )];
+  // Simplified: Toggle / Edit / Auto Msgs / Delete / Back
+  return [ buildNavRow([
+    semanticButton(ev.enabled ? 'danger' : 'success', { id: `events_toggle_${ev.id}`, label: ev.enabled ? 'Disable' : 'Enable', emoji: ev.enabled ? theme.emojis.disable : theme.emojis.enable }),
+    semanticButton('primary', { id: `events_edit_${ev.id}`, label: 'Edit', emoji: theme.emojis.edit || theme.emojis.message || '✏️' }),
+    semanticButton('nav', { id: `events_notifs_${ev.id}`, label: 'Auto Msgs', emoji: theme.emojis.bell || '🔔' }),
+    semanticButton('danger', { id: `events_delete_${ev.id}`, label: 'Delete', emoji: theme.emojis.delete }),
+    semanticButton('nav', { id: 'events_back', label: 'Back', emoji: theme.emojis.back })
+  ]) ];
 }
 
 // ---- Automated Messages (per-event) ----
@@ -171,19 +173,39 @@ function buildNotifsEmbed(guild, ev) {
 }
 
 function notifManagerRows(ev) {
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`event_notif_add_${ev.id}`).setLabel('Add').setStyle(ButtonStyle.Success).setEmoji(theme.emojis.create||'➕'),
-    new ButtonBuilder().setCustomId(`event_notif_selectmode_${ev.id}`).setLabel('Select').setStyle(ButtonStyle.Primary).setEmoji(theme.emojis.events||'📋').setDisabled(!(ev.autoMessages||[]).length),
-    new ButtonBuilder().setCustomId(`event_notif_back_${ev.id}`).setLabel('Back').setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.back)
-  );
-  return [row];
+  return [ buildNavRow([
+    semanticButton('success', { id: `event_notif_add_${ev.id}`, label: 'Add', emoji: theme.emojis.create||'➕' }),
+    semanticButton('primary', { id: `event_notif_selectmode_${ev.id}`, label: 'Select', emoji: theme.emojis.events||'📋', enabled: !!(ev.autoMessages||[]).length }),
+    semanticButton('nav', { id: `event_notif_back_${ev.id}`, label: 'Back', emoji: theme.emojis.back })
+  ]) ];
 }
 
 function notifSelectRows(ev) {
   const opts = (ev.autoMessages||[]).slice(0,25).map(n => ({ label: `${humanizeMinutes(n.offsetMinutes)} ${n.enabled?'(on)':'(off)'} #${n.id}`.slice(0,100), value: n.id, description: (n.messageJSON?.content || n.message || '').replace(/\n/g,' ').slice(0,90) }));
   const row1 = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`event_notif_select_${ev.id}`).setPlaceholder('Select auto message').addOptions(opts));
-  const row2 = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`event_notif_cancel_${ev.id}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.back));
+  const row2 = buildNavRow([
+    semanticButton('nav', { id: `event_notif_cancel_${ev.id}`, label: 'Cancel', emoji: theme.emojis.back })
+  ]);
   return [row1,row2];
+}
+
+// Newly added: detailed auto message control rows
+function notifDetailRows(ev, notif) {
+  // Row 1: Toggle / Edit (all) / Channel / Offset / Message
+  const row1 = buildNavRow([
+    semanticButton(notif.enabled ? 'danger' : 'success', { id: `event_notif_toggle_${ev.id}_${notif.id}`, label: notif.enabled ? 'Disable' : 'Enable', emoji: notif.enabled ? theme.emojis.disable : theme.emojis.enable }),
+    semanticButton('primary', { id: `event_notif_edit_${ev.id}_${notif.id}`, label: 'Edit', emoji: theme.emojis.edit || theme.emojis.message || '✏️' }),
+    semanticButton('nav', { id: `event_notif_edit_channel_${ev.id}_${notif.id}`, label: 'Channel', emoji: theme.emojis.channel || '🧵' }),
+    semanticButton('nav', { id: `event_notif_edit_offset_${ev.id}_${notif.id}`, label: 'Offset', emoji: '⏱️' }),
+    semanticButton('nav', { id: `event_notif_edit_msg_${ev.id}_${notif.id}`, label: 'Msg', emoji: theme.emojis.message || '💬' })
+  ]);
+  // Row 2: Trigger / Delete / Back
+  const row2 = buildNavRow([
+    semanticButton('success', { id: `event_notif_trigger_${ev.id}_${notif.id}`, label: 'Trigger', emoji: theme.emojis.enable || '✅' }),
+    semanticButton('danger', { id: `event_notif_delete_${ev.id}_${notif.id}`, label: 'Delete', emoji: theme.emojis.delete || '🗑️' }),
+    semanticButton('nav', { id: `event_notif_back_${ev.id}`, label: 'Back', emoji: theme.emojis.back })
+  ]);
+  return [row1, row2];
 }
 
 function buildNotifDetailEmbed(guild, ev, notif) {
@@ -368,7 +390,7 @@ async function handleEventCreateModal(interaction) {
 // Legacy schedule modal (deprecated)
 async function handleScheduleModal(interaction) {
   if (!interaction.isModalSubmit() || !interaction.customId.startsWith('schedule_create_modal')) return;
-  await interaction.reply({ content: 'Scheduling system deprecated. Use Events Manager.', ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content: 'Scheduling system deprecated. Use Events Manager.', flags:1<<6 }).catch(()=>{});
 }
 
 // ActiveMenus handler
@@ -439,7 +461,7 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
 }
 
 ActiveMenus.registerHandler('events', async (interaction, session) => {
-  if (interaction.user.id !== OWNER_ID) return interaction.reply({ content: 'Not for you.', ephemeral: true });
+  if (interaction.user.id !== OWNER_ID) return interaction.reply({ content: 'Not for you.', flags: 1<<6 });
   const data = session.data || {}; // { mode, currentId }
   const customId = interaction.customId;
 
@@ -476,48 +498,48 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   // Detail actions
   if (customId.startsWith('events_toggle_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', ephemeral: true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', flags: 1<<6 });
     const updated = updateEvent(id, { enabled: !ev.enabled });
     await interaction.update({ embeds: [buildDetailEmbed(interaction.guild, updated)], components: detailRows(updated) });
     return;
   }
   if (customId.startsWith('events_edit_times_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', ephemeral: true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', flags: 1<<6 });
     const modal = new ModalBuilder().setCustomId(`event_times_modal_${id}_${interaction.message.id}`).setTitle('Edit Times')
   .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('times').setLabel('Times (HH:MM or HH:MM-HH:MM, comma)').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue((ev.times||[]).join(','))));
     await interaction.showModal(modal); return;
   }
   if (customId.startsWith('events_edit_days_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', ephemeral: true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', flags: 1<<6 });
     const modal = new ModalBuilder().setCustomId(`event_days_modal_${id}_${interaction.message.id}`).setTitle('Edit Days')
       .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('days').setLabel('Days (Sun,Mon,...)').setStyle(TextInputStyle.Short).setRequired(true).setValue((ev.days||[]).map(d=>DAY_NAMES[d]||d).join(','))));
     await interaction.showModal(modal); return;
   }
   if (customId.startsWith('events_edit_msg_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', ephemeral: true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', flags: 1<<6 });
     const modal = new ModalBuilder().setCustomId(`event_msg_modal_${id}_${interaction.message.id}`).setTitle('Edit Message')
       .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message Content').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(ev.message || '')));
     await interaction.showModal(modal); return;
   }
   if (customId.startsWith('events_notifs_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', ephemeral:true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', flags:1<<6 });
     if (!Array.isArray(ev.autoMessages)) updateEvent(ev.id, { autoMessages: [] });
     await interaction.update({ embeds: [buildNotifsEmbed(interaction.guild, getEvent(id))], components: notifManagerRows(ev) });
     return;
   }
   if (customId.startsWith('event_notif_back_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     await interaction.update({ embeds: [buildDetailEmbed(interaction.guild, ev)], components: detailRows(ev) });
     return;
   }
   if (customId.startsWith('event_notif_add_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const modal = new ModalBuilder().setCustomId(`notif_add_modal_${id}_${interaction.message.id}`).setTitle('Add Auto Message')
       .addComponents(
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder(ev.channelId||'')),
@@ -529,9 +551,9 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   if (customId.startsWith('event_notif_edit_')) {
     const parts = customId.split('_');
     const evId = parts[3]; const notifId = parts[4];
-    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
-    if (!notif) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
     const modal = new ModalBuilder().setCustomId(`notif_edit_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Auto Message')
       .addComponents(
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setValue(notif.channelId||'')),
@@ -543,32 +565,32 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   if (customId.startsWith('event_notif_edit_channel_')) {
     const parts = customId.split('_');
     const evId = parts[4]; const notifId = parts[5];
-    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
-    if (!notif) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
     const modal = new ModalBuilder().setCustomId(`notif_channel_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Channel')
       .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setValue(notif.channelId||'')));
     await interaction.showModal(modal); return;
   }
   if (customId.startsWith('event_notif_selectmode_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     await interaction.update({ embeds: [buildNotifsEmbed(interaction.guild, ev)], components: notifSelectRows(ev) });
     return;
   }
   if (customId.startsWith('event_notif_cancel_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     await interaction.update({ embeds: [buildNotifsEmbed(interaction.guild, ev)], components: notifManagerRows(ev) });
     return;
   }
   if (customId.startsWith('event_notif_toggle_')) {
     const parts = customId.split('_');
     const evId = parts[3]; const notifId = parts[4];
-    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
     const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
     list[idx].enabled = !list[idx].enabled;
     updateEvent(ev.id, { autoMessages: list });
     await interaction.update({ embeds:[buildNotifDetailEmbed(interaction.guild, getEvent(evId), list[idx])], components: notifDetailRows(ev, list[idx]) });
@@ -576,32 +598,32 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   }
   if (customId.startsWith('event_notif_clockin_')) {
   // Removed: legacy clock-in toggle disabled
-  return interaction.reply({ content:'Clock-In toggle removed. To designate a clock-in message, set isClockIn in data manually if still needed.', ephemeral:true }).catch(()=>{});
+  return interaction.reply({ content:'Clock-In toggle removed. To designate a clock-in message, set isClockIn in data manually if still needed.', flags:1<<6 }).catch(()=>{});
   }
   if (customId.startsWith('event_notif_trigger_')) {
     const parts = customId.split('_');
     const evId = parts[3]; const notifId = parts[4];
-    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
-    if (!notif) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
     try {
       const sentOk = await manualTriggerAutoMessage(interaction, ev, notif);
       if (sentOk) {
-        await interaction.reply({ content: `✅ Triggered auto message #${notif.id}${config.testingMode?' (testing mode output only)':''}.`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content: `✅ Triggered auto message #${notif.id}${config.testingMode?' (testing mode output only)':''}.`, flags:1<<6 }).catch(()=>{});
       } else {
-        await interaction.reply({ content: '❌ Failed to send message.', ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content: '❌ Failed to send message.', flags:1<<6 }).catch(()=>{});
       }
     } catch (e) {
-      await interaction.reply({ content: '❌ Error: '+(e.message||e), ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content: '❌ Error: '+(e.message||e), flags:1<<6 }).catch(()=>{});
     }
     return;
   }
   if (customId.startsWith('event_notif_edit_offset_')) {
     const parts = customId.split('_');
     const evId = parts[4]; const notifId = parts[5];
-    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
-    if (!notif) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
     const modal = new ModalBuilder().setCustomId(`notif_offset_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Offset')
       .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('offset').setLabel('Minutes BEFORE (0=start)').setStyle(TextInputStyle.Short).setRequired(true).setValue(String(notif.offsetMinutes||0))));
     await interaction.showModal(modal); return;
@@ -609,9 +631,9 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   if (customId.startsWith('event_notif_edit_msg_')) {
     const parts = customId.split('_');
     const evId = parts[4]; const notifId = parts[5];
-    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
-    if (!notif) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
     const modal = new ModalBuilder().setCustomId(`notif_msg_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Auto Message')
       .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message / JSON').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(notif.message || (notif.messageJSON? JSON.stringify(notif.messageJSON,null,2):''))));
     await interaction.showModal(modal); return;
@@ -619,7 +641,7 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   if (customId.startsWith('event_notif_delete_')) {
     const parts = customId.split('_');
     const evId = parts[4]; const notifId = parts[5];
-    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const list = (ev.autoMessages||[]).filter(n=>String(n.id)!==String(notifId));
     updateEvent(ev.id, { autoMessages: list });
     await interaction.update({ embeds:[buildNotifsEmbed(interaction.guild, getEvent(evId))], components: notifManagerRows(getEvent(evId)) });
@@ -627,7 +649,7 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   }
   if (customId.startsWith('events_delete_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', ephemeral: true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', flags: 1<<6 });
     removeEvent(id);
     data.mode = 'main'; data.currentId = null;
     await interaction.update({ embeds: [buildMainEmbed(interaction.guild)], components: mainRows() });
@@ -635,7 +657,7 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   }
   if (customId.startsWith('events_edit_')) {
     const id = customId.split('_').pop();
-    const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', ephemeral: true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', flags: 1<<6 });
     const modal = new ModalBuilder().setCustomId(`event_edit_modal_${id}_${interaction.message.id}`).setTitle('Edit Event')
       .addComponents(
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('name').setLabel('Name').setStyle(TextInputStyle.Short).setRequired(true).setValue(ev.name || '')),
@@ -651,14 +673,14 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   if (interaction.isStringSelectMenu()) {
     if (customId === 'events_select') {
       const id = interaction.values[0];
-      const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Not found.', ephemeral: true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Not found.', flags: 1<<6 });
       data.mode = 'detail'; data.currentId = id;
       await interaction.update({ embeds: [buildDetailEmbed(interaction.guild, ev)], components: detailRows(ev) });
       return;
     }
     if (customId === 'events_delete') {
       const id = interaction.values[0];
-      const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Not found.', ephemeral: true });
+  const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Not found.', flags: 1<<6 });
       removeEvent(id);
       // Stay in delete mode or back to main if empty
       const evs = getEvents();
@@ -672,10 +694,10 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
     }
     if (customId.startsWith('event_notif_select_')) {
       const evId = customId.split('_').pop();
-      const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', ephemeral:true });
+  const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
       const notifId = interaction.values[0];
       const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
-      if (!notif) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
       await interaction.update({ embeds:[buildNotifDetailEmbed(interaction.guild, ev, notif)], components: notifDetailRows(ev, notif) });
       return;
     }
@@ -690,24 +712,24 @@ async function handleEventEditModal(interaction) {
   const parts = interaction.customId.split("_");
   const eventId = parts[3];
   const managerMessageId = parts[4] || null;
-  if (!/^\d+$/.test(eventId)) { await interaction.reply({ content: '❌ Bad event id.', ephemeral: true }).catch(()=>{}); return; }
+  if (!/^\d+$/.test(eventId)) { await interaction.reply({ content: '❌ Bad event id.', flags: 1<<6 }).catch(()=>{}); return; }
   const ev = getEvent(eventId);
-  if (!ev) { await interaction.reply({ content: "Event not found.", ephemeral:true }); return; }
+  if (!ev) { await interaction.reply({ content: "Event not found.", flags:1<<6 }); return; }
   let updatedEv = null;
   if (interaction.customId.startsWith("event_times_modal_")) {
     const raw = interaction.fields.getTextInputValue("times");
     const times = raw.split(/[\,\s]+/).map(t=>t.trim()).filter(Boolean);
   const ranges = times.map(t => t.includes('-') ? (()=>{ const [s,e]=t.split('-').map(x=>x.trim()); return { start:s, end:e };})() : null).filter(Boolean);
-    if (!times.length) { await interaction.reply({ content: "❌ Provide times.", ephemeral:true }); return; }
+  if (!times.length) { await interaction.reply({ content: "❌ Provide times.", flags:1<<6 }); return; }
   updatedEv = updateEvent(ev.id, { times, ranges });
-    await interaction.reply({ content: "✅ Times updated.", ephemeral:true });
+  await interaction.reply({ content: "✅ Times updated.", flags:1<<6 });
   } else if (interaction.customId.startsWith("event_days_modal_")) {
     const raw = interaction.fields.getTextInputValue("days");
     const dayMap = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
     const days = raw.split(/[\,\s]+/).map(d=>d.trim().toLowerCase()).filter(Boolean).map(d=>dayMap[d]).filter(d=>d!==undefined);
-    if (!days.length) { await interaction.reply({ content: "❌ Invalid days.", ephemeral:true }); return; }
+  if (!days.length) { await interaction.reply({ content: "❌ Invalid days.", flags:1<<6 }); return; }
     updatedEv = updateEvent(ev.id, { days });
-    await interaction.reply({ content: "✅ Days updated.", ephemeral:true });
+  await interaction.reply({ content: "✅ Days updated.", flags:1<<6 });
   } else if (interaction.customId.startsWith("event_msg_modal_")) {
     const messageContent = interaction.fields.getTextInputValue("message");
     let messageJSON = null;
@@ -719,7 +741,7 @@ async function handleEventEditModal(interaction) {
       } catch { /* ignore */ }
     }
     updatedEv = updateEvent(ev.id, { message: messageContent, messageJSON });
-    await interaction.reply({ content: `✅ Message updated${messageJSON ? ' (JSON payload detected)' : ''}.`, ephemeral:true });
+  await interaction.reply({ content: `✅ Message updated${messageJSON ? ' (JSON payload detected)' : ''}.`, flags:1<<6 });
   } else if (interaction.customId.startsWith("event_edit_modal_")) {
     const name = interaction.fields.getTextInputValue('name').trim();
     let channelId = interaction.fields.getTextInputValue('channel').trim().replace(/[<#>]/g,'');
@@ -730,10 +752,10 @@ async function handleEventEditModal(interaction) {
     const ranges = times.map(t => t.includes('-') ? (()=>{ const [s,e]=t.split('-').map(x=>x.trim()); return { start:s, end:e };})() : null).filter(Boolean);
     const dayMap = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
     const days = daysRaw.split(/[\,\s]+/).map(d=>d.trim().toLowerCase()).filter(Boolean).map(d=>dayMap[d]).filter(d=>d!==undefined);
-    if (!name) return interaction.reply({ content: '❌ Name required.', ephemeral:true });
-    if (!/^\d{1,32}$/.test(channelId)) return interaction.reply({ content: '❌ Invalid channel id.', ephemeral:true });
-    if (!times.length) return interaction.reply({ content: '❌ Provide times.', ephemeral:true });
-    if (!days.length) return interaction.reply({ content: '❌ Invalid days.', ephemeral:true });
+  if (!name) return interaction.reply({ content: '❌ Name required.', flags:1<<6 });
+  if (!/^\d{1,32}$/.test(channelId)) return interaction.reply({ content: '❌ Invalid channel id.', flags:1<<6 });
+  if (!times.length) return interaction.reply({ content: '❌ Provide times.', flags:1<<6 });
+  if (!days.length) return interaction.reply({ content: '❌ Invalid days.', flags:1<<6 });
     let messageJSON = null;
     const cleaned = messageContent.replace(/^```(json)?/i, '').replace(/```$/,'').trim();
     if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
@@ -745,7 +767,7 @@ async function handleEventEditModal(interaction) {
     updatedEv = updateEvent(ev.id, { name, channelId, times, ranges, days, message: messageContent, messageJSON, dynamicBaseContent: messageJSON?.content || messageContent });
     // Auto anchor create/update
     try { await ensureAnchor(interaction, updatedEv, { content: messageJSON?.content || messageContent }); } catch {}
-    await interaction.reply({ content: `✅ Event updated${messageJSON? ' (JSON payload detected)':''}.`, ephemeral:true });
+  await interaction.reply({ content: `✅ Event updated${messageJSON? ' (JSON payload detected)':''}.`, flags:1<<6 });
   }
   if (managerMessageId && updatedEv) {
     try {
@@ -777,7 +799,7 @@ async function handleEventNotificationModal(interaction) {
   const notifId = (kind==='add') ? null : parts[4];
   const managerMessageId = (kind==='add') ? parts[4] : parts[5];
   const ev = getEvent(evId);
-  if (!ev) { await interaction.reply({ content:'Event missing.', ephemeral:true }).catch(()=>{}); return; }
+  if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
   const healJSON = (txt) => txt.replace(/^```(json)?/i,'').replace(/```$/,'').trim().replace(/,\s*([}\]])/g,'$1');
   let updatedEv = null;
   if (kind==='add') {
@@ -786,7 +808,7 @@ async function handleEventNotificationModal(interaction) {
     const msgRaw = interaction.fields.getTextInputValue('message');
     const chanRaw = (interaction.fields.getTextInputValue('channel')||'').trim();
     let msgChannelId = chanRaw.replace(/[<#>]/g,'');
-    if (msgChannelId && !/^\d{1,32}$/.test(msgChannelId)) { return interaction.reply({ content:'❌ Invalid channel id.', ephemeral:true }).catch(()=>{}); }
+  if (msgChannelId && !/^\d{1,32}$/.test(msgChannelId)) { return interaction.reply({ content:'❌ Invalid channel id.', flags:1<<6 }).catch(()=>{}); }
     let messageJSON = null;
     const healed = healJSON(msgRaw);
     if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
@@ -796,42 +818,42 @@ async function handleEventNotificationModal(interaction) {
     if (msgChannelId) entry.channelId = msgChannelId;
     list.push(entry);
     updatedEv = updateEvent(ev.id, { autoMessages: list, nextAutoId: Number(nextId)+1 });
-    await interaction.reply({ content:`✅ Auto message #${nextId} created${messageJSON?' (JSON)':''}.`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content:`✅ Auto message #${nextId} created${messageJSON?' (JSON)':''}.`, flags:1<<6 }).catch(()=>{});
   } else if (kind==='offset') {
     const offsetRaw = interaction.fields.getTextInputValue('offset');
     let offset = parseOffsetInput(offsetRaw);
     const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
     const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
     list[idx].offsetMinutes = offset;
     updatedEv = updateEvent(ev.id, { autoMessages: list });
-    await interaction.reply({ content:`✅ Offset updated.`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content:`✅ Offset updated.`, flags:1<<6 }).catch(()=>{});
   } else if (kind==='msg') {
     const msgRaw = interaction.fields.getTextInputValue('message');
     const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
     const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
     let messageJSON = null; const healed = healJSON(msgRaw); if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
     list[idx].message = msgRaw; list[idx].messageJSON = messageJSON;
     updatedEv = updateEvent(ev.id, { autoMessages: list });
-    await interaction.reply({ content:`✅ Message updated${messageJSON?' (JSON)':''}.`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content:`✅ Message updated${messageJSON?' (JSON)':''}.`, flags:1<<6 }).catch(()=>{});
   } else if (kind==='channel') {
     const chanRaw = (interaction.fields.getTextInputValue('channel')||'').trim();
     const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
     const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
     const cleaned = chanRaw.replace(/[<#>]/g,'');
-    if (cleaned && !/^\d{1,32}$/.test(cleaned)) return interaction.reply({ content:'❌ Invalid channel id.', ephemeral:true });
+  if (cleaned && !/^\d{1,32}$/.test(cleaned)) return interaction.reply({ content:'❌ Invalid channel id.', flags:1<<6 });
     if (cleaned) list[idx].channelId = cleaned; else delete list[idx].channelId;
     updatedEv = updateEvent(ev.id, { autoMessages: list });
-    await interaction.reply({ content:`✅ Channel ${cleaned? 'updated':'reset to event channel'}.`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content:`✅ Channel ${cleaned? 'updated':'reset to event channel'}.`, flags:1<<6 }).catch(()=>{});
   } else if (kind==='edit') {
     const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
     const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', ephemeral:true });
+  if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
     const chanRaw = (interaction.fields.getTextInputValue('channel')||'').trim();
     const cleanedChan = chanRaw.replace(/[<#>]/g,'');
-    if (cleanedChan && !/^\d{1,32}$/.test(cleanedChan)) return interaction.reply({ content:'❌ Invalid channel id.', ephemeral:true });
+  if (cleanedChan && !/^\d{1,32}$/.test(cleanedChan)) return interaction.reply({ content:'❌ Invalid channel id.', flags:1<<6 });
     const offsetRaw = interaction.fields.getTextInputValue('offset');
     let offset = parseOffsetInput(offsetRaw);
     const msgRaw = interaction.fields.getTextInputValue('message');
@@ -842,7 +864,7 @@ async function handleEventNotificationModal(interaction) {
     entry.messageJSON = messageJSON;
     if (cleanedChan) entry.channelId = cleanedChan; else delete entry.channelId;
     updatedEv = updateEvent(ev.id, { autoMessages: list });
-    await interaction.reply({ content:`✅ Auto message updated.`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content:`✅ Auto message updated.`, flags:1<<6 }).catch(()=>{});
   }
   if (managerMessageId && updatedEv) {
     try {

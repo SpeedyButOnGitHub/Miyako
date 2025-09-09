@@ -124,14 +124,13 @@ async function sendModLog(
 
   // Staff-only quick-action buttons (compact: open submenus)
   const userIdSafe = String(targetId);
-  const rows = [
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`modact:menu:warnings:${userIdSafe}`).setLabel("Warnings").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.warn),
-      new ButtonBuilder().setCustomId(`modact:menu:mute:${userIdSafe}`).setLabel("Mute").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.mute),
-      new ButtonBuilder().setCustomId(`modact:init:kick:${userIdSafe}`).setLabel("Kick").setStyle(ButtonStyle.Secondary).setEmoji(theme.emojis.kick),
-      new ButtonBuilder().setCustomId(`modact:init:ban:${userIdSafe}`).setLabel("Ban").setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.ban)
-    )
-  ];
+  const { semanticButton } = require('./ui');
+  const rows = [ new ActionRowBuilder().addComponents(
+    semanticButton('nav', { id: `modact:menu:warnings:${userIdSafe}`, label: 'Warnings', emoji: theme.emojis.warn }),
+    semanticButton('nav', { id: `modact:menu:mute:${userIdSafe}`, label: 'Mute', emoji: theme.emojis.mute }),
+    semanticButton('nav', { id: `modact:init:kick:${userIdSafe}`, label: 'Kick', emoji: theme.emojis.kick }),
+    semanticButton('danger', { id: `modact:init:ban:${userIdSafe}`, label: 'Ban', emoji: theme.emojis.ban })
+  ) ];
 
   try {
   return await channel.send({ embeds: [embed], components: rows, allowedMentions: { parse: [] } });

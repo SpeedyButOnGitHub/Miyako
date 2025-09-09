@@ -1,13 +1,13 @@
 // Early crash reporter (must be first)
 require('./utils/crashReporter').initEarly();
 require("dotenv/config");
-// Shim for deprecated ephemeral option -> flags conversion
-require('./utils/ephemeralShim');
+// (ephemeralShim removed; all interactions now use flags:1<<6 directly)
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
 const { config, saveConfig } = require("./utils/storage");
 const { postStartupChangelog } = require("./utils/changelog");
+const { registerErrorListener } = require('./utils/errorUtil');
 let lastOfflineDurationMs = null;
 try {
   if (fs.existsSync("./config/lastShutdown.json")) {
@@ -22,6 +22,7 @@ try {
 const { attachMessageEvents } = require("./events/messages");
 const { attachGuildEvents } = require("./events/guildEvents");
 const { attachInteractionEvents } = require("./events/interactionEvents");
+let CRASH_LOG_CHANNEL_ID = null; // resolved post-config load
 const { startScheduler } = require("./utils/scheduler");
 const ActiveMenus = require("./utils/activeMenus");
 const { startVoiceLeveling } = require("./utils/voiceLeveling");
@@ -35,6 +36,31 @@ try { require("./utils/depositProgress").load(); } catch {}
 
 const BOT_STATUS_FILE = path.resolve(__dirname, "./config/botStatus.json");
 
+// Real-time error forwarding (compact). Fires after client ready.
+registerErrorListener(async (entry) => {
+  try {
+    if (!client.isReady || !client.isReady()) return; // wait for ready
+    if (!CRASH_LOG_CHANNEL_ID) CRASH_LOG_CHANNEL_ID = config.crashLogChannelId || CONFIG_LOG_CHANNEL;
+    if (!CRASH_LOG_CHANNEL_ID) return; // nowhere to send
+    const channel = await client.channels.fetch(CRASH_LOG_CHANNEL_ID).catch(()=>null);
+    if (!channel) return;
+    // De-duplicate high volume warnings; throttle identical scope+message pairs within 30s
+    global.__ERR_CACHE = global.__ERR_CACHE || new Map();
+    const key = entry.scope + ':' + entry.message.slice(0,120);
+    const now = Date.now();
+    const prev = global.__ERR_CACHE.get(key);
+    if (prev && (now - prev) < 30000) return; // skip spam
+    global.__ERR_CACHE.set(key, now);
+    // Build compact embed
+    const em = createEmbed({
+      title: `⚠️ ${entry.scope}`,
+      description: `\u200B\n\`${(entry.message||'').slice(0, 350).replace(/`/g,'\u200b')}\`\n\u200B`,
+      color: entry.scope.startsWith('fatal') ? 0xE74C3C : 0xFFA500
+    });
+    em.setFooter({ text: `At <t:${Math.floor(entry.ts/1000)}:T>` });
+    await channel.send({ embeds:[em] }).catch(()=>{});
+  } catch { /* ignore */ }
+});
 // After client ready, start voice leveling service
 // This file's ready handler likely exists below; if not, attach minimal
 if (require.main === module) {
@@ -140,8 +166,8 @@ async function sendBotStatusMessage() {
     let components = [];
     if (changelogSession && changelogSession.detailLines && changelogSession.detailLines.length) {
       components = [ new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('status_show').setLabel('Details').setStyle(ButtonStyle.Primary)
-      ) ];
+          new ButtonBuilder().setCustomId('status_show').setLabel('Details').setStyle(ButtonStyle.Primary)
+        ) ];
     }
     const sent = await channel.send({ embeds: [embed], components }).catch(() => null);
     if (sent && changelogSession) {
@@ -273,8 +299,8 @@ try {
       }
       embed.setFields(filtered);
       const rows = [ new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('status_hide').setLabel('Hide Details').setStyle(ButtonStyle.Secondary)
-      ) ];
+          new ButtonBuilder().setCustomId('status_hide').setLabel('Hide').setStyle(ButtonStyle.Secondary)
+        ) ];
       await interaction.update({ embeds: [embed], components: rows });
       session.data = data;
       return;
@@ -286,8 +312,8 @@ try {
       // Ensure overview field name is 'Changelog Overview'
       embed.setFields(fields.map(f => f.name === 'Changelog' ? { ...f, name: 'Changelog Overview' } : f));
       const rows = [ new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('status_show').setLabel('Details').setStyle(ButtonStyle.Primary)
-      ) ];
+          new ButtonBuilder().setCustomId('status_show').setLabel('Details').setStyle(ButtonStyle.Primary)
+        ) ];
       await interaction.update({ embeds: [embed], components: rows });
       session.data = data;
       return;

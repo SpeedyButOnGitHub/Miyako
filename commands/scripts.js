@@ -72,7 +72,7 @@ async function handleScriptsCommand(client, message) {
 
 ActiveMenus.registerHandler("scripts", async (interaction, session) => {
   if (!interaction.isButton()) return;
-  if (interaction.user.id !== session.userId) { try { await interaction.reply({ content: "Not your session.", ephemeral: true }); } catch {} return; }
+  if (interaction.user.id !== session.userId) { try { await interaction.reply({ content: "Not your session.", flags: 1<<6 }); } catch {} return; }
   if (interaction.customId === "scripts_close") {
     try { await interaction.update({ components: [] }); } catch {}
     return;

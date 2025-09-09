@@ -24,7 +24,7 @@ async function handleConfigMenuCommand(message) {
 ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
   if (!interaction.isButton() && !interaction.isModalSubmit()) return;
   if (interaction.user.id !== session.userId) {
-    if (interaction.isRepliable()) return interaction.reply({ content: 'Not your session.', ephemeral: true }).catch(()=>{});
+  if (interaction.isRepliable()) return interaction.reply({ content: 'Not your session.', flags: 1<<6 }).catch(()=>{});
     return;
   }
   try {
@@ -79,7 +79,7 @@ ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
   } catch (err) {
     console.error('[configMenu] handler error:', err);
     if (interaction.isRepliable() && !interaction.replied) {
-      try { await interaction.reply({ content: 'Error handling config interaction.', ephemeral: true }); } catch {}
+  try { await interaction.reply({ content: 'Error handling config interaction.', flags: 1<<6 }); } catch {}
     }
   }
 });
