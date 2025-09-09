@@ -5,51 +5,51 @@ const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
 const { applyStandardFooter, semanticButton } = require("../utils/ui");
 
-// Categorized help with interactive buttons (compact mode removed per request).
-const HELP_CATEGORIES = [
-  { id: 'general', label: 'General', emoji: '📌', commands: [
-    '.help - show this menu',
-    '.profile - show your profile',
-    '.leaderboard - show leaderboard(s)',
-    '.cash - show wallet balance'
-  ]},
-  { id: 'level', label: 'Leveling', emoji: '🧬', commands: [
-    '.rank / .level - show rank card',
-    '.leaderboard - text leveling leaderboard',
-    '.profile vc - show VC stats'
-  ]},
-  { id: 'economy', label: 'Economy', emoji: '💰', commands: [
-    '.balance - open bank & wallet UI',
-    '.deposit <amount> - deposit into bank',
-    '.withdraw <amount> - withdraw from bank'
-  ]},
-  { id: 'moderation', label: 'Moderation', emoji: '🛡️', modOnly: true, commands: [
-    '.mute <@user> [time] [reason]',
-    '.unmute <@user>',
-    '.timeout <@user> <time> [reason]',
-    '.ban <@user> [reason]',
-    '.kick <@user> [reason]',
-    '.warn <@user> <reason>',
-    '.warnings [@user]',
-    '.removewarn <@user> <index>',
-    '.purge <count> [@user|filters]' 
-  ]},
-  { id: 'config', label: 'Config', emoji: '🛠️', ownerOnly: true, commands: [
-    '.config - open configuration menu',
-    '.test - owner test utilities',
-    '.errors - list recent errors',
-    '.errdetail <index> - full error detail',
-    '.restart - restart bot'
-  ]}
+// Dynamic help command registry: each command exports a meta.description optionally
+const COMMAND_META = [
+  { cmd: '.help', cat: 'general', desc: 'Show this menu' },
+  { cmd: '.profile', cat: 'general', desc: 'Show your profile' },
+  { cmd: '.leaderboard', cat: 'general', desc: 'Show leaderboards' },
+  { cmd: '.cash', cat: 'general', desc: 'Wallet balance' },
+  { cmd: '.rank / .level', cat: 'level', desc: 'Show rank card' },
+  { cmd: '.profile vc', cat: 'level', desc: 'Show VC stats' },
+  { cmd: '.balance', cat: 'economy', desc: 'Bank & wallet UI' },
+  { cmd: '.deposit <amount>', cat: 'economy', desc: 'Deposit into bank' },
+  { cmd: '.withdraw <amount>', cat: 'economy', desc: 'Withdraw from bank' },
+  { cmd: '.metrics', cat: 'config', desc: 'Metrics dashboard', ownerOnly: true },
+  { cmd: '.config', cat: 'config', desc: 'Configuration menu', ownerOnly: true },
+  { cmd: '.test', cat: 'config', desc: 'Owner test utilities', ownerOnly: true },
+  { cmd: '.errors', cat: 'config', desc: 'List recent errors', ownerOnly: true },
+  { cmd: '.errdetail <index>', cat: 'config', desc: 'Error detail', ownerOnly: true },
+  { cmd: '.restart', cat: 'config', desc: 'Restart bot', ownerOnly: true },
+  { cmd: '.mute <@user> [time] [reason]', cat: 'moderation', modOnly: true, desc: 'Mute user' },
+  { cmd: '.unmute <@user>', cat: 'moderation', modOnly: true, desc: 'Remove mute' },
+  { cmd: '.timeout <@user> <time> [reason]', cat: 'moderation', modOnly: true, desc: 'Timeout user' },
+  { cmd: '.ban <@user> [reason]', cat: 'moderation', modOnly: true, desc: 'Ban user' },
+  { cmd: '.kick <@user> [reason]', cat: 'moderation', modOnly: true, desc: 'Kick user' },
+  { cmd: '.warn <@user> <reason>', cat: 'moderation', modOnly: true, desc: 'Warn user' },
+  { cmd: '.warnings [@user]', cat: 'moderation', modOnly: true, desc: 'List warnings' },
+  { cmd: '.removewarn <@user> <index>', cat: 'moderation', modOnly: true, desc: 'Remove warning' },
+  { cmd: '.purge <count> [@user|filters]', cat: 'moderation', modOnly: true, desc: 'Bulk delete' }
 ];
-
-function filterCategories(member) {
-  return HELP_CATEGORIES.filter(cat => {
-    if (cat.ownerOnly && String(member.id) !== String(OWNER_ID)) return false;
-    if (cat.modOnly && !isModerator(member)) return false;
-    return true;
-  });
+function buildHelpCategories(member) {
+  const cats = {
+    general: { id: 'general', label: 'General', emoji: '�', commands: [] },
+    level: { id: 'level', label: 'Leveling', emoji: '🧬', commands: [] },
+    economy: { id: 'economy', label: 'Economy', emoji: '💰', commands: [] },
+    moderation: { id: 'moderation', label: 'Moderation', emoji: '🛡️', modOnly: true, commands: [] },
+    config: { id: 'config', label: 'Config', emoji: '🛠️', ownerOnly: true, commands: [] }
+  };
+  for (const meta of COMMAND_META) {
+    if (meta.ownerOnly && String(member.id) !== String(OWNER_ID)) continue;
+    if (meta.modOnly && !isModerator(member)) continue;
+    if (!cats[meta.cat]) continue;
+    cats[meta.cat].commands.push(`${meta.cmd} - ${meta.desc}`);
+  }
+  return Object.values(cats);
 }
+
+function filterCategories(member) { return buildHelpCategories(member); }
 
 function buildCategoryEmbed(guild, member, categories, current) {
   const embed = new EmbedBuilder().setColor(theme.colors.primary || 0x5865F2);

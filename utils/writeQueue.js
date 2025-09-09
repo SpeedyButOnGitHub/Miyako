@@ -3,8 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const pending = new Map(); // filePath -> { timer, lastContent }
+const pending = new Map(); // filePath -> { timer, lastContent, created }
 let metrics = { enqueued: 0, flushed: 0, lastFlushAt: 0 };
+const MAX_FLUSH_INTERVAL_MS = 5000; // force flush at most 5s after first enqueue
+let watchdog = null;
 
 function ensureDir(filePath) {
   const dir = path.dirname(filePath);
@@ -34,7 +36,7 @@ function enqueueWrite(filePath, getContentFn, { delay = 150 } = {}) {
   let entry = pending.get(filePath);
   const content = getContentFn();
   if (!entry) {
-    entry = { timer: null, lastContent: content };
+    entry = { timer: null, lastContent: content, created: Date.now() };
     pending.set(filePath, entry);
   } else {
     entry.lastContent = content;
@@ -43,6 +45,18 @@ function enqueueWrite(filePath, getContentFn, { delay = 150 } = {}) {
   entry.timer = setTimeout(() => flush(filePath), delay);
   if (typeof entry.timer.unref === 'function') entry.timer.unref();
   metrics.enqueued++;
+  // Start watchdog to force flush stale entries
+  if (!watchdog) {
+    watchdog = setInterval(() => {
+      const now = Date.now();
+      for (const [fp, ent] of pending.entries()) {
+        if (now - ent.created > MAX_FLUSH_INTERVAL_MS) {
+          try { flush(fp); } catch {}
+        }
+      }
+    }, 2000);
+    if (watchdog.unref) watchdog.unref();
+  }
 }
 function getWriteQueueMetrics() { return { ...metrics, pending: pending.size }; }
 

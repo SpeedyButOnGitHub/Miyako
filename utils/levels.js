@@ -51,7 +51,11 @@ function addXP(userId, amount) {
   cur.level = newLevel;
   levels[userId] = cur;
 
-  if (newLevel !== oldLevel) saveLevels(); else saveLevels(); // always schedule save (coalesced)
+  if (newLevel !== oldLevel) {
+    // Invalidate leaderboard cache for text leveling
+    try { require('../services/leaderboardService').invalidate('text'); } catch {}
+  }
+  saveLevels(); // always schedule save (coalesced)
   return newLevel > oldLevel ? newLevel : 0;
 }
 

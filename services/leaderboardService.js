@@ -8,8 +8,8 @@ const { applyFooterWithPagination } = require('../utils/ui');
 const { levels, vcLevels } = require('./levelingService');
 const { getTopBank } = require('../utils/bank');
 
-const CACHE_TTL_MS = 5000; // 5s window; lightweight, avoids explicit invalidation wiring
-const caches = { text: { expires: 0, entries: [] }, vc: { expires: 0, entries: [] } };
+const CACHE_TTL_MS = 5000; // 5s window; can also be explicitly invalidated when XP changes
+const caches = { text: { expires: 0, entries: [], dirty: false }, vc: { expires: 0, entries: [], dirty: false } };
 
 function buildEntries(mode) {
   const src = mode === 'vc' ? vcLevels : levels;
@@ -24,9 +24,10 @@ function getEntries(mode = 'text') {
   const key = mode === 'vc' ? 'vc' : 'text';
   const now = Date.now();
   const cache = caches[key];
-  if (cache.expires < now) {
+  if (cache.expires < now || cache.dirty) {
     cache.entries = buildEntries(key === 'vc' ? 'vc' : 'text');
     cache.expires = now + CACHE_TTL_MS;
+    cache.dirty = false;
   }
   return cache.entries;
 }
@@ -74,4 +75,9 @@ function buildLeaderboardEmbed(guild, viewerId, page = 1, pageSize = 10, mode = 
   return embed;
 }
 
-module.exports = { getEntries, computeRank, buildLeaderboardEmbed };
+function invalidate(mode = 'both') {
+  if (mode === 'both' || mode === 'text') caches.text.dirty = true;
+  if (mode === 'both' || mode === 'vc') caches.vc.dirty = true;
+}
+
+module.exports = { getEntries, computeRank, buildLeaderboardEmbed, invalidate };

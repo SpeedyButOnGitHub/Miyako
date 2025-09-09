@@ -242,13 +242,14 @@ function startScheduler(client, opts = {}) {
                       // Clock-In special behavior
                       if (m.isClockIn) {
                         // Maintain per-event clockIn data structure: { positions: {key: [userId]}, messageIds:[], lastEventStart: timestamp }
+                        // Modernized positions: Only Instance Master has a cap (1), others unlimited.
                         const POSITIONS = [
-                          { key: 'instance_manager', label: '🗝️ Instance Manager', short:'IM', max: 1, roleRequired: '1375958480380493844' },
-                          { key: 'manager', label: '🛠️ Manager', short:'M', max: 5, roleRequired: '1375958480380493844' },
-                          { key: 'bouncer', label: '🛡️ Bouncer', short:'B', max: 10 },
-                          { key: 'bartender', label: '🍸 Bartender', short:'BT', max: 15 },
-                          { key: 'backup', label: '🎯 Backup', short:'BK', max: 20 },
-                          { key: 'maybe', label: '⏳ Maybe/Late', short:'?', max: 50 }
+                          { key: 'instance_manager', label: '🗝️ Instance Master', short:'IM', max: 1 },
+                          { key: 'manager', label: '🛠️ Manager', short:'M' },
+                          { key: 'bouncer', label: '🛡️ Bouncer', short:'B' },
+                          { key: 'bartender', label: '🍸 Bartender', short:'BT' },
+                          { key: 'backup', label: '🎯 Backup', short:'BK' },
+                          { key: 'maybe', label: '⏳ Maybe/Late', short:'?' }
                         ];
                         const clockKey = '__clockIn';
                         const state = ev[clockKey] && typeof ev[clockKey]==='object' ? ev[clockKey] : { positions: {}, messageIds: [] };
@@ -256,6 +257,7 @@ function startScheduler(client, opts = {}) {
                         // Build base text (header) and embed fields
                         // Standardized base text (ignore any custom saved clock-in message to ensure uniformity)
                         let baseText = `🕒 Staff Clock-In — ${ev.name}`;
+                        baseText = baseText.replace(/{{EVENT_NAME}}/g, ev.name || 'Event');
                         baseText = applyTimestampPlaceholders(baseText, ev).replace(/\n{3,}/g,'\n\n');
                         if (config.testingMode) {
                           // Light sanitization of role/user mentions in testing
@@ -270,7 +272,8 @@ function startScheduler(client, opts = {}) {
                         for (const p of POSITIONS) {
                           const arr = state.positions[p.key];
                           const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-                          embed.addFields({ name: `${p.label} (${arr.length}/${p.max})`, value: value.substring(0,1024), inline: true });
+                          const name = p.key === 'instance_manager' ? `${p.label} (${arr.length}/1)` : `${p.label} (${arr.length})`;
+                          embed.addFields({ name, value: value.substring(0,1024), inline: true });
                         }
                         const menu = new StringSelectMenuBuilder()
                           .setCustomId(`clockin:${ev.id}:${m.id}`)

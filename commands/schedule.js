@@ -8,6 +8,11 @@ const { applyFooterWithPagination, semanticButton, buildNavRow } = require("../u
 const { config } = require('../utils/storage');
 const { ms } = require('../utils/time');
 const { createEmbed, safeAddField } = require('../utils/embeds');
+// Helper to inject event name placeholder
+function applyEventName(str, ev) {
+  if (!str || typeof str !== 'string') return str;
+  return str.replace(/{{EVENT_NAME}}/g, ev.name || 'Event');
+}
 
 // --- Duration Parsing Helpers ---
 // Accept forms:
@@ -233,6 +238,7 @@ async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
   if (!channel || !channel.send) return null;
   const { applyTimestampPlaceholders } = require('../utils/timestampPlaceholders');
   let baseContent = ev.dynamicBaseContent || (ev.messageJSON?.content) || ev.message || ev.name;
+  baseContent = applyEventName(baseContent, ev);
   // Auto-build Midnight Bar template if missing signature header
   if (/Midnight Bar/i.test(ev.name || '') && (!baseContent || !/Midnight Bar/i.test(baseContent))) {
     const barDivider = '─'.repeat(36);
@@ -256,11 +262,12 @@ async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
     ].join('\n');
   }
   baseContent = applyTimestampPlaceholders(baseContent, ev);
+  baseContent = applyEventName(baseContent, ev);
   if (basePayloadOverride && basePayloadOverride.content) baseContent = basePayloadOverride.content;
   baseContent = applyTimestampPlaceholders(baseContent, ev);
   // Inject initial relative countdown line for Midnight Bar
   try {
-    if (/Midnight Bar/i.test(ev.name || '') && /# The Midnight bar is opening:?$/im.test(baseContent)) {
+  if (/Midnight Bar/i.test(ev.name || '') && /# The Midnight bar is opening:?$/im.test(baseContent)) {
       const { computeNextRange } = require('../utils/timestampPlaceholders');
       const range = computeNextRange(ev);
       if (range) {
@@ -407,30 +414,34 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     // Build a minimal clock-in message (doesn't alter state beyond skip marker when not testing)
   const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
   const theme = require('../utils/theme');
+    // Modernized: Only Instance Master has a cap (1). Others unlimited.
     const POSITIONS = [
-      { key:'instance_manager', label:'🗝️ Instance Manager', max:1 },
-      { key:'manager', label:'🛠️ Manager', max:5 },
-      { key:'bouncer', label:'🛡️ Bouncer', max:10 },
-      { key:'bartender', label:'🍸 Bartender', max:15 },
-      { key:'backup', label:'🎯 Backup', max:20 },
-      { key:'maybe', label:'⏳ Maybe/Late', max:50 }
+      { key:'instance_manager', label:'🗝️ Instance Master', max:1 },
+      { key:'manager', label:'🛠️ Manager' },
+      { key:'bouncer', label:'🛡️ Bouncer' },
+      { key:'bartender', label:'🍸 Bartender' },
+      { key:'backup', label:'🎯 Backup' },
+      { key:'maybe', label:'⏳ Maybe/Late' }
     ];
     ev.__clockIn = ev.__clockIn || { positions:{}, messageIds:[] };
     for (const p of POSITIONS) { if (!Array.isArray(ev.__clockIn.positions[p.key])) ev.__clockIn.positions[p.key] = []; }
   // Enforce standardized staff clock-in header (ignore saved custom message)
   let baseText = `🕒 Staff Clock-In — ${ev.name}`;
+  baseText = applyEventName(baseText, ev);
     baseText = applyTimestampPlaceholders(baseText, ev).replace(/\n{3,}/g,'\n\n');
     if (config.testingMode) baseText = sanitizeMentionsForTesting(baseText);
-    const embed = new EmbedBuilder()
-      .setTitle(`🕒 Staff Clock-In — ${ev.name}`)
-      .setColor(theme.colors?.primary || 0x5865F2)
-      .setDescription(`${baseText}\n\nSelect a position below. One slot per staff; selecting moves you.`);
+    const embed = createEmbed({
+      title: `🕒 Staff Clock-In — ${ev.name}`,
+      description: `${baseText}\n\nSelect a position below. Instance Master limited to 1 slot; selecting updates your role.`,
+      color: theme.colors?.primary || 0x5865F2
+    });
     for (const p of POSITIONS) {
       const arr = ev.__clockIn.positions[p.key];
       const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-      embed.addFields({ name: `${p.label} (${arr.length}/${p.max})`, value: value.substring(0,1024), inline: true });
+      const name = p.key === 'instance_manager' ? `${p.label} (${arr.length}/1)` : `${p.label} (${arr.length})`;
+      embed.addFields({ name, value: value.substring(0,1024), inline: true });
     }
-    const menu = new StringSelectMenuBuilder().setCustomId(`clockin:${ev.id}:${notif.id}`).setPlaceholder('📋 Select a position').addOptions(POSITIONS.map(p=>({ label: p.label.replace(/^\S+\s+/,'').slice(0,100), value:p.key })));
+  const menu = new StringSelectMenuBuilder().setCustomId(`clockin:${ev.id}:${notif.id}`).setPlaceholder('📋 Select a position').addOptions(POSITIONS.map(p=>({ label: p.label.replace(/^\S+\s+/,'').slice(0,100), value:p.key })));
     const row = new ActionRowBuilder().addComponents(menu);
     const sent = await channel.send({ embeds:[embed], components:[row] }).catch(()=>null);
     if (sent && !config.testingMode) {

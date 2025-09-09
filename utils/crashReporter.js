@@ -100,6 +100,19 @@ function initEarly() {
 
 function attachClient(client) {
   clientRef = client;
+  // Crash replay summary
+  try {
+    const latest = fs.existsSync(CRASH_LATEST_FILE) ? JSON.parse(fs.readFileSync(CRASH_LATEST_FILE,'utf8')) : null;
+    if (latest && latest.scope !== 'init' && client?.channels) {
+      const { CONFIG_LOG_CHANNEL } = require('./logChannels');
+      client.channels.fetch(CONFIG_LOG_CHANNEL).then(ch => {
+        if (!ch) return;
+        const when = latest.ts ? `<t:${Math.floor(latest.ts/1000)}:R>` : 'unknown';
+        const summary = `🧯 Last Crash Replay: **${latest.reason || latest.scope}** ${when}`;
+        ch.send({ content: summary.slice(0,1900) }).catch(()=>{});
+      }).catch(()=>{});
+    }
+  } catch {}
 }
 
 module.exports = { initEarly, attachClient };

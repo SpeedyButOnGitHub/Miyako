@@ -123,5 +123,15 @@
     "ts": 1757455714189,
     "scope": "exit",
     "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757456580502,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757457263157,
+    "scope": "exit",
+    "message": "process exiting with code 0"
   }
 ]

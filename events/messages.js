@@ -20,6 +20,9 @@ const { semanticButton, buildNavRow } = require('../utils/ui');
 const { config } = require("../utils/storage");
 const { handleCashCommand } = require("../commands/cash");
 const { handleBalanceCommand } = require("../commands/balance");
+const { handleMetricsCommand } = require("../commands/metrics");
+const { markCommand } = require('../services/metricsService');
+const { checkPolicy } = require('../utils/policy');
 const theme = require("../utils/theme");
 const { TEST_LOG_CHANNEL } = require("../utils/logChannels");
 const { snapshotSessions } = require("../utils/activeMenus");
@@ -87,32 +90,53 @@ function attachMessageEvents(client) {
 
     if (!message.content.startsWith(".")) return;
 
+    // --- Duplicate command execution guard ---
+    // In some dev / hot-reload scenarios or accidental multiple listener attachments,
+    // a single message may trigger command handling twice. Guard by tagging the message.
+    if (message.__commandHandled) return; // already processed
+    message.__commandHandled = true;
+    // Also maintain a short-lived global set to catch edge cases where the message object differs
+    try {
+      const g = (client.__handledCommandIds = client.__handledCommandIds || new Set());
+      if (g.has(message.id)) return; // already processed via different object reference
+      g.add(message.id);
+      // Prune set occasionally to avoid unbounded growth
+      if (g.size > 5000) {
+        // Remove oldest ~20% (inefficient simple approach acceptable at this scale)
+        let i = 0; for (const id of g) { g.delete(id); if (++i > 1000) break; }
+      }
+    } catch {}
+
     const args = message.content.slice(1).trim().split(/\s+/);
     const command = args.shift().toLowerCase();
 
     try {
       if (command === "help") {
-        await handleHelpCommand(client, message);
+        await handleHelpCommand(client, message); markCommand();
       } else if (["mute", "unmute", "timeout", "untimeout", "ban", "kick", "warn", "removewarn"].includes(command)) {
+        if (!checkPolicy(command, message)) return;
         if (!cdOk(message.author.id, command, 2500)) return;
-        await handleModerationCommands(client, message, command, args);
+        await handleModerationCommands(client, message, command, args); markCommand();
       } else if (command === 'purge' || command === 'clean') {
+        if (!checkPolicy('purge', message)) return;
         if (!cdOk(message.author.id, 'purge', 5000)) return;
-        await handlePurgeCommand(client, message, args);
+        await handlePurgeCommand(client, message, args); markCommand();
       } else if (["snipe", "s", "ds"].includes(command)) {
-        await handleSnipeCommands(client, message, command, args);
+        await handleSnipeCommands(client, message, command, args); markCommand();
       } else if (command === "warnings" || command === "warns") {
-        await handleWarningsCommand(client, message);
+        await handleWarningsCommand(client, message); markCommand();
       } else if (command === "config") {
-        await handleMessageCreate(client, message);
+        if (!checkPolicy('config', message)) return;
+        await handleMessageCreate(client, message); markCommand();
       } else if (command === "level" || command === "rank") {
-        await handleRankCommand(client, message);
+        await handleRankCommand(client, message); markCommand();
       } else if (command === "profile" || command === "p") {
-        await handleProfileCommand(client, message);
+        await handleProfileCommand(client, message); markCommand();
       } else if (command === "test") {
-        await handleTestCommand(client, message);
+        if (!checkPolicy('test', message)) return;
+        await handleTestCommand(client, message); markCommand();
       } else if (command === "leaderboard" || command === "lb") {
-        await handleLeaderboardCommand(client, message);
+        await handleLeaderboardCommand(client, message); markCommand();
       } else if (command === "restart") {
         if (message.author.id !== process.env.OWNER_ID) return;
         // Record restart timestamp for next boot to compute downtime
@@ -145,13 +169,15 @@ function attachMessageEvents(client) {
       } else if (command === "schedule") {
         await handleScheduleCommand(client, message);
       } else if (command === "scripts") {
-        await handleScriptsCommand(client, message);
+        await handleScriptsCommand(client, message); markCommand();
       } else if (command === "cash") {
-        await handleCashCommand(client, message);
+        await handleCashCommand(client, message); markCommand();
       } else if (command === "balance" || command === "bal") {
-        await handleBalanceCommand(client, message);
+        await handleBalanceCommand(client, message); markCommand();
       } else if (command === "diag" || command === "diagnostics") {
-        await handleDiagnosticsCommand(client, message);
+        await handleDiagnosticsCommand(client, message); markCommand();
+      } else if (command === 'metrics') {
+        await handleMetricsCommand(client, message); markCommand();
   } else if (command === 'errors' || command === 'err') {
         if (message.author.id !== process.env.OWNER_ID) return;
         // Accept patterns: .errors, .errors 25, .errors embed 25, .errors 25 embed

@@ -116,6 +116,23 @@ function buildWithdrawMenuPayload(userId) {
 
 async function handleBalanceCommand(client, message) {
   const payload = buildBalancePayload(message.author.id);
+  try {
+    const { activeDrops } = require('../utils/cashDrops');
+    const dropActive = activeDrops && Array.from(activeDrops.values()).some(d => d && !d.claimedBy && d.expiresAt > Date.now());
+    if (dropActive) {
+      const BROADCAST_CHANNEL_ID = '1232701768987578462';
+      const channel = await client.channels.fetch(BROADCAST_CHANNEL_ID).catch(()=>null);
+      let linkMsg = null;
+      if (channel && channel.send) {
+        // Public broadcast with ping
+        linkMsg = await channel.send({ content: `🔍 Balance Check: <@${message.author.id}>`, ...payload, allowedMentions:{ users:[message.author.id] } }).catch(()=>null);
+      }
+      // Ephemeral redirect style reply: minimal message linking to broadcast
+      const jumpLink = linkMsg ? `https://discord.com/channels/${linkMsg.guildId}/${linkMsg.channelId}/${linkMsg.id}` : null;
+      await message.reply({ content: jumpLink ? `Balance posted here → ${jumpLink}` : 'Balance posted.', allowedMentions:{ repliedUser:false } }).catch(()=>{});
+      return;
+    }
+  } catch {}
   await message.reply({ ...payload, allowedMentions: { repliedUser: false } }).catch(() => {});
 }
 

@@ -52,9 +52,10 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       if (!Number.isFinite(n) || n < 0 || n > 100) {
   return submitted.reply({ content: 'Enter a valid percent between 0 and 100.', flags: 1<<6 });
       }
-      e.dropChance = Math.max(0, Math.min(1, n / 100));
-  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
-      await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop chance to ${(e.dropChance * 100).toFixed(2)}%/msg.` });
+  const prev = e.dropChance;
+  e.dropChance = Math.max(0, Math.min(1, n / 100));
+	await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
+  await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop Chance`, before: prev, after: e.dropChance });
   await submitted.reply({ content: `Drop chance set to ${(e.dropChance * 100).toFixed(2)}% per message.`, flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
@@ -85,9 +86,10 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < 0 || max < min) {
   return submitted.reply({ content: 'Enter valid non-negative integers (max >= min).', flags: 1<<6 });
       }
-      e.minAmount = min; e.maxAmount = max;
-  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
-      await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop amount range to ${min}-${max}.` });
+  const beforeRange = { min: e.minAmount, max: e.maxAmount };
+  e.minAmount = min; e.maxAmount = max;
+	await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
+  await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop Amount Range`, before: beforeRange, after: { min, max } });
   await submitted.reply({ content: `Drop amount range set to ${min}-${max}.`, flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
@@ -110,9 +112,10 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       if (!Number.isFinite(s) || s < 5 || s > 86400) {
   return submitted.reply({ content: 'Enter a valid seconds value between 5 and 86400.', flags: 1<<6 });
       }
-      e.lifetimeMs = s * 1000;
-  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
-      await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop lifetime to ${s}s.` });
+  const prev = e.lifetimeMs;
+  e.lifetimeMs = s * 1000;
+	await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
+  await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop Lifetime`, before: prev, after: e.lifetimeMs });
   await submitted.reply({ content: `Drop lifetime set to ${s}s.`, flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
       return;
@@ -141,16 +144,18 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
       if (!Number.isFinite(num) || num <= 0 || num > 100) {
   return submitted.reply({ content: 'Enter a valid number >0 and <=100.', flags: 1<<6 });
       }
-      config.globalXPMultiplier = num;
-  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
-      await logConfigChange(interaction.client, { user: interaction.user, change: `Set Global XP multiplier to x${num.toFixed(2)}` });
+  const prev = config.globalXPMultiplier;
+  config.globalXPMultiplier = num;
+	await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
+  await logConfigChange(interaction.client, { user: interaction.user, change: `Set Global XP Multiplier`, before: prev, after: num });
   await submitted.reply({ content: `XP multiplier set to x${num.toFixed(2)}.`, flags: 1<<6 });
       return;
     }
     if (action === 'reset') {
-      config.globalXPMultiplier = 1;
-  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
-      await logConfigChange(interaction.client, { user: interaction.user, change: `Reset Global XP multiplier to x1.00` });
+  const prev = config.globalXPMultiplier;
+  config.globalXPMultiplier = 1;
+	await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
+  await logConfigChange(interaction.client, { user: interaction.user, change: `Reset Global XP Multiplier`, before: prev, after: 1 });
       return openSetting(interaction, categoryName, settingName);
     }
   }

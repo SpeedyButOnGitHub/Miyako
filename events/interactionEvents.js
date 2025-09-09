@@ -49,12 +49,28 @@ function attachInteractionEvents(client) {
         if (res && res.handled) return;
       }
 
-      // Cash balance quick button
+      // Cash balance quick button (with cash drop broadcast redirect)
       if (interaction.isButton() && interaction.customId && interaction.customId.startsWith("cash:check")) {
-        // Reply ephemerally with the balance embed/buttons
         const { buildBalancePayload } = require("../commands/balance");
         const payload = buildBalancePayload(interaction.user.id);
-  await interaction.reply({ ...payload, flags: 1<<6 }).catch(() => {});
+        let jumpLink = null;
+        try {
+          const { activeDrops } = require('../utils/cashDrops');
+          const dropActive = activeDrops && Array.from(activeDrops.values()).some(d => d && !d.claimedBy && d.expiresAt > Date.now());
+          if (dropActive) {
+            const BROADCAST_CHANNEL_ID = '1232701768987578462';
+            const ch = await interaction.client.channels.fetch(BROADCAST_CHANNEL_ID).catch(()=>null);
+            if (ch && ch.send) {
+              const pubMsg = await ch.send({ content: `🔍 Balance Check: <@${interaction.user.id}>`, ...payload, allowedMentions:{ users:[interaction.user.id] } }).catch(()=>null);
+              if (pubMsg) jumpLink = `https://discord.com/channels/${pubMsg.guildId}/${pubMsg.channelId}/${pubMsg.id}`;
+            }
+          }
+        } catch {}
+        if (jumpLink) {
+          await interaction.reply({ content: `Balance posted here → ${jumpLink}`, flags: 1<<6 }).catch(()=>{});
+        } else {
+          await interaction.reply({ ...payload, flags: 1<<6 }).catch(() => {});
+        }
         return;
       }
 

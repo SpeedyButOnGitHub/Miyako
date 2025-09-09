@@ -23,6 +23,8 @@ try {
 const { attachMessageEvents } = require("./events/messages");
 const { attachGuildEvents } = require("./events/guildEvents");
 const { attachInteractionEvents } = require("./events/interactionEvents");
+// Legacy command handler in events/messageEvents.js caused duplicate replies; ensure not required/attached elsewhere.
+try { delete require.cache[require.resolve('./events/messageEvents')]; } catch {}
 let CRASH_LOG_CHANNEL_ID = null; // resolved post-config load
 const { startScheduler } = require("./utils/scheduler");
 const ActiveMenus = require("./utils/activeMenus");
