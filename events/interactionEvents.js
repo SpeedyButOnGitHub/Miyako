@@ -857,12 +857,12 @@ function attachInteractionEvents(client) {
         const choice = interaction.values[0];
         const ROLE_REQUIRED = '1375958480380493844';
         const POS_META = {
-          'instance_manager': { label: 'Instance Manager', max:1, role: ROLE_REQUIRED },
-          'manager': { label: 'Manager', max:5, role: ROLE_REQUIRED },
-          'bouncer': { label: 'Bouncer', max:10 },
-          'bartender': { label: 'Bartender', max:15 },
-          'backup': { label: 'Backup', max:20 },
-          'maybe': { label: 'Maybe/Late', max:50 }
+          'instance_manager': { label: 'Instance Master', max:1, role: ROLE_REQUIRED },
+          'manager': { label: 'Manager', max:Infinity, role: ROLE_REQUIRED },
+          'bouncer': { label: 'Bouncer', max:Infinity },
+          'bartender': { label: 'Bartender', max:Infinity },
+          'backup': { label: 'Backup', max:Infinity },
+          'maybe': { label: 'Maybe/Late', max:Infinity }
         };
   if (!POS_META[choice]) { await interaction.reply({ content:'Invalid selection.', flags:1<<6 }).catch(()=>{}); return; }
         const meta = POS_META[choice];
@@ -877,7 +877,7 @@ function attachInteractionEvents(client) {
           state.positions[key] = Array.isArray(state.positions[key]) ? state.positions[key].filter(id=>id!==member.id) : [];
         }
         if (!Array.isArray(state.positions[choice])) state.positions[choice] = [];
-        if (state.positions[choice].length >= meta.max) {
+  if (meta.max !== Infinity && state.positions[choice].length >= meta.max) {
           await interaction.reply({ content:`${meta.label} is full.`, flags:1<<6 }).catch(()=>{}); return;
         }
         state.positions[choice].push(member.id);
@@ -899,7 +899,8 @@ function attachInteractionEvents(client) {
             const arr = state.positions[k] || [];
             const label = POS_META[k].label;
             const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-            safeAddField(embed, `${label} (${arr.length}/${POS_META[k].max})`, value.substring(0,1024), true);
+            const cap = POS_META[k].max === Infinity ? '' : `/${POS_META[k].max}`;
+            safeAddField(embed, `${label} (${arr.length}${cap})`, value.substring(0,1024), true);
           }
           for (const mid of state.messageIds || []) {
             try {

@@ -49,8 +49,19 @@ const LEVEL_ROLES = {
 };
 
 function attachMessageEvents(client) {
+  if (client.__messageListenerAttached) return; // prevent multiple registrations
+  client.__messageListenerAttached = true;
   client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
+    // Global duplicate guard (prevents double XP, drops, and command replies if listener attached twice)
+    try {
+      const set = (client.__handledMessages = client.__handledMessages || new Set());
+      if (set.has(message.id)) return; // already fully processed
+      set.add(message.id);
+      if (set.size > 10000) { // prune oldest ~20%
+        let i = 0; for (const id of set) { set.delete(id); if (++i > 2000) break; }
+      }
+    } catch {}
     // Award leveling XP for all non-bot messages (gated in handleLeveling by channel rules)
     await handleLeveling(message, LEVEL_ROLES);
     // Cash drops: first check if a drop can be claimed by this message
@@ -88,24 +99,7 @@ function attachMessageEvents(client) {
       }
     }
 
-    if (!message.content.startsWith(".")) return;
-
-    // --- Duplicate command execution guard ---
-    // In some dev / hot-reload scenarios or accidental multiple listener attachments,
-    // a single message may trigger command handling twice. Guard by tagging the message.
-    if (message.__commandHandled) return; // already processed
-    message.__commandHandled = true;
-    // Also maintain a short-lived global set to catch edge cases where the message object differs
-    try {
-      const g = (client.__handledCommandIds = client.__handledCommandIds || new Set());
-      if (g.has(message.id)) return; // already processed via different object reference
-      g.add(message.id);
-      // Prune set occasionally to avoid unbounded growth
-      if (g.size > 5000) {
-        // Remove oldest ~20% (inefficient simple approach acceptable at this scale)
-        let i = 0; for (const id of g) { g.delete(id); if (++i > 1000) break; }
-      }
-    } catch {}
+  if (!message.content.startsWith(".")) return;
 
     const args = message.content.slice(1).trim().split(/\s+/);
     const command = args.shift().toLowerCase();
