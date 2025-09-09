@@ -1,4 +1,5 @@
 const { addSchedule, updateSchedule, getSchedules } = require("./scheduleStorage");
+const { getEvents, updateEvent } = require("./eventsStorage");
 const ms = require("ms");
 
 /**
@@ -158,6 +159,36 @@ function startScheduler(client, opts = {}) {
         console.error("Scheduler loop error for schedule", schedule.id, err);
       }
     }
+    // Handle multi-daily events
+    try {
+      const events = getEvents();
+      const nowDt = new Date();
+      const currentDay = nowDt.getDay();
+      const hh = nowDt.getHours().toString().padStart(2, "0");
+      const mm = nowDt.getMinutes().toString().padStart(2, "0");
+      const currentHM = `${hh}:${mm}`;
+      for (const ev of events) {
+        if (!ev.enabled) continue;
+        if (ev.type !== "multi-daily") continue;
+        if (Array.isArray(ev.days) && ev.days.length && !ev.days.includes(currentDay)) continue;
+        if (!Array.isArray(ev.times)) continue;
+        // fire exactly at listed time once (no duplicate within same minute)
+        if (ev.times.includes(currentHM)) {
+          const lastKey = `__lastFired_${currentHM}`;
+          if (ev[lastKey] && now - ev[lastKey] < 60000) continue; // already fired this minute
+          try {
+            const channel = await client.channels.fetch(ev.channelId).catch(() => null);
+            if (channel && channel.send) {
+              await channel.send({ content: ev.message || `Event: ${ev.name}` });
+            }
+          } catch (e) {
+            console.error("Event dispatch failed", ev.id, e);
+          }
+          ev[lastKey] = now;
+          updateEvent(ev.id, { [lastKey]: now });
+        }
+      }
+    } catch (e) { /* ignore event errors */ }
   }, tickInterval);
 }
 

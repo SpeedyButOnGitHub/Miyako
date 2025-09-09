@@ -5,7 +5,7 @@ const { config, saveConfig } = require("../utils/storage");
 const { logMemberLeave } = require("../utils/memberLogs");
 const { TEST_LOG_CHANNEL } = require("../utils/logChannels");
 const { spawnTestDrop, activeDrops } = require("../utils/cashDrops");
-const { clearTestingCash, getTestingCash, formatCash } = require("../utils/cash");
+const { clearTestingCash, getTestingCash } = require("../utils/cash");
 const theme = require("../utils/theme");
 
 const CATEGORY_ROOT = "root";
@@ -54,7 +54,7 @@ function buildEconomyEmbed() {
       "Spawn a test cash drop in the testing channel and try claiming it.\n" +
       "Test-mode drops and balances are sandboxed and do not affect real cash."
     )
-    .addFields({ name: "Your test balance", value: formatCash(bal), inline: true });
+    .addFields({ name: "Your test balance", value: `$${bal.toLocaleString()}`, inline: true });
 }
 
 function buildEconomyRow() {
@@ -80,10 +80,7 @@ async function handleTestCommand(client, message) {
 
       if (id === "test:toggle") {
         config.testingMode = !config.testingMode;
-        if (!config.testingMode) {
-          // Leaving testing: clear test economy overlay
-          clearTestingCash();
-        }
+        // Do NOT clear testing balances; they must persist across toggles & restarts
         saveConfig();
         return interaction.update({ embeds: [buildRootEmbed()], components: [buildRootRow()] });
       }
@@ -132,17 +129,14 @@ async function handleTestCommand(client, message) {
         const drop = spawnTestDrop(num);
         const channel = await client.channels.fetch(TEST_LOG_CHANNEL).catch(() => null);
         if (channel) {
-          const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+          const { EmbedBuilder } = require("discord.js");
           const embed = new EmbedBuilder()
-            .setTitle("🧪 � Test Cash Drop")
+            .setTitle("🧪 Test Cash Drop")
             .setColor(theme.colors.warning)
             .setDescription(`Type this word to claim it first:\n\n→ \`${drop.word}\``)
-            .addFields({ name: "Reward", value: `**${drop.amount}** coins`, inline: true })
+            .addFields({ name: "Reward", value: `**$${drop.amount.toLocaleString()}**`, inline: true })
             .setFooter({ text: "First correct message wins (testing)." });
-          const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId("cash:check:test").setLabel("Check Balance").setEmoji("💳").setStyle(ButtonStyle.Secondary)
-          );
-          await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
+          await channel.send({ embeds: [embed], components: [] }).catch(() => {});
         }
         await submitted.reply({ content: `Spawned a test drop of ${drop.amount} in <#${TEST_LOG_CHANNEL}>.`, ephemeral: true });
         // Stay on economy view and refresh balance row

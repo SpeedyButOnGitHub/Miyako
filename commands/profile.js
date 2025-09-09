@@ -6,6 +6,7 @@ const { config } = require("../utils/storage");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
 const { getCash, formatCash, getTopCash } = require("../utils/cash");
+const { getBank, getBaseLimit } = require("../utils/bank");
 
 // Map configured level reward roles to human-friendly labels
 const PERMISSION_ROLE_LABELS = {
@@ -136,14 +137,15 @@ function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 
     ? `\n— —\nYou: **#${rank}** <@${viewerId}>`
     : "";
 
-  // Build Cash leaderboard section (top 10) appended below
-  const topCash = getTopCash(10) || [];
-  const cashLines = topCash.map((e, i) => {
+  // Build Bank leaderboard section (top 10)
+  const { getTopBank } = require("../utils/bank");
+  const topBank = getTopBank(10);
+  const bankLines = topBank.map((e, i) => {
     const rankNum = i + 1;
     const medal = rankNum === 1 ? "🥇" : rankNum === 2 ? "🥈" : rankNum === 3 ? "🥉" : `#${rankNum}`;
-    return `${medal} <@${e.userId}> — ${formatCash(e.amount)}`;
+    return `${medal} <@${e.userId}> — $${e.amount.toLocaleString()}`;
   });
-  const cashSection = `\n\n💰 Cash Leaderboard\n${cashLines.length ? cashLines.join("\n") : "No balances yet."}`;
+  const cashSection = `\n\n🏦 Bank Leaderboard\n${bankLines.length ? bankLines.join("\n") : "No balances yet."}`;
   return new EmbedBuilder()
     .setTitle(mode === "text" ? "🏆 Leaderboard" : "🎙️ VC Leaderboard")
   .setColor(mode === "text" ? theme.colors.warning : theme.colors.danger)
@@ -177,6 +179,8 @@ async function handleProfileCommand(client, message) {
   const userPerms = collectUserPermissions(member, mode);
   const permsDisplay = formatPermissionPhrases(userPerms);
 
+  const bank = getBank(userId) || 0;
+  const base = getBaseLimit();
   const embed = new EmbedBuilder()
     .setColor(theme.colors.primary)
     .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
@@ -186,7 +190,8 @@ async function handleProfileCommand(client, message) {
       { name: "Level", value: `\`Lv. ${level}\``, inline: true },
       { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
   { name: "XP Modifier", value: `x${effective.toFixed(2)}`, inline: true },
-  { name: "Cash", value: `${formatCash(getCash(userId))}`, inline: true },
+  { name: "Money", value: `$${(getCash(userId)||0).toLocaleString()}` , inline: true },
+  { name: "Bank", value: `$${bank.toLocaleString()}/$${base.toLocaleString()}`, inline: true },
     )
     .addFields(
       { name: "Progress", value: `${progressBar}`, inline: false },
@@ -265,7 +270,9 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
       const userMod = getUserModifier(uid) || 1.0;
       const globalMod = typeof config.globalXPMultiplier === "number" ? config.globalXPMultiplier : 1.0;
       const eff = Math.max(0, +(userMod * globalMod).toFixed(2));
-      const pEmbed = new EmbedBuilder()
+  const bankNow = getBank(uid) || 0;
+  const baseNow = getBaseLimit();
+  const pEmbed = new EmbedBuilder()
         .setColor(m === "text" ? theme.colors.primary : theme.colors.danger)
         .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
@@ -274,7 +281,8 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
           { name: "Level", value: `\`Lv. ${userLvl}\``, inline: true },
           { name: "Rank", value: r ? `#${r}` : "—", inline: true },
           { name: m === "text" ? "XP Modifier" : "VC XP Modifier", value: `x${eff.toFixed(2)}`, inline: true },
-          { name: "Cash", value: `${formatCash(getCash(uid))}`, inline: true },
+          { name: "Money", value: `$${(getCash(uid)||0).toLocaleString()}` , inline: true },
+          { name: "Bank", value: `$${bankNow.toLocaleString()}/$${baseNow.toLocaleString()}`, inline: true },
         )
         .addFields(
           { name: "Progress", value: `${bar}`, inline: false },
@@ -335,6 +343,8 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
   const upcoming = Object.keys(rewardsForMode || {})
     .map(n => Number(n)).filter(n => Number.isFinite(n) && n > lvl)
     .sort((a,b) => a-b)[0];
+  const bank0 = getBank(uid) || 0;
+  const base0 = getBaseLimit();
   const pEmbed = new EmbedBuilder()
     .setColor(mode === "text" ? theme.colors.primary : theme.colors.danger)
     .setAuthor({ name: `${member.user.tag}`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
@@ -344,7 +354,8 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
       { name: "Level", value: `\`Lv. ${lvl}\``, inline: true },
       { name: "Rank", value: rank ? `#${rank}` : "—", inline: true },
   { name: "XP Modifier", value: `x${eff.toFixed(2)}`, inline: true },
-  { name: "Cash", value: `${formatCash(getCash(uid))}`, inline: true },
+  { name: "Money", value: `$${(getCash(uid)||0).toLocaleString()}` , inline: true },
+  { name: "Bank", value: `$${bank0.toLocaleString()}/$${base0.toLocaleString()}`, inline: true },
     )
     .addFields(
       { name: "Progress", value: `${bar}`, inline: false },

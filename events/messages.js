@@ -41,8 +41,8 @@ function attachMessageEvents(client) {
       const claimEmbed = new EmbedBuilder()
         .setTitle(`🎉 Cash Claimed${testTag}`)
         .setColor(theme.colors.success)
-        .setDescription(`Looks like someone snagged the bag! You received **${claimed.amount}**.`)
-        .addFields({ name: "New Balance", value: `${claimed.testing ? "(test) " : ""}${claimed.newBalance}`, inline: true })
+        .setDescription(`Looks like someone snagged the bag! You received **$${claimed.amount.toLocaleString()}**.`)
+        .addFields({ name: "New Balance", value: `${claimed.testing ? "(test) " : ""}$${Number(claimed.newBalance || 0).toLocaleString()}` , inline: true })
         .setFooter({ text: "Keep chatting for more surprise drops!" });
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId(claimed.testing ? "cash:check:test" : "cash:check").setLabel("Check Balance").setEmoji("💳").setStyle(ButtonStyle.Primary)
@@ -52,7 +52,7 @@ function attachMessageEvents(client) {
       const drop = maybeSpawnDrop(message, config);
       if (drop) {
         const isTest = !!drop.testing;
-        const spawnEmbed = new EmbedBuilder()
+    const spawnEmbed = new EmbedBuilder()
           .setTitle(`${isTest ? "🧪 " : ""}💸 A Wild Cash Drop Appeared!`)
           .setColor(theme.colors.warning)
           .setDescription(
@@ -61,14 +61,11 @@ function attachMessageEvents(client) {
             `→ \`${drop.word}\``
           )
           .addFields(
-            { name: "Reward", value: `**${drop.amount}** coins`, inline: true },
+      { name: "Reward", value: `**$${drop.amount.toLocaleString()}**`, inline: true },
             { name: "How", value: "Send the word exactly as shown.", inline: true }
           )
           .setFooter({ text: "First correct message wins. Good luck!" });
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("cash:check").setLabel("Check Balance").setEmoji("💳").setStyle(ButtonStyle.Secondary)
-        );
-        try { await message.reply({ embeds: [spawnEmbed], components: [row], allowedMentions: { repliedUser: false } }); } catch {}
+  try { await message.reply({ embeds: [spawnEmbed], allowedMentions: { repliedUser: false } }); } catch {}
       }
     }
 
@@ -98,8 +95,13 @@ function attachMessageEvents(client) {
         await handleLeaderboardCommand(client, message);
       } else if (command === "restart") {
         if (message.author.id !== process.env.OWNER_ID) return;
-        await message.reply("🔄 Restarting bot...");
-        process.exit(0);
+        // Record restart timestamp for next boot to compute downtime
+        try {
+          const fs = require("fs");
+            fs.writeFileSync("./config/lastShutdown.json", JSON.stringify({ ts: Date.now() }));
+        } catch {}
+        await message.reply({ content: "🔄 Restarting bot...", allowedMentions: { repliedUser: false } }).catch(() => {});
+        setTimeout(() => process.exit(0), 75);
       } else if (command === "stop") {
         if (message.author.id !== process.env.OWNER_ID) return;
         await message.reply("🛑 Stopping bot...");

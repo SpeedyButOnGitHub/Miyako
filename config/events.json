@@ -1,0 +1,29 @@
+{
+  "nextId": 2,
+  "events": [
+    {
+      "id": "1",
+      "name": "Midnight Bar",
+      "description": "Daily opening windows for the Midnight Bar event.",
+      "channelId": "1413966369296220233",
+      "enabled": true,
+      "times": [
+        "06:00",
+        "07:00",
+        "08:00",
+        "09:00",
+        "10:00"
+      ],
+      "days": [
+        0,
+        2,
+        3,
+        4,
+        5
+      ],
+      "type": "multi-daily",
+      "color": 3066993,
+      "__lastFired_10:00": 1757404809004
+    }
+  ]
+}

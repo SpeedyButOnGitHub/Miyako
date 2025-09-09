@@ -4,12 +4,16 @@ const { handleWarningButtons } = require("../commands/moderation/index");
 const { config, saveConfig } = require("../utils/storage");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("../commands/moderation/replies");
 const { renderSettingEmbed } = require("../commands/configMenu");
-const { handleScheduleModal } = require("../commands/schedule");
+const { handleScheduleModal, handleEventCreateModal, handleEventEditModal } = require("../commands/schedule");
 const ActiveMenus = require("../utils/activeMenus");
 const { sendModLog } = require("../utils/modLogs");
 const { sendUserDM } = require("../commands/moderation/dm");
 const { parseDurationAndReason } = require("../utils/time");
-const { handleBalanceCommand } = require("../commands/balance");
+const { handleBalanceCommand, buildDepositMenuPayload, buildWithdrawMenuPayload, buildBalancePayload, bankColor, buildStatusLine } = require("../commands/balance");
+const { addProgress } = require("../utils/depositProgress");
+const { depositToBank, withdrawFromBank, amountToNextThreshold, quoteDeposit, getBank, getBaseLimit, computeMaxAffordableDeposit, computeTaxForDeposit } = require("../utils/bank");
+const { getCash, getTestingCash } = require("../utils/cash");
+const theme = require("../utils/theme");
 
 // Pending Kick/Ban confirmations: key = `${userId}:${action}:${moderatorId}` -> { reason: string|null, originChannelId?:string, originMessageId?:string }
 const pendingPunishments = new Map();
@@ -25,21 +29,198 @@ function attachInteractionEvents(client) {
 
       // Cash balance quick button
       if (interaction.isButton() && interaction.customId && interaction.customId.startsWith("cash:check")) {
-        // Reuse the balance command handler by fabricating a message-like
-        const channel = interaction.channel;
-        if (channel) {
-          await interaction.deferUpdate().catch(() => {});
+        // Reply ephemerally with the balance embed/buttons
+        const { buildBalancePayload } = require("../commands/balance");
+        const payload = buildBalancePayload(interaction.user.id);
+        await interaction.reply({ ...payload, ephemeral: true }).catch(() => {});
+        return;
+      }
+
+      // --- New Balance Menu System ---
+      if (interaction.isButton() && interaction.customId === "bank:menu:deposit") {
+        await interaction.deferUpdate().catch(() => {});
+        try { await interaction.message.edit(buildDepositMenuPayload(interaction.user.id)); } catch {}
+        return;
+      }
+      if (interaction.isButton() && interaction.customId === "bank:menu:withdraw") {
+        await interaction.deferUpdate().catch(() => {});
+        try { await interaction.message.edit(buildWithdrawMenuPayload(interaction.user.id)); } catch {}
+        return;
+      }
+      if (interaction.isButton() && interaction.customId === "bank:back") {
+        await interaction.deferUpdate().catch(() => {});
+        try { await interaction.message.edit(buildBalancePayload(interaction.user.id)); } catch {}
+        return;
+      }
+
+      // Deposit amount (opens modal) -> ephemeral confirmation
+      if (interaction.isButton() && interaction.customId === "bank:deposit:amount") {
+        const modalId = `bank_deposit_amount_${Date.now()}`;
+        const modal = new ModalBuilder().setCustomId(modalId).setTitle("Deposit Amount").addComponents(new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId("amount").setLabel("Amount (number)").setStyle(TextInputStyle.Short).setRequired(true)
+        ));
+        await interaction.showModal(modal);
+        const submitted = await interaction.awaitModalSubmit({ time: 30000, filter: i => i.customId === modalId && i.user.id === interaction.user.id }).catch(() => null);
+        if (!submitted) return;
+        const raw = submitted.fields.getTextInputValue("amount");
+        const amt = Math.max(0, Math.floor(Number((raw||"").replace(/[^0-9]/g, "")) || 0));
+        if (amt <= 0) { await submitted.reply({ content: "❌ Enter a positive amount.", ephemeral: true }); return; }
+        const q = quoteDeposit(interaction.user.id, amt);
+        if (!q.ok) { await submitted.reply({ content: "❌ Invalid amount.", ephemeral: true }); return; }
+        const taxPct = q.deposit > 0 ? (q.tax / q.deposit) * 100 : 0;
+        let warningLine = "";
+        if (q.requiresConfirmation) {
+          warningLine = `\n\n⚠️ **Warning:** Above / crossing daily limit. Tax: **$${q.tax.toLocaleString()}** (${taxPct.toFixed(1)}%) (Total Cost: **$${q.totalCost.toLocaleString()}**).`;
+        } else if (q.tax > 0) {
+          warningLine = `\n\nTax: **$${q.tax.toLocaleString()}** (${taxPct.toFixed(1)}%) (Total Cost: **$${q.totalCost.toLocaleString()}**).`;
+        }
+        const content = `Confirm depositing **$${q.deposit.toLocaleString()}**?${warningLine}`;
+        const rootMsgId = interaction.message?.id; // original menu message id
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`bank:confirm:${q.deposit}:${q.tax}:${q.totalCost}:${rootMsgId}`).setLabel("Confirm").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId(`bank:confirm:toLimit:${rootMsgId}`).setLabel("To Limit").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+        );
+        await submitted.reply({ content, components: [row], ephemeral: true }).catch(() => {});
+        return;
+      }
+
+      // Deposit Max logic per spec
+      if (interaction.isButton() && interaction.customId === "bank:deposit:max") {
+        const bankBal = getBank(interaction.user.id) || 0;
+        const base = getBaseLimit();
+        const maxAff = computeMaxAffordableDeposit(interaction.user.id);
+        if (maxAff.deposit <= 0) {
+          await interaction.reply({ content: "Nothing to deposit.", ephemeral: true }).catch(()=>{});
+          return;
+        }
+        const taxPct = maxAff.deposit > 0 ? (maxAff.tax / maxAff.deposit) * 100 : 0;
+        const warnNeeded = bankBal >= base || (bankBal < base && bankBal + maxAff.deposit > base);
+        const warn = warnNeeded ? `\n\n⚠️ **Warning:** Above / crossing daily limit. Tax: **$${maxAff.tax.toLocaleString()}** (${taxPct.toFixed(1)}%) (Total Cost: **$${maxAff.totalCost.toLocaleString()}**).` : (maxAff.tax ? `\n\nTax: **$${maxAff.tax.toLocaleString()}** (${taxPct.toFixed(1)}%)` : "");
+        const content = `Confirm Deposit Max: **$${maxAff.deposit.toLocaleString()}**?${warn}`;
+        const rootMsgId = interaction.message?.id;
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`bank:confirm:${maxAff.deposit}:${maxAff.tax}:${maxAff.totalCost}:${rootMsgId}`).setLabel("Confirm Max").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId(`bank:confirm:toLimit:${rootMsgId}`).setLabel("To Limit").setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+        );
+        await interaction.reply({ content, components: [row], ephemeral: true }).catch(()=>{});
+        return;
+      }
+
+      // Withdraw amount
+      if (interaction.isButton() && interaction.customId === "bank:withdraw:amount") {
+        const modalId = `bank_withdraw_amount_${Date.now()}`;
+        const modal = new ModalBuilder().setCustomId(modalId).setTitle("Withdraw Amount").addComponents(new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId("amount").setLabel("Amount (number)").setStyle(TextInputStyle.Short).setRequired(true)
+        ));
+        await interaction.showModal(modal);
+        const submitted = await interaction.awaitModalSubmit({ time:30000, filter:i=>i.customId===modalId && i.user.id===interaction.user.id }).catch(()=>null);
+        if (!submitted) return;
+        const raw = submitted.fields.getTextInputValue("amount");
+        const amt = Math.max(0, Math.floor(Number((raw||"").replace(/[^0-9]/g, ""))||0));
+        if (amt<=0) { await submitted.reply({ content: "❌ Enter a positive amount.", ephemeral:true }); return; }
+        if (amt > getBank(interaction.user.id)) { await submitted.reply({ content: "❌ You don't have that much in the bank.", ephemeral:true }); return; }
+        const content = `Confirm withdrawing $${amt.toLocaleString()}?`;
+        const rootMsgId = interaction.message?.id;
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`bank:withdraw:confirm:${amt}:${rootMsgId}`).setLabel("Confirm").setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+        );
+        await submitted.reply({ content, components:[row], ephemeral:true }).catch(()=>{});
+        return;
+      }
+
+      // Withdraw Max (no penalty) -> confirm
+      if (interaction.isButton() && interaction.customId === "bank:withdraw:max") {
+        const bankBal = getBank(interaction.user.id);
+        if (bankBal <= 0) { await interaction.reply({ content: "Bank is empty.", ephemeral:true }).catch(()=>{}); return; }
+        const rootMsgId = interaction.message?.id;
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`bank:withdraw:confirm:${bankBal}:${rootMsgId}`).setLabel("Confirm Withdraw All").setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("bank:decline").setLabel("Cancel").setStyle(ButtonStyle.Secondary)
+        );
+        await interaction.reply({ content: `Withdraw all $${bankBal.toLocaleString()}?`, components:[row], ephemeral:true }).catch(()=>{});
+        return;
+      }
+
+      // Confirmation handlers
+      if (interaction.isButton() && interaction.customId.startsWith("bank:confirm:toLimit")) {
+        const parts = interaction.customId.split(":");
+        const rootId = parts[3];
+        const base = getBaseLimit();
+        const bankBal = getBank(interaction.user.id);
+        if (bankBal >= base) {
+          await interaction.reply({ content: "Already at or above the daily limit.", ephemeral:true }).catch(()=>{});
+          return;
+        }
+        const needed = base - bankBal;
+        const q = quoteDeposit(interaction.user.id, needed);
+        if (!q.ok) { await interaction.reply({ content: "❌ Could not compute required amount.", ephemeral:true }).catch(()=>{}); return; }
+  const res = depositToBank(interaction.user.id, q.deposit, { allowAboveLimit:true });
+        if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Deposit failed"}`, ephemeral:true }).catch(()=>{}); return; }
+  addProgress(interaction.user.id, res.moved || 0);
+  const pct = res.moved ? ((res.tax || 0) / res.moved) * 100 : 0;
+  await interaction.reply({ content: `✅ Deposited $${res.moved.toLocaleString()} to reach the daily limit.${res.tax?` Tax $${res.tax.toLocaleString()} (${pct.toFixed(1)}%)`:''}`, ephemeral:true }).catch(()=>{});
+        // Revert original menu (if we have the id) back to root balance
+        if (rootId) {
           try {
-            // Create a lightweight shim to route to same embed output
-            const fakeMsg = {
-              author: interaction.user,
-              reply: (payload) => channel.send(payload)
-            };
-            await handleBalanceCommand(interaction.client, fakeMsg);
+            const channel = interaction.channel;
+            if (channel?.messages?.fetch) {
+              const rootMsg = await channel.messages.fetch(rootId).catch(()=>null);
+              if (rootMsg) await rootMsg.edit(buildBalancePayload(interaction.user.id)).catch(()=>{});
+            }
           } catch {}
         }
         return;
       }
+      if (interaction.isButton() && interaction.customId.startsWith("bank:confirm:")) {
+        const parts = interaction.customId.split(":");
+        const depositAmt = Number(parts[2])||0;
+        const tax = Number(parts[3])||0;
+        const total = Number(parts[4])|| (depositAmt+tax);
+        const rootId = parts[5];
+        const res = depositToBank(interaction.user.id, depositAmt, { allowAboveLimit:true });
+        if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Deposit failed"}`, ephemeral:true }).catch(()=>{}); return; }
+        addProgress(interaction.user.id, res.moved || 0);
+        await interaction.reply({ content: `✅ Deposited $${res.moved.toLocaleString()}${tax?` (Tax $${tax.toLocaleString()})`:""}.`, ephemeral:true }).catch(()=>{});
+        // Revert original menu back to balance root if we know it
+        if (rootId) {
+          try {
+            const channel = interaction.channel;
+            if (channel?.messages?.fetch) {
+              const rootMsg = await channel.messages.fetch(rootId).catch(()=>null);
+              if (rootMsg) await rootMsg.edit(buildBalancePayload(interaction.user.id)).catch(()=>{});
+            }
+          } catch {}
+        }
+        return;
+      }
+      if (interaction.isButton() && interaction.customId.startsWith("bank:withdraw:confirm:")) {
+        const parts = interaction.customId.split(":");
+        const amt = Number(parts[3])||0;
+        const rootId = parts[4];
+        const res = withdrawFromBank(interaction.user.id, amt);
+        if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Withdraw failed"}`, ephemeral:true }).catch(()=>{}); return; }
+        await interaction.reply({ content: `✅ Withdrew $${res.moved.toLocaleString()}.`, ephemeral:true }).catch(()=>{});
+        // Revert to root balance menu (withdraw does not affect progress)
+        if (rootId) {
+          try {
+            const channel = interaction.channel;
+            if (channel?.messages?.fetch) {
+              const rootMsg = await channel.messages.fetch(rootId).catch(()=>null);
+              if (rootMsg) await rootMsg.edit(buildBalancePayload(interaction.user.id)).catch(()=>{});
+            }
+          } catch {}
+        }
+        return;
+      }
+      if (interaction.isButton() && (interaction.customId === "bank:decline")) {
+        await interaction.reply({ content: "❌ Cancelled.", ephemeral:true }).catch(()=>{});
+        return;
+      }
+
+  // (Old handlers removed and replaced by new menu system above)
 
       // Warnings dashboard/buttons/selects/modals (only routes warns:*)
       if (
@@ -586,6 +767,15 @@ function attachInteractionEvents(client) {
       // Schedule creation modal submit
       if (interaction.type === InteractionType.ModalSubmit && interaction.customId.startsWith("schedule_create_modal")) {
         await handleScheduleModal(interaction);
+        return;
+      }
+      // Event creation modal submit
+      if (interaction.type === InteractionType.ModalSubmit && interaction.customId === "event_create_modal") {
+        await handleEventCreateModal(interaction);
+        return;
+      }
+      if (interaction.type === InteractionType.ModalSubmit && /^event_(times|days|msg)_modal_/.test(interaction.customId)) {
+        await handleEventEditModal(interaction);
         return;
       }
     } catch (err) {

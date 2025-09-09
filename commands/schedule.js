@@ -1,132 +1,220 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ComponentType } = require("discord.js");
-const { addSchedule, getSchedules, removeSchedule, getSchedule, updateSchedule } = require("../utils/scheduleStorage");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ComponentType, StringSelectMenuBuilder } = require("discord.js");
+const { addSchedule, getSchedules, removeSchedule, getSchedule, updateSchedule } = require("../utils/scheduleStorage"); // legacy (kept for compatibility)
+const { getEvents, getEvent, addEvent, updateEvent, removeEvent } = require("../utils/eventsStorage");
 const { computeNextRun } = require("../utils/scheduler");
 const { OWNER_ID } = require("./moderation/permissions");
+const theme = require("../utils/theme");
 
-function humanizeFrequency(s) {
-  if (!s) return "Unknown";
-  if (s.type === "once") return `Once — ${s.date} ${s.time}`;
-  if (s.type === "daily") return `Daily at ${s.time}`;
-  if (s.type === "weekly") return `Weekly on ${s.days?.map(d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(", ")} at ${s.time}`;
-  if (s.type === "monthly") return `Monthly on day ${s.dayOfMonth} at ${s.time}`;
-  if (s.type === "interval") return `Every ${s.intervalDays} day(s) at ${s.time}`;
-  return "Custom";
+// --- Event Manager Implementation ---
+
+const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function buildEventsMainEmbed() {
+  const evs = getEvents();
+  const embed = new EmbedBuilder()
+    .setTitle("🎉 Events Manager")
+    .setColor(theme.colors?.primary || 0x5865F2)
+    .setDescription("Create, delete, and customize multi-time events.");
+  const body = evs.length ? evs.map(e => {
+    const times = (e.times||[]).join(", ") || "(no times)";
+    const days = (e.days||[]).map(d=>DAY_NAMES[d]||d).join(" ") || "(all?)";
+    return `${e.enabled?"🟢":"🔴"} **${e.name}** (ID ${e.id})\n• Times: ${times}\n• Days: ${days}`;
+  }).join("\n\n") : "*No events defined*";
+  embed.setDescription(body + "\n\nUse the buttons below.");
+  return embed;
+}
+
+function buildEventDetailEmbed(ev) {
+  const times = (ev.times||[]).length ? ev.times.join(", ") : "(none)";
+  const days = (ev.days||[]).length ? ev.days.map(d=>DAY_NAMES[d]||d).join(", ") : "(none)";
+  return new EmbedBuilder()
+    .setTitle(`${ev.enabled?"🟢":"🔴"} ${ev.name}`)
+    .setColor(ev.enabled ? (theme.colors?.success || 0x00ff00) : (theme.colors?.danger || 0xff5555))
+    .setDescription(ev.description || "No description.")
+    .addFields(
+      { name: "Channel", value: ev.channelId ? `<#${ev.channelId}>` : "(none)", inline: true },
+      { name: "Type", value: ev.type || "multi-daily", inline: true },
+      { name: "Enabled", value: ev.enabled ? "Yes" : "No", inline: true },
+      { name: "Times", value: times, inline: false },
+      { name: "Days", value: days, inline: false },
+      { name: "Message", value: ev.message ? (ev.message.length>200 ? ev.message.slice(0,197)+"..." : ev.message) : "(none)" }
+    )
+    .setFooter({ text: `Event ID ${ev.id}` });
 }
 
 async function handleScheduleCommand(client, message) {
   if (message.author.id !== OWNER_ID) return message.reply("Only owner can use schedule command.");
-  const schedules = getSchedules();
 
-  const embed = new EmbedBuilder()
-    .setTitle("📅 Schedule Manager")
-    .setColor(0x5865F2)
-    .setDescription("Create and manage automated scheduled messages.\n\nClick Create to make a new schedule. Select a schedule to delete or toggle it.")
-    .setTimestamp();
+  let mode = "main"; // main | select | delete | detail
+  let currentEventId = null;
 
-  const listText = schedules.length
-    ? schedules.map(s => `**[${s.id}] ${s.name}** — ${humanizeFrequency(s)} — ${s.enabled ? "Enabled" : "Disabled"}`).join("\n")
-    : "*No schedules configured*";
+  const buildMainComponents = () => {
+    const evs = getEvents();
+    return [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("ev_create").setLabel("Create").setStyle(ButtonStyle.Success).setEmoji("➕"),
+        new ButtonBuilder().setCustomId("ev_delete_mode").setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
+        new ButtonBuilder().setCustomId("ev_select_mode").setLabel("Select").setStyle(ButtonStyle.Primary).setEmoji("🎯").setDisabled(!evs.length)
+      )
+    ];
+  };
 
-  embed.addFields({ name: "Configured Schedules", value: listText });
+  const replyMsg = await message.reply({ embeds: [buildEventsMainEmbed()], components: buildMainComponents(), allowedMentions: { repliedUser: false } });
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("sched_create").setLabel("Create").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("sched_list_refresh").setLabel("Refresh").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("sched_close").setLabel("Close").setStyle(ButtonStyle.Danger)
-  );
-
-  // Buttons for each schedule: delete / toggle — cap to 4 rows to respect Discord's 5-row max (1 main + 4 controls)
-  const controlRows = [];
-  for (const s of schedules.slice(0, 4)) {
-    const r = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`sched_toggle_${s.id}`).setLabel(s.enabled ? `Disable ${s.id}` : `Enable ${s.id}`).setStyle(s.enabled ? ButtonStyle.Secondary : ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`sched_delete_${s.id}`).setLabel(`Delete ${s.id}`).setStyle(ButtonStyle.Danger)
-    );
-    controlRows.push(r);
-  }
-
-  const replyMsg = await message.reply({ embeds: [embed], components: [row, ...controlRows], allowedMentions: { repliedUser: false } });
-
-  const collector = replyMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 5 * 60 * 1000 });
+  const collector = replyMsg.createMessageComponentCollector({ time: 5 * 60 * 1000 });
 
   collector.on("collect", async interaction => {
     if (interaction.user.id !== OWNER_ID) {
       await interaction.reply({ content: "Only owner may manage schedules.", ephemeral: true });
       return;
     }
-
-    // Create: show modal to create schedule
-    if (interaction.customId === "sched_create") {
-      const modal = new ModalBuilder()
-        .setCustomId("schedule_create_modal")
-        .setTitle("Create Schedule");
-
-      // Discord limits modals to 5 inputs; collect core fields and a flexible Extras field
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("name").setLabel("Name").setStyle(TextInputStyle.Short).setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("channel").setLabel("Channel ID or #channel").setStyle(TextInputStyle.Short).setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("type").setLabel("Type (once/daily/weekly/monthly/interval)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("e.g. weekly")
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("time").setLabel("Time (HH:MM 24h)").setStyle(TextInputStyle.Short).setRequired(true).setPlaceholder("14:30")
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId("extras").setLabel("Extras (date/days/interval/repeats)").setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder("once: 2025-09-08 | weekly: Mon,Wed | monthly: 15 | interval: 2; repeats=5")
-        )
-      );
-
-      await interaction.showModal(modal);
-      return;
+    // --- Main mode buttons ---
+    if (interaction.isButton()) {
+      const id = interaction.customId;
+      if (id === "ev_create") {
+        const modal = new ModalBuilder()
+          .setCustomId("event_create_modal")
+          .setTitle("Create Event")
+          .addComponents(
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("name").setLabel("Name").setStyle(TextInputStyle.Short).setRequired(true)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("channel").setLabel("Channel ID or #channel").setStyle(TextInputStyle.Short).setRequired(true)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("times").setLabel("Times (HH:MM,comma)").setStyle(TextInputStyle.Short).setRequired(true)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("days").setLabel("Days (Sun,Mon,...)").setStyle(TextInputStyle.Short).setRequired(true)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("message").setLabel("Message").setStyle(TextInputStyle.Paragraph).setRequired(true))
+          );
+        await interaction.showModal(modal);
+        return;
+      }
+      if (id === "ev_select_mode") {
+        mode = "select";
+        await interaction.deferUpdate();
+        const evs = getEvents();
+        const options = evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(" ").slice(0,100), emoji: e.enabled?"🟢":"🔴" }));
+        const rowSel = new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder().setCustomId("ev_select").setPlaceholder("Select an event...").addOptions(options)
+        );
+        const rowBack = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+        );
+        await replyMsg.edit({ embeds: [buildEventsMainEmbed()], components: [rowSel, rowBack] });
+        return;
+      }
+      if (id === "ev_delete_mode") {
+        mode = "delete";
+        await interaction.deferUpdate();
+        const evs = getEvents();
+        if (!evs.length) {
+          await interaction.followUp({ content: "No events to delete.", ephemeral: true });
+          mode = "main";
+          return;
+        }
+        const rowSel = new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder().setCustomId("ev_delete_select").setPlaceholder("Select event to delete").addOptions(
+            evs.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(" ").slice(0,100), emoji: "�️" }))
+          )
+        );
+        const rowBack = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+        );
+        await replyMsg.edit({ embeds: [buildEventsMainEmbed()], components: [rowSel, rowBack] });
+        return;
+      }
+      if (id === "ev_back_main") {
+        mode = "main"; currentEventId = null;
+        await interaction.deferUpdate();
+        await replyMsg.edit({ embeds: [buildEventsMainEmbed()], components: buildMainComponents() });
+        return;
+      }
+      // Detail mode buttons
+      if (id.startsWith("ev_toggle_")) {
+        const eid = id.split("_").pop();
+        const ev = getEvent(eid);
+        if (!ev) { await interaction.reply({ content: "Event missing.", ephemeral: true }); return; }
+        const updated = updateEvent(eid, { enabled: !ev.enabled });
+        await interaction.deferUpdate();
+        const detailRows = buildDetailRows(updated.id);
+        await replyMsg.edit({ embeds: [buildEventDetailEmbed(updated)], components: detailRows });
+        return;
+      }
+      if (id.startsWith("ev_edit_times_")) {
+        const eid = id.split("_").pop();
+        const ev = getEvent(eid); if (!ev) { await interaction.reply({ content: "Event missing.", ephemeral:true }); return; }
+        const modal = new ModalBuilder().setCustomId(`event_times_modal_${eid}`).setTitle("Edit Times").addComponents(
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("times").setLabel("Times (HH:MM,comma)").setStyle(TextInputStyle.Paragraph).setRequired(true).setValue((ev.times||[]).join(",")))
+        );
+        await interaction.showModal(modal); return;
+      }
+      if (id.startsWith("ev_edit_days_")) {
+        const eid = id.split("_").pop();
+        const ev = getEvent(eid); if (!ev) { await interaction.reply({ content: "Event missing.", ephemeral:true }); return; }
+        const modal = new ModalBuilder().setCustomId(`event_days_modal_${eid}`).setTitle("Edit Days").addComponents(
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("days").setLabel("Days (Sun,Mon,...)").setStyle(TextInputStyle.Short).setRequired(true).setValue((ev.days||[]).map(d=>DAY_NAMES[d]||d).join(",")))
+        );
+        await interaction.showModal(modal); return;
+      }
+      if (id.startsWith("ev_edit_msg_")) {
+        const eid = id.split("_").pop();
+        const ev = getEvent(eid); if (!ev) { await interaction.reply({ content: "Event missing.", ephemeral:true }); return; }
+        const modal = new ModalBuilder().setCustomId(`event_msg_modal_${eid}`).setTitle("Edit Message").addComponents(
+          new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("message").setLabel("Message Content").setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(ev.message || ""))
+        );
+        await interaction.showModal(modal); return;
+      }
+      if (id.startsWith("ev_delete_")) {
+        const eid = id.split("_").pop();
+        const ev = getEvent(eid); if (!ev) { await interaction.reply({ content: "Event missing.", ephemeral:true }); return; }
+        removeEvent(eid);
+        mode = "main"; currentEventId = null;
+        await interaction.reply({ content: `Deleted event ${ev.name}.`, ephemeral:true });
+        await replyMsg.edit({ embeds: [buildEventsMainEmbed()], components: buildMainComponents() });
+        return;
+      }
     }
 
-    if (interaction.customId === "sched_list_refresh") {
-      // refresh the embed
-      await interaction.deferUpdate();
-      const refreshed = getSchedules();
-      const desc = refreshed.length
-        ? refreshed.map(s => `**[${s.id}] ${s.name}** — ${humanizeFrequency(s)} — ${s.enabled ? "Enabled" : "Disabled"}`).join("\n")
-        : "*No schedules configured*";
-      const newEmbed = EmbedBuilder.from(embed).setFields({ name: "Configured Schedules", value: desc });
-      await replyMsg.edit({ embeds: [newEmbed] });
-      return;
+    // Select menu interactions
+    if (interaction.isStringSelectMenu()) {
+      const id = interaction.customId;
+      if (id === "ev_select") {
+        const eid = interaction.values[0];
+        const ev = getEvent(eid);
+        if (!ev) { await interaction.reply({ content: "Event not found.", ephemeral: true }); return; }
+        currentEventId = eid; mode = "detail";
+        await interaction.deferUpdate();
+        const detailRows = buildDetailRows(eid);
+        await replyMsg.edit({ embeds: [buildEventDetailEmbed(ev)], components: detailRows });
+        return;
+      }
+      if (id === "ev_delete_select") {
+        const eid = interaction.values[0];
+        const ev = getEvent(eid);
+        if (!ev) { await interaction.reply({ content: "Event not found.", ephemeral: true }); return; }
+        removeEvent(eid);
+        await interaction.deferUpdate();
+        // Return to delete selection (update list) or main if none left
+        const remaining = getEvents();
+        if (!remaining.length) {
+          mode = "main";
+          await replyMsg.edit({ embeds: [buildEventsMainEmbed()], components: buildMainComponents() });
+        } else {
+          const rowSel = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder().setCustomId("ev_delete_select").setPlaceholder("Select event to delete").addOptions(
+              remaining.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(" ").slice(0,100), emoji: "🗑️" }))
+            )
+          );
+            const rowBack = new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+            );
+          await replyMsg.edit({ embeds: [buildEventsMainEmbed()], components: [rowSel, rowBack] });
+        }
+        return;
+      }
     }
 
-    if (interaction.customId === "sched_close") {
-      await interaction.update({ content: "Schedule manager closed.", embeds: [], components: [] });
-      collector.stop();
-      return;
-    }
-
-    // toggle or delete schedule
-    if (interaction.customId.startsWith("sched_toggle_")) {
-      const id = interaction.customId.replace("sched_toggle_", "");
-      const s = getSchedule(id);
-      if (!s) return interaction.reply({ content: "Schedule not found.", ephemeral: true });
-      const updated = updateSchedule(id, { enabled: !s.enabled });
-      await interaction.reply({ content: `Schedule ${id} ${updated.enabled ? "enabled" : "disabled"}.`, ephemeral: true });
-      return;
-    }
-
-    if (interaction.customId.startsWith("sched_delete_")) {
-      const id = interaction.customId.replace("sched_delete_", "");
-      const ok = removeSchedule(id);
-      await interaction.reply({ content: ok ? `Schedule ${id} deleted.` : `Schedule ${id} not found.`, ephemeral: true });
-      return;
-    }
+  // Legacy schedule management removed from UI (still accessible via code if needed)
   });
 
   collector.on("end", async () => {
-    try {
-      const { timeoutRow } = require("../utils/activeMenus");
-      await replyMsg.edit({ components: timeoutRow() });
-    } catch {
-      try { await replyMsg.edit({ components: [] }); } catch {}
-    }
+    try { await replyMsg.edit({ components: [] }); } catch {}
   });
 }
 
@@ -190,7 +278,78 @@ async function handleScheduleModal(interaction) {
   await interaction.reply({ content: `Schedule "${name}" created and will run at <t:${Math.floor(schedule.nextRun/1000)}:F>`, ephemeral: true });
 }
 
+// Handle Event creation modal (called from interactionEvents if imported, or extend export usage)
+async function handleEventCreateModal(interaction) {
+  if (!interaction.isModalSubmit()) return;
+  if (interaction.customId !== "event_create_modal") return;
+  const name = interaction.fields.getTextInputValue("name").trim();
+  let channelId = interaction.fields.getTextInputValue("channel").trim().replace(/[<#>]/g, "");
+  const timesRaw = interaction.fields.getTextInputValue("times").trim();
+  const daysRaw = interaction.fields.getTextInputValue("days").trim();
+  const message = interaction.fields.getTextInputValue("message").trim();
+  const times = timesRaw.split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
+  const dayMap = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
+  const days = daysRaw.split(/[,\s]+/).map(d => d.trim().toLowerCase()).filter(Boolean).map(d => dayMap[d]).filter(d => d !== undefined);
+  if (!days.length) { await interaction.reply({ content: "❌ Invalid days.", ephemeral: true }); return; }
+  if (!times.length) { await interaction.reply({ content: "❌ Provide at least one time.", ephemeral: true }); return; }
+  const ev = addEvent({
+    name,
+    description: name,
+    channelId,
+    message,
+    enabled: true,
+    times,
+    days,
+    type: "multi-daily",
+    color: 0x00aa00
+  });
+  await interaction.reply({ content: `✅ Event ${ev.name} created with ${ev.times.length} time(s).`, ephemeral: true });
+}
+
+function buildDetailRows(eventId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`ev_toggle_${eventId}`).setLabel("Toggle").setStyle(ButtonStyle.Secondary).setEmoji("🔁"),
+      new ButtonBuilder().setCustomId(`ev_edit_times_${eventId}`).setLabel("Times").setStyle(ButtonStyle.Primary).setEmoji("🕒"),
+      new ButtonBuilder().setCustomId(`ev_edit_days_${eventId}`).setLabel("Days").setStyle(ButtonStyle.Primary).setEmoji("📅")
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`ev_edit_msg_${eventId}`).setLabel("Message").setStyle(ButtonStyle.Secondary).setEmoji("📝"),
+      new ButtonBuilder().setCustomId(`ev_delete_${eventId}`).setLabel("Delete").setStyle(ButtonStyle.Danger).setEmoji("🗑️"),
+      new ButtonBuilder().setCustomId("ev_back_main").setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+    )
+  ];
+}
+
+async function handleEventEditModal(interaction) {
+  if (!interaction.isModalSubmit()) return;
+  if (!/^event_(times|days|msg)_modal_/.test(interaction.customId)) return;
+  const [, kind,, id] = interaction.customId.split(/_|modal_/).filter(Boolean); // crude parse
+  const ev = getEvent(id);
+  if (!ev) { await interaction.reply({ content: "Event not found.", ephemeral:true }); return; }
+  if (interaction.customId.startsWith("event_times_modal_")) {
+    const raw = interaction.fields.getTextInputValue("times");
+    const times = raw.split(/[,\s]+/).map(t=>t.trim()).filter(Boolean);
+    if (!times.length) { await interaction.reply({ content: "❌ Provide times.", ephemeral:true }); return; }
+    updateEvent(ev.id, { times });
+    await interaction.reply({ content: "✅ Times updated.", ephemeral:true });
+  } else if (interaction.customId.startsWith("event_days_modal_")) {
+    const raw = interaction.fields.getTextInputValue("days");
+    const dayMap = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
+    const days = raw.split(/[,\s]+/).map(d=>d.trim().toLowerCase()).filter(Boolean).map(d=>dayMap[d]).filter(d=>d!==undefined);
+    if (!days.length) { await interaction.reply({ content: "❌ Invalid days.", ephemeral:true }); return; }
+    updateEvent(ev.id, { days });
+    await interaction.reply({ content: "✅ Days updated.", ephemeral:true });
+  } else if (interaction.customId.startsWith("event_msg_modal_")) {
+    const messageContent = interaction.fields.getTextInputValue("message");
+    updateEvent(ev.id, { message: messageContent });
+    await interaction.reply({ content: "✅ Message updated.", ephemeral:true });
+  }
+}
+
 module.exports = {
   handleScheduleCommand,
-  handleScheduleModal
+  handleScheduleModal,
+  handleEventCreateModal,
+  handleEventEditModal
 };

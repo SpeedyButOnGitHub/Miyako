@@ -4,6 +4,17 @@ const fs = require("fs");
 const path = require("path");
 const { config, saveConfig } = require("./utils/storage");
 const { postStartupChangelog } = require("./utils/changelog");
+let lastOfflineDurationMs = null;
+try {
+  if (fs.existsSync("./config/lastShutdown.json")) {
+    const raw = JSON.parse(fs.readFileSync("./config/lastShutdown.json", "utf8"));
+    if (raw && raw.ts) {
+      lastOfflineDurationMs = Date.now() - raw.ts;
+      // remove file after reading
+      try { fs.unlinkSync("./config/lastShutdown.json"); } catch {}
+    }
+  }
+} catch {}
 const { attachMessageEvents } = require("./events/messages");
 const { attachGuildEvents } = require("./events/guildEvents");
 const { attachInteractionEvents } = require("./events/interactionEvents");
@@ -11,6 +22,8 @@ const { startScheduler } = require("./utils/scheduler");
 const ActiveMenus = require("./utils/activeMenus");
 const { startVoiceLeveling } = require("./utils/voiceLeveling");
 const { startCashDrops } = require("./utils/cashDrops");
+// Load daily deposit progress tracker
+try { require("./utils/depositProgress").load(); } catch {}
 // debug: ensure functions are imported correctly
 // console.log('attachMessageEvents typeof =', typeof attachMessageEvents);
 // console.log('attachGuildEvents typeof =', typeof attachGuildEvents);
@@ -47,13 +60,13 @@ async function sendBotStatusMessage() {
   if (channel) {
     // Build a single, modern embed with inline smart changelog
     const isColdStart = diff >= 5 * 60 * 1000;
-    const title = isColdStart ? "🟢 Miyako is Online" : "🔄 Miyako Restarted";
+  const title = isColdStart ? "🟢 Miyako is Online" : "🔄 Miyako Restarted";
     const color = isColdStart ? 0x5865F2 : 0xFFD700;
 
     const embed = new EmbedBuilder()
       .setTitle(title)
       .setColor(color)
-      .setDescription(isColdStart ? "All systems are up. Here's what changed since last run:" : "Restart complete. Here's what changed since last run:")
+  .setDescription(isColdStart ? "All systems are up. Here's what changed since last run:" : `Restart complete. ${lastOfflineDurationMs!=null ? `Offline for ${Math.max(0, Math.round(lastOfflineDurationMs/1000))}s.` : ""} Here's what changed since last run:`)
       .setTimestamp();
 
     // Inline changelog: compute diff and add as fields/description

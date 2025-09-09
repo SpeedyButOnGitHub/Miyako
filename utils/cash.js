@@ -12,8 +12,14 @@ try {
   cash = {};
 }
 
-// Testing overlay balances (not persisted)
-const testingCash = {};
+// Testing overlay balances (persisted separately)
+const TEST_CASH_FILE = path.resolve(__dirname, "../config/testingCash.json");
+let testingCash = {};
+try {
+  if (fs.existsSync(TEST_CASH_FILE)) {
+    testingCash = JSON.parse(fs.readFileSync(TEST_CASH_FILE, "utf8") || "{}");
+  }
+} catch { testingCash = {}; }
 
 let saveTimer = null;
 function scheduleSave() {
@@ -63,11 +69,13 @@ function addTestingCash(userId, delta) {
   const cur = getTestingCash(userId);
   const next = Math.max(0, cur + Math.floor(Number(delta) || 0));
   testingCash[userId] = { amount: next };
+  try { fs.writeFileSync(TEST_CASH_FILE, JSON.stringify(testingCash, null, 2)); } catch {}
   return next;
 }
 
 function clearTestingCash() {
-  for (const k of Object.keys(testingCash)) delete testingCash[k];
+  testingCash = {};
+  try { fs.writeFileSync(TEST_CASH_FILE, JSON.stringify(testingCash, null, 2)); } catch {}
 }
 
 module.exports = {
