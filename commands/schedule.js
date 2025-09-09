@@ -425,6 +425,17 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     ];
     ev.__clockIn = ev.__clockIn || { positions:{}, messageIds:[] };
     for (const p of POSITIONS) { if (!Array.isArray(ev.__clockIn.positions[p.key])) ev.__clockIn.positions[p.key] = []; }
+    // Deduplication: if a clock-in message was sent in last 5 minutes, skip creating a new one
+    try {
+      const DEDUP_MS = 5 * 60 * 1000;
+      if (ev.__clockIn.lastSentTs && (Date.now() - ev.__clockIn.lastSentTs) < DEDUP_MS) {
+        // Still update skip window markers if manually triggered for clarity
+        notif.__skipUntil = Date.now() + 60*60*1000;
+        notif.lastManualTrigger = Date.now();
+        updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn });
+        return true; // treat as success without duplication
+      }
+    } catch {}
   // Enforce standardized staff clock-in header (ignore saved custom message)
   let baseText = `🕒 Staff Clock-In — ${ev.name}`;
   baseText = applyEventName(baseText, ev);
@@ -447,7 +458,8 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     if (sent && !config.testingMode) {
       notif.__skipUntil = Date.now() + 60*60*1000; // skip for an hour
       notif.lastManualTrigger = Date.now();
-      updateEvent(ev.id, { autoMessages: ev.autoMessages });
+      ev.__clockIn.lastSentTs = Date.now();
+      updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn });
     }
     return !!sent;
   }

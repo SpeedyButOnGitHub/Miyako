@@ -134,6 +134,9 @@ function computeAfterRun(schedule) {
 
 function startScheduler(client, opts = {}) {
   const tickInterval = opts.intervalMs || 15 * 1000;
+  // Configurable clock-in dedup window (ms) via env or opts
+  const CLOCKIN_DEDUP_MS = Number(process.env.CLOCKIN_DEDUP_MS) || opts.clockInDedupMs || (5 * 60 * 1000);
+  const CLOCKIN_ORPHAN_MAX = Number(process.env.CLOCKIN_ORPHAN_MAX) || 10; // retain at most this many ids
 
   // ensure existing schedules have nextRun computed
   const schedules = getSchedules();
@@ -254,6 +257,31 @@ function startScheduler(client, opts = {}) {
                         const clockKey = '__clockIn';
                         const state = ev[clockKey] && typeof ev[clockKey]==='object' ? ev[clockKey] : { positions: {}, messageIds: [] };
                         for (const p of POSITIONS) { if (!Array.isArray(state.positions[p.key])) state.positions[p.key] = []; }
+                        // --- Deduplication: skip sending if a recent clock-in message already exists ---
+                        try {
+                          const DEDUP_MS = CLOCKIN_DEDUP_MS;
+                          let recentOk = false;
+                          const nowTs = Date.now();
+                          if (state.lastSentTs && (nowTs - state.lastSentTs) < DEDUP_MS) {
+                            recentOk = true;
+                          }
+                          // Fallback: probe last message id if timestamp missing
+                          if (!recentOk && Array.isArray(state.messageIds) && state.messageIds.length) {
+                            const lastId = state.messageIds[state.messageIds.length - 1];
+                            try {
+                              const lastMsg = await channel.messages.fetch(lastId).catch(()=>null);
+                              if (lastMsg) {
+                                // If last message younger than dedup window, skip
+                                if (nowTs - lastMsg.createdTimestamp < DEDUP_MS) recentOk = true;
+                              }
+                            } catch {}
+                          }
+                          if (recentOk) {
+                            // Ensure state persisted (positions may have changed earlier) but do not send duplicate
+                            updateEvent(ev.id, { [clockKey]: state });
+                            continue; // skip creating a new clock-in embed
+                          }
+                        } catch {}
                         // Build base text (header) and embed fields
                         // Standardized base text (ignore any custom saved clock-in message to ensure uniformity)
                         let baseText = `🕒 Staff Clock-In — ${ev.name}`;
@@ -285,6 +313,9 @@ function startScheduler(client, opts = {}) {
                         const sent = await channel.send({ embeds: [embed], components: [row] }).catch(()=>null);
                         if (sent) {
                           state.messageIds.push(sent.id);
+                          // Cleanup orphaned / non-existent ids beyond cap
+                          if (state.messageIds.length > CLOCKIN_ORPHAN_MAX) state.messageIds = state.messageIds.slice(-CLOCKIN_ORPHAN_MAX);
+                          state.lastSentTs = Date.now();
                           updateEvent(ev.id, { [clockKey]: state });
                         }
                       } else if (m.messageJSON && typeof m.messageJSON === 'object') {
