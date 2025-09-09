@@ -3,6 +3,34 @@ const theme = require('./theme');
 const { createEmbed } = require('./embeds');
 const { toTitleCase } = require('./text');
 
+// Central toggle state registry (boolean / mode) for consistent UI + future automation.
+// Each entry: { key, getter:()=>value, kind:'boolean'|'mode', on?:()=>bool }
+const toggleRegistry = [];
+function registerToggle(def) {
+  if (!def || !def.key || typeof def.getter !== 'function') return;
+  if (toggleRegistry.find(t => t.key === def.key)) return; // dedupe
+  toggleRegistry.push(def);
+}
+function getToggleState(key) {
+  const t = toggleRegistry.find(x => x.key === key);
+  if (!t) return null;
+  try {
+    const v = t.getter();
+    if (t.kind === 'boolean') return { value: !!v, on: !!v };
+    if (t.kind === 'mode') return { value: v, on: typeof t.on === 'function' ? !!t.on(v) : !!v };
+    return { value: v };
+  } catch { return null; }
+}
+
+// Unified visual mapping for a toggle state
+function getToggleVisual(on) {
+  return {
+    emoji: on ? (theme.emojis.enable || '✅') : (theme.emojis.disable || '❌'),
+    color: on ? theme.colors.success : theme.colors.neutral,
+    prefix: on ? '✅' : '❌'
+  };
+}
+
 // Semantic button helpers (navigation, toggle, confirm, danger, disabled display)
 function semanticButton(kind, { id, label, emoji, active = false, enabled = true } = {}) {
   if (!id) return null;
@@ -131,15 +159,30 @@ function closeRow(id = 'close_menu', label = 'Close') {
 function applyToggleVisual(embed, { on } = { on: false }) {
   try {
     if (!embed || typeof embed.setColor !== 'function') return embed;
-    embed.setColor(on ? theme.colors.success : theme.colors.neutral);
-    // Prepend indicator to title if not already
+    const visual = getToggleVisual(on);
+    embed.setColor(visual.color);
     if (embed.data && embed.data.title) {
       const t = embed.data.title.replace(/^([🔴🟢✅❌]\s*)*/, '');
-      const prefix = on ? (theme.emojis.enable || '✅') : (theme.emojis.disable || '❌');
-      embed.setTitle(`${prefix} ${t}`);
+      embed.setTitle(`${visual.prefix} ${t}`);
     }
   } catch {}
   return embed;
 }
 
-module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow, closeRow, semanticButton, buildNavRow, buildToggleRow, buildDestructiveRow, toTitleCase, applyToggleVisual };
+// Shared builder for setting embeds (category + key + dynamic state) with lastUpdated metadata.
+// opts: { title, description, current, toggleKey }
+function buildSettingEmbedUnified({ title, description, current, toggleKey, lastUpdatedTs } = {}) {
+  const e = createEmbed({ title, description, color: theme.colors.neutral, timestamp: true });
+  if (current) e.addFields({ name: 'Current', value: current });
+  if (toggleKey) {
+    const st = getToggleState(toggleKey);
+    if (st && typeof st.on === 'boolean') applyToggleVisual(e, { on: st.on });
+  }
+  if (lastUpdatedTs) {
+    const rel = Math.floor(lastUpdatedTs/1000);
+    e.setFooter({ text: `Last Updated: <t:${rel}:R>` });
+  }
+  return e;
+}
+
+module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow, closeRow, semanticButton, buildNavRow, buildToggleRow, buildDestructiveRow, toTitleCase, applyToggleVisual, getToggleVisual, registerToggle, getToggleState, buildSettingEmbedUnified };

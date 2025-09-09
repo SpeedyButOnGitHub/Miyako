@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { semanticButton, buildNavRow, applyToggleVisual } = require('../../utils/ui');
+const { semanticButton, buildNavRow, applyToggleVisual, buildSettingEmbedUnified, registerToggle } = require('../../utils/ui');
 const theme = require("../../utils/theme");
 const { config } = require("../../utils/storage");
 const { configCategories } = require("./constants");
@@ -83,18 +83,17 @@ function buildCategoryEmbed(categoryName) {
 function buildSettingEmbed(categoryName, settingName) {
   const cat = configCategories[categoryName];
   const setting = cat?.settings?.[settingName];
-  const e = new EmbedBuilder()
-  .setTitle(`${theme.emojis.edit} ${categoryName} • ${setting.getLabel ? setting.getLabel() : settingName}`)
-    .setColor(theme.colors.neutral)
-    .setDescription(
-      typeof setting.description === "function"
-        ? setting.description()
-        : setting.description || ""
-    )
-    .addFields({
-      name: "Current",
-      value: setting.getDisplay ? setting.getDisplay() : "—",
-    });
+  const toggleKey = (categoryName === 'Testing' && settingName === 'TestingMode') ? 'testingMode'
+    : (categoryName === 'Sniping' && settingName === 'ChannelList') ? 'snipeMode'
+    : (categoryName === 'Leveling' && settingName === 'LevelingChannels') ? 'levelingMode'
+    : null;
+  const title = `${theme.emojis.edit} ${categoryName} • ${setting.getLabel ? setting.getLabel() : settingName}`;
+  const e = buildSettingEmbedUnified({
+    title,
+    description: (typeof setting.description === 'function' ? setting.description() : setting.description) || '',
+    current: setting.getDisplay ? setting.getDisplay() : '—',
+    toggleKey
+  });
   return e;
 }
 
@@ -200,6 +199,11 @@ function renderSettingEmbed(categoryName, settingKey) {
       }**`
     )
     .addFields({ name: "Current", value: setting.getDisplay ? setting.getDisplay() : "—" });
+  if ((categoryName === 'Testing' && settingKey === 'TestingMode') || (categoryName==='Sniping' && settingKey==='ChannelList') || (categoryName==='Leveling' && settingKey==='LevelingChannels')) {
+    const toggleKey = categoryName === 'Testing' ? 'testingMode' : (categoryName==='Sniping' ? 'snipeMode' : 'levelingMode');
+    const on = toggleKey === 'testingMode' ? !!config.testingMode : (toggleKey==='snipeMode' ? config.snipeMode==='whitelist' : config.levelingMode==='whitelist');
+    applyToggleVisual(itemEmbed, { on });
+  }
 
   // Single row with toggles/actions/back
   const row = buildSettingRow(categoryName, settingKey);
@@ -207,3 +211,8 @@ function renderSettingEmbed(categoryName, settingKey) {
 }
 
 module.exports.renderSettingEmbed = renderSettingEmbed;
+
+// Register core toggles (idempotent)
+registerToggle({ key: 'testingMode', kind: 'boolean', getter: () => config.testingMode });
+registerToggle({ key: 'snipeMode', kind: 'mode', getter: () => config.snipeMode, on: v => v === 'whitelist' });
+registerToggle({ key: 'levelingMode', kind: 'mode', getter: () => config.levelingMode, on: v => v === 'whitelist' });

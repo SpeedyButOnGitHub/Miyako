@@ -1,6 +1,7 @@
 const { getEvents, updateEvent } = require('./eventsStorage');
 const { ensureAnchor } = require('../commands/schedule');
 const { updateStaffMessage } = require('./staffTeam');
+const ActiveMenus = require('./activeMenus');
 
 /**
  * Perform startup health checks for dynamic, auto-edited messages (event anchors, staff team message).
@@ -114,6 +115,24 @@ async function runHealthChecks(client) {
     }
   } catch (e) {
     results.push({ kind: 'staffTeam', id: 'staff', name: 'Staff Team', ok: false, error: e.message });
+  }
+
+  // ActiveMenus sanity: ensure no session with empty component rows
+  try {
+    const snapshot = ActiveMenus.snapshotSessions ? ActiveMenus.snapshotSessions() : [];
+    let stale = 0; let emptyRows = 0;
+    const now = Date.now();
+    for (const s of snapshot) {
+      if (s.expiresAt && s.expiresAt < now) stale++;
+      if (Array.isArray(s.components)) {
+        for (const row of s.components) {
+          if (row && Array.isArray(row.components) && row.components.length === 0) emptyRows++;
+        }
+      }
+    }
+    results.push({ kind: 'activeMenus', id: 'activeMenus', name: 'Active Menus', ok: stale === 0 && emptyRows === 0, error: (stale||emptyRows)?`stale:${stale} emptyRows:${emptyRows}`:undefined });
+  } catch (e) {
+    results.push({ kind: 'activeMenus', id: 'activeMenus', name: 'Active Menus', ok: false, error: e.message });
   }
 
   return results;
