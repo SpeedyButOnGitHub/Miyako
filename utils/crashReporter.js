@@ -57,6 +57,7 @@ function onUncaught(err) { gracefulShutdown('uncaughtException', err); }
 function onUnhandled(reason) { gracefulShutdown('unhandledRejection', reason); }
 function onSignal(sig) {
   const graceful = (sig === 'SIGINT' || sig === 'SIGTERM');
+  // Never classify SIGINT/SIGTERM as fatal; treat as controlled shutdown
   gracefulShutdown(`signal:${sig}`, null, graceful);
 }
 

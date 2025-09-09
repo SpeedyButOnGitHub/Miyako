@@ -253,7 +253,7 @@ function attachInteractionEvents(client) {
         // Permission gate
         const member = interaction.member;
         if (!member || !isModerator(member)) {
-          await interaction.reply({ content: `${EMOJI_ERROR} You are not allowed to use this.`, ephemeral: true }).catch(() => {});
+          await interaction.reply({ content: `${EMOJI_ERROR} You are not allowed to use this.`, flags: 1<<6 }).catch(() => {});
           return;
         }
 
@@ -262,7 +262,7 @@ function attachInteractionEvents(client) {
         const targetMember = guild ? await guild.members.fetch(uid).catch(() => null) : null;
         const targetUser = targetMember?.user || (await client.users.fetch(uid).catch(() => null));
         if (!targetMember && !targetUser) {
-          await interaction.reply({ content: `${EMOJI_ERROR} Could not resolve user.`, ephemeral: true }).catch(() => {});
+          await interaction.reply({ content: `${EMOJI_ERROR} Could not resolve user.`, flags: 1<<6 }).catch(() => {});
           return;
         }
 
@@ -812,9 +812,9 @@ function attachInteractionEvents(client) {
         const evId = parts[1];
         const notifId = parts[2]; // not used yet for constraints
         const ev = getEvent(evId);
-        if (!ev) { await interaction.reply({ content:'Event missing.', ephemeral:true }).catch(()=>{}); return; }
+  if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
         const member = interaction.member;
-        if (!member) { await interaction.reply({ content:'Member not found.', ephemeral:true }).catch(()=>{}); return; }
+  if (!member) { await interaction.reply({ content:'Member not found.', flags:1<<6 }).catch(()=>{}); return; }
         const choice = interaction.values[0];
         const ROLE_REQUIRED = '1375958480380493844';
         const POS_META = {
@@ -825,10 +825,10 @@ function attachInteractionEvents(client) {
           'backup': { label: 'Backup', max:20 },
           'maybe': { label: 'Maybe/Late', max:50 }
         };
-        if (!POS_META[choice]) { await interaction.reply({ content:'Invalid selection.', ephemeral:true }).catch(()=>{}); return; }
+  if (!POS_META[choice]) { await interaction.reply({ content:'Invalid selection.', flags:1<<6 }).catch(()=>{}); return; }
         const meta = POS_META[choice];
         if (meta.role && !member.roles.cache.has(meta.role)) {
-          await interaction.reply({ content:`You need the required role to select ${meta.label}.`, ephemeral:true }).catch(()=>{}); return;
+          await interaction.reply({ content:`You need the required role to select ${meta.label}.`, flags:1<<6 }).catch(()=>{}); return;
         }
         const clockKey = '__clockIn';
         const state = ev[clockKey] && typeof ev[clockKey]==='object' ? { ...ev[clockKey] } : { positions: {}, messageIds: [] };
@@ -839,7 +839,7 @@ function attachInteractionEvents(client) {
         }
         if (!Array.isArray(state.positions[choice])) state.positions[choice] = [];
         if (state.positions[choice].length >= meta.max) {
-          await interaction.reply({ content:`${meta.label} is full.`, ephemeral:true }).catch(()=>{}); return;
+          await interaction.reply({ content:`${meta.label} is full.`, flags:1<<6 }).catch(()=>{}); return;
         }
         state.positions[choice].push(member.id);
         updateEvent(ev.id, { [clockKey]: state });
@@ -870,7 +870,7 @@ function attachInteractionEvents(client) {
             } catch {}
           }
         } catch {}
-        await interaction.reply({ content:`Registered as ${meta.label}.`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content:`Registered as ${meta.label}.`, flags:1<<6 }).catch(()=>{});
         return;
       }
     } catch (err) {

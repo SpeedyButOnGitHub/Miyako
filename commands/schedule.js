@@ -328,13 +328,13 @@ async function handleEventCreateModal(interaction) {
     return c;
   };
   const clamp = (s,max=1900)=> (s && s.length>max? s.slice(0,max-3)+'...':s);
-  if (!name) return interaction.reply({ content: '❌ Name required.', ephemeral:true }).catch(()=>{});
-  if (!/^\d{1,32}$/.test(channelId)) return interaction.reply({ content: '❌ Invalid channel id.', ephemeral:true }).catch(()=>{});
+  if (!name) return interaction.reply({ content: '❌ Name required.', flags:1<<6 }).catch(()=>{});
+  if (!/^\d{1,32}$/.test(channelId)) return interaction.reply({ content: '❌ Invalid channel id.', flags:1<<6 }).catch(()=>{});
   const times = timesRaw.split(/[\,\s]+/).map(t=>t.trim()).filter(Boolean);
-  if (!times.length) return interaction.reply({ content: '❌ Provide times.', ephemeral:true }).catch(()=>{});
+  if (!times.length) return interaction.reply({ content: '❌ Provide times.', flags:1<<6 }).catch(()=>{});
   const ranges = times.map(t => t.includes('-') ? (()=>{ const [s,e]=t.split('-').map(x=>x.trim()); return { start:s, end:e };})() : null).filter(Boolean);
   const days = daysRaw.split(/[\,\s]+/).map(d=>d.trim().toLowerCase()).filter(Boolean).map(d=>dayMap[d]).filter(d=>d!==undefined);
-  if (!days.length) return interaction.reply({ content: '❌ Invalid days.', ephemeral:true }).catch(()=>{});
+  if (!days.length) return interaction.reply({ content: '❌ Invalid days.', flags:1<<6 }).catch(()=>{});
   let messageJSON = null;
   const healed = healJSON(messageContent);
   if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
@@ -356,7 +356,7 @@ async function handleEventCreateModal(interaction) {
   });
   try { await ensureAnchor(interaction, ev, { content: base }); } catch (e) { console.error('[anchor create]', e); }
   const jsonNote = messageJSON ? ' (JSON payload detected)' : '';
-  await interaction.reply({ content: `✅ Event ${ev.name} created with ${ev.times.length} time(s).${jsonNote}`, ephemeral:true }).catch(()=>{});
+  await interaction.reply({ content: `✅ Event ${ev.name} created with ${ev.times.length} time(s).${jsonNote}`, flags:1<<6 }).catch(()=>{});
   if (managerMessageId) {
     try {
       const mgrMsg = await interaction.channel.messages.fetch(managerMessageId).catch(()=>null);

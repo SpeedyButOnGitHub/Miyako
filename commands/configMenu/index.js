@@ -1,9 +1,13 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { buildRootEmbed, buildCategorySelect, buildCategoryEmbed, buildSettingEmbed, buildSettingSelect, buildSettingRow, renderSettingEmbed } = require('./render');
-const { openCategory, openSetting, handleButton, handleModal } = require('./handlers');
+const { handleButton } = require('./handlers');
 const { OWNER_ID } = require('../moderation/permissions');
 const { config, saveConfig } = require('../../utils/storage');
 const { logConfigChange } = require('../../utils/configLogs');
+const ActiveMenus = require('../../utils/activeMenus');
+
+function buildRootComponents(currentCat) {
+  return [buildCategorySelect(currentCat || null)];
+}
 
 async function handleConfigMenuCommand(message) {
   if (String(message.author.id) !== String(OWNER_ID)) {
@@ -11,86 +15,74 @@ async function handleConfigMenuCommand(message) {
     return;
   }
   const embed = buildRootEmbed();
-  const categoryRow = buildCategorySelect();
-  const sent = await message.channel.send({ embeds: [embed], components: [categoryRow] });
-
-  const collector = sent.createMessageComponentCollector({ time: 5 * 60 * 1000 });
-
-  collector.on('collect', async (interaction) => {
-    try {
-      if (interaction.user.id !== message.author.id) {
-        return interaction.reply({ content: 'This menu is not for you.', ephemeral: true });
-      }
-      if (interaction.isButton()) {
-        // New uniform navigation
-        if (interaction.customId.startsWith('cfg:cat:')) {
-          const categoryName = interaction.customId.split(':')[2];
-          // Replace components with category row only
-          return interaction.update({ embeds: [buildCategoryEmbed(categoryName)], components: [buildSettingSelect(categoryName)] });
-        }
-        if (interaction.customId.startsWith('cfg:set:')) {
-          const [, , categoryName, settingName] = interaction.customId.split(':');
-          // Replace single row of buttons for setting
-          return interaction.update({ embeds: [buildSettingEmbed(categoryName, settingName)], components: [buildSettingRow(categoryName, settingName)] });
-        }
-        if (interaction.customId.startsWith('cfg:back:')) {
-          const part = interaction.customId.split(':')[2];
-          if (part === 'root') {
-            return interaction.update({ embeds: [buildRootEmbed()], components: [buildCategorySelect()] });
-          }
-          const categoryName = part;
-          return interaction.update({ embeds: [buildCategoryEmbed(categoryName)], components: [buildSettingSelect(categoryName)] });
-        }
-        // Legacy IDs still supported
-        if (interaction.customId.startsWith('config:')) {
-          const parts = interaction.customId.split(':').slice(1); // category:setting:action
-          return handleButton(interaction, parts);
-        }
-        // Per-setting mode toggles for Channels
-        if (interaction.customId.startsWith('settingMode_')) {
-          const [, cat, key, mode] = interaction.customId.split('_');
-          if (cat === 'Sniping' && key === 'ChannelList') {
-            const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
-            if (config.snipeMode !== newMode) { config.snipeMode = newMode; await saveConfig(); try { await logConfigChange(interaction.client, { user: interaction.user, change: `Set Sniping mode to ${newMode}.` }); } catch {} }
-            return interaction.update({
-              embeds: [buildSettingEmbed('Sniping', 'ChannelList')],
-              components: [buildSettingRow('Sniping', 'ChannelList')]
-            });
-          }
-          if (cat === 'Leveling' && key === 'LevelingChannels') {
-            const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
-            if (config.levelingMode !== newMode) { config.levelingMode = newMode; await saveConfig(); try { await logConfigChange(interaction.client, { user: interaction.user, change: `Set Leveling mode to ${newMode}.` }); } catch {} }
-            return interaction.update({
-              embeds: [buildSettingEmbed('Leveling', 'LevelingChannels')],
-              components: [buildSettingRow('Leveling', 'LevelingChannels')]
-            });
-          }
-          return;
-        }
-        if (interaction.customId.startsWith('back_category_')) {
-          const categoryName = interaction.customId.replace('back_category_', '');
-          return interaction.update({ embeds: [buildCategoryEmbed(categoryName)], components: [buildSettingSelect(categoryName)] });
-        }
-      } else if (interaction.isModalSubmit()) {
-        return handleModal(interaction);
-      }
-    } catch (err) {
-      console.error('[configMenu] interaction error:', err);
-      if (!interaction.replied) {
-        await interaction.reply({ content: 'Error handling interaction.', ephemeral: true });
-      }
-    }
-  });
-
-  collector.on('end', async () => {
-    try {
-      const { timeoutRow } = require('../../utils/activeMenus');
-      await sent.edit({ components: timeoutRow() });
-    } catch {
-      try { await sent.edit({ components: [] }); } catch {}
-    }
-  });
+  const components = buildRootComponents();
+  const sent = await message.channel.send({ embeds: [embed], components });
+  ActiveMenus.registerMessage(sent, { type: 'configMenu', userId: message.author.id, data: { view: 'root' } });
 }
+
+// ActiveMenus handler
+ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
+  if (!interaction.isButton() && !interaction.isModalSubmit()) return;
+  if (interaction.user.id !== session.userId) {
+    if (interaction.isRepliable()) return interaction.reply({ content: 'Not your session.', ephemeral: true }).catch(()=>{});
+    return;
+  }
+  try {
+    if (interaction.isButton()) {
+      const id = interaction.customId;
+      // Category navigation
+      if (id.startsWith('cfg:cat:')) {
+        const categoryName = id.split(':')[2];
+        session.data.view = 'category';
+        session.data.category = categoryName;
+        return interaction.update({ embeds: [buildCategoryEmbed(categoryName)], components: [buildCategorySelect(categoryName), buildSettingSelect(categoryName)] });
+      }
+      if (id.startsWith('cfg:set:')) {
+        const [, , catName, settingName] = id.split(':');
+        session.data.view = 'setting';
+        session.data.category = catName; session.data.setting = settingName;
+        return interaction.update({ embeds: [buildSettingEmbed(catName, settingName)], components: [buildCategorySelect(catName), buildSettingRow(catName, settingName)] });
+      }
+      if (id.startsWith('cfg:back:')) {
+        const target = id.split(':')[2];
+        if (target === 'root') {
+          session.data = { view: 'root' };
+          return interaction.update({ embeds: [buildRootEmbed()], components: buildRootComponents() });
+        }
+        session.data.view = 'category'; session.data.category = target;
+        return interaction.update({ embeds: [buildCategoryEmbed(target)], components: [buildCategorySelect(target), buildSettingSelect(target)] });
+      }
+      if (id.startsWith('config:')) {
+        // legacy setting action buttons
+        const parts = id.split(':').slice(1); // category:setting:action
+        await handleButton(interaction, parts);
+        return;
+      }
+      if (id.startsWith('settingMode_')) {
+        const [, cat, key, mode] = id.split('_');
+        if (cat === 'Sniping' && key === 'ChannelList') {
+          const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
+          if (config.snipeMode !== newMode) { config.snipeMode = newMode; await saveConfig(); try { await logConfigChange(interaction.client, { user: interaction.user, change: `Set Sniping mode to ${newMode}.` }); } catch {} }
+          return interaction.update({ embeds: [buildSettingEmbed('Sniping', 'ChannelList')], components: [buildCategorySelect(cat), buildSettingRow('Sniping', 'ChannelList')] });
+        }
+        if (cat === 'Leveling' && key === 'LevelingChannels') {
+          const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
+          if (config.levelingMode !== newMode) { config.levelingMode = newMode; await saveConfig(); try { await logConfigChange(interaction.client, { user: interaction.user, change: `Set Leveling mode to ${newMode}.` }); } catch {} }
+          return interaction.update({ embeds: [buildSettingEmbed('Leveling', 'LevelingChannels')], components: [buildCategorySelect(cat), buildSettingRow('Leveling', 'LevelingChannels')] });
+        }
+        return;
+      }
+    } else if (interaction.isModalSubmit()) {
+      // Modal submits are handled inside handleButton flows which reply/update separately; nothing extra here.
+      return;
+    }
+  } catch (err) {
+    console.error('[configMenu] handler error:', err);
+    if (interaction.isRepliable() && !interaction.replied) {
+      try { await interaction.reply({ content: 'Error handling config interaction.', ephemeral: true }); } catch {}
+    }
+  }
+});
 
 // Legacy exports
 const handleMessageCreate = handleConfigMenuCommand;

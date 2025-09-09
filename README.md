@@ -42,3 +42,30 @@ npm start
 - Testing Mode banner and config changes are logged to the config log channel.
 - Interactive menus time out and are cleaned up on restart.
 - Services layer introduced (see ARCHITECTURE.md) for status, economy, and leveling to simplify future caching or DB migration.
+
+## Development
+
+Start the bot:
+
+```powershell
+npm start
+```
+
+Run module smoke load only:
+
+```powershell
+npm run smoke
+```
+
+### Pre-commit guard (ephemeral deprecation)
+
+Discord.js v14 deprecates `ephemeral:true` in favor of interaction `flags` (64). A helper shim converts, but new code should use `flags: 1<<6` directly.
+
+Add a local pre-commit hook to block deprecated usage:
+
+```powershell
+echo node scripts/check-ephemeral.js > .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+The hook aborts the commit if any `ephemeral:true` remains.

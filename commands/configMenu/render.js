@@ -23,7 +23,7 @@ function buildRootEmbed() {
 }
 
 // Build category navigation as buttons (uniform with Help UI)
-function buildCategorySelect() {
+function buildCategorySelect(currentCategory) {
   const row = new ActionRowBuilder();
   const emojiByCat = {
     Sniping: "🔭",
@@ -33,11 +33,12 @@ function buildCategorySelect() {
     Testing: "🧪",
   };
   for (const name of Object.keys(configCategories)) {
+    const active = currentCategory === name;
     const btn = new ButtonBuilder()
       .setCustomId(`cfg:cat:${name}`)
       .setLabel(name)
       .setEmoji(emojiByCat[name] || theme.emojis.settings)
-      .setStyle(ButtonStyle.Primary);
+      .setStyle(active ? ButtonStyle.Primary : ButtonStyle.Secondary);
     if (row.components.length < 5) row.addComponents(btn);
   }
   return row;
@@ -124,7 +125,7 @@ function buildSettingSelect(categoryName) {
     new ButtonBuilder()
       .setCustomId('cfg:back:root')
       .setLabel('Back')
-  .setEmoji(theme.emojis.back)
+      .setEmoji(theme.emojis.back)
       .setStyle(ButtonStyle.Secondary)
   );
   return row;
@@ -172,7 +173,7 @@ function buildSettingRow(categoryName, settingName) {
     new ButtonBuilder()
       .setCustomId(`cfg:back:${categoryName}`)
       .setLabel('Back')
-  .setEmoji(theme.emojis.back)
+      .setEmoji(theme.emojis.back)
       .setStyle(ButtonStyle.Secondary)
   );
   return row;
