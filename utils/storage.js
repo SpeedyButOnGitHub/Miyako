@@ -41,6 +41,22 @@ const defaultConfig = {
   moderatorLogChannelId: null
 };
 
+// Setting metadata (timestamps, etc.) persisted separately
+let settingMeta = {};
+const SETTING_META_FILE = path.resolve('./config/settingMeta.json');
+try {
+  if (fs.existsSync(SETTING_META_FILE)) {
+    settingMeta = JSON.parse(fs.readFileSync(SETTING_META_FILE,'utf8')) || {};
+  }
+} catch { settingMeta = {}; }
+function saveSettingMeta() {
+  try { fs.writeFileSync(SETTING_META_FILE, JSON.stringify(settingMeta, null, 2)); } catch {}
+}
+function touchSettingMeta(key) {
+  settingMeta[key] = { lastUpdated: Date.now() };
+  saveSettingMeta();
+}
+
 function ensureDir() {
   const dir = path.dirname(CONFIG_FILE);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -160,3 +176,5 @@ function saveConfig() {
 }
 
 module.exports = { config, saveConfig };
+module.exports.settingMeta = settingMeta;
+module.exports.touchSettingMeta = touchSettingMeta;

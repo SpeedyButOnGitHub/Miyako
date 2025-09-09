@@ -1,7 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { semanticButton, buildNavRow, applyToggleVisual, buildSettingEmbedUnified, registerToggle } = require('../../utils/ui');
 const theme = require("../../utils/theme");
-const { config } = require("../../utils/storage");
+const { config, settingMeta } = require("../../utils/storage");
 const { configCategories } = require("./constants");
 
 function buildRootEmbed() {
@@ -88,11 +88,14 @@ function buildSettingEmbed(categoryName, settingName) {
     : (categoryName === 'Leveling' && settingName === 'LevelingChannels') ? 'levelingMode'
     : null;
   const title = `${theme.emojis.edit} ${categoryName} • ${setting.getLabel ? setting.getLabel() : settingName}`;
+  const metaKey = `${categoryName}.${settingName}`;
+  const lastUpdatedTs = settingMeta?.[metaKey]?.lastUpdated;
   const e = buildSettingEmbedUnified({
     title,
     description: (typeof setting.description === 'function' ? setting.description() : setting.description) || '',
     current: setting.getDisplay ? setting.getDisplay() : '—',
-    toggleKey
+    toggleKey,
+    lastUpdatedTs
   });
   return e;
 }

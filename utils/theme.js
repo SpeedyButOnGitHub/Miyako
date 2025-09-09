@@ -1,5 +1,13 @@
-// Centralized theme: colors and emojis used across embeds
-const theme = {
+// Centralized theme: colors and emojis used across embeds (now supports external override config/theme.json)
+const fs = require('fs');
+const path = require('path');
+let external = null;
+try {
+  const ext = path.resolve(__dirname, '../config/theme.json');
+  if (fs.existsSync(ext)) external = JSON.parse(fs.readFileSync(ext,'utf8'));
+} catch { external = null; }
+
+const baseTheme = {
   colors: {
     primary: 0x5865F2,
     success: 0x00ff00,
@@ -50,9 +58,10 @@ const theme = {
     unmute: "🔊",
     kick: "👢",
     ban: "🔨"
-  },
-  color(name, fallback = 0x2f3136) { return this.colors[name] ?? fallback; },
-  emoji(name, fallback = "❔") { return this.emojis[name] ?? fallback; }
+  }
 };
 
+const theme = Object.assign({}, baseTheme, external || {});
+theme.color = function(name, fallback = 0x2f3136) { return (theme.colors||{})[name] ?? fallback; };
+theme.emoji = function(name, fallback = '❔') { return (theme.emojis||{})[name] ?? fallback; };
 module.exports = theme;

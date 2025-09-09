@@ -6,7 +6,8 @@ const { logConfigChange } = require('../../utils/configLogs');
 const ActiveMenus = require('../../utils/activeMenus');
 
 function buildRootComponents(currentCat) {
-  return [buildCategorySelect(currentCat || null)];
+  // buildCategorySelect already returns an array of ActionRowBuilders; return directly (avoid nested array)
+  return buildCategorySelect(currentCat || null);
 }
 
 async function handleConfigMenuCommand(message) {
@@ -16,7 +17,14 @@ async function handleConfigMenuCommand(message) {
   }
   const embed = buildRootEmbed();
   const components = buildRootComponents();
-  const sent = await message.channel.send({ embeds: [embed], components });
+  let sent;
+  try {
+    sent = await message.channel.send({ embeds: [embed], components });
+  } catch (e) {
+    console.error('[configMenu] send failed', e);
+    try { await message.reply({ content: 'Failed to open config menu (logged).', flags: 1<<6 }); } catch {}
+    return;
+  }
   ActiveMenus.registerMessage(sent, { type: 'configMenu', userId: message.author.id, data: { view: 'root' } });
 }
 

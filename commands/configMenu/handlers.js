@@ -1,5 +1,5 @@
 const { PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
-const { saveConfig, config } = require('../../utils/storage');
+const { saveConfig, config, touchSettingMeta } = require('../../utils/storage');
 const { logConfigChange } = require('../../utils/configLogs');
 const { updateTestingStatus } = require('../../utils/testingBanner');
 const { buildCategoryEmbed, buildSettingEmbed, buildSettingButtons, buildSettingSelect } = require('./render');
@@ -53,7 +53,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
   return submitted.reply({ content: 'Enter a valid percent between 0 and 100.', flags: 1<<6 });
       }
       e.dropChance = Math.max(0, Math.min(1, n / 100));
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop chance to ${(e.dropChance * 100).toFixed(2)}%/msg.` });
   await submitted.reply({ content: `Drop chance set to ${(e.dropChance * 100).toFixed(2)}% per message.`, flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
@@ -86,7 +86,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
   return submitted.reply({ content: 'Enter valid non-negative integers (max >= min).', flags: 1<<6 });
       }
       e.minAmount = min; e.maxAmount = max;
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop amount range to ${min}-${max}.` });
   await submitted.reply({ content: `Drop amount range set to ${min}-${max}.`, flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
@@ -111,7 +111,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
   return submitted.reply({ content: 'Enter a valid seconds value between 5 and 86400.', flags: 1<<6 });
       }
       e.lifetimeMs = s * 1000;
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Set Cash Drop lifetime to ${s}s.` });
   await submitted.reply({ content: `Drop lifetime set to ${s}s.`, flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
@@ -142,14 +142,14 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
   return submitted.reply({ content: 'Enter a valid number >0 and <=100.', flags: 1<<6 });
       }
       config.globalXPMultiplier = num;
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Set Global XP multiplier to x${num.toFixed(2)}` });
   await submitted.reply({ content: `XP multiplier set to x${num.toFixed(2)}.`, flags: 1<<6 });
       return;
     }
     if (action === 'reset') {
       config.globalXPMultiplier = 1;
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Reset Global XP multiplier to x1.00` });
       return openSetting(interaction, categoryName, settingName);
     }
@@ -181,7 +181,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     if (action === 'reseed') {
       const seed = config.testingSeed || {};
       config.testingWarnings = JSON.parse(JSON.stringify(seed));
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Reseeded testing warnings from seed (${Object.keys(seed).length} users).` });
   await interaction.reply({ content: 'Reseeded testing warnings from seed.', flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
@@ -189,7 +189,7 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     }
     if (action === 'clear') {
       config.testingWarnings = {};
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Cleared testing warnings.` });
   await interaction.reply({ content: 'Cleared testing warnings.', flags: 1<<6 });
       await refreshSettingMessage(interaction.message, categoryName, settingName);
@@ -270,12 +270,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     config.levelingChannelList = ensureArray(config.levelingChannelList);
     if (action === 'addChannel') {
       if (!config.levelingChannelList.includes(id)) config.levelingChannelList.push(id);
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Added <#${id}> to leveling channel list.` });
   await submitted.reply({ content: `Added <#${id}>.`, flags: 1<<6 });
     } else {
       config.levelingChannelList = config.levelingChannelList.filter(x => x !== id);
-      await saveConfig();
+    await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <#${id}> from leveling channel list.` });
   await submitted.reply({ content: `Removed <#${id}>.`, flags: 1<<6 });
     }
@@ -305,12 +305,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     config.moderatorRoles = ensureArray(config.moderatorRoles);
     if (action === 'addRole') {
       if (!config.moderatorRoles.includes(id)) config.moderatorRoles.push(id);
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Added <@&${id}> to moderatorRoles.` });
   await submitted.reply({ content: `Added <@&${id}>.`, flags: 1<<6 });
     } else {
       config.moderatorRoles = config.moderatorRoles.filter(x => x !== id);
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <@&${id}> from moderatorRoles.` });
   await submitted.reply({ content: `Removed <@&${id}>.`, flags: 1<<6 });
     }
@@ -340,12 +340,12 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
     config.roleLogBlacklist = ensureArray(config.roleLogBlacklist);
     if (action === 'addBlacklistRole') {
       if (!config.roleLogBlacklist.includes(id)) config.roleLogBlacklist.push(id);
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Blacklisted <@&${id}> from role logs.` });
   await submitted.reply({ content: `Blacklisted <@&${id}> from role logs.`, flags: 1<<6 });
     } else {
       config.roleLogBlacklist = config.roleLogBlacklist.filter(x => x !== id);
-      await saveConfig();
+  await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
       await logConfigChange(interaction.client, { user: interaction.user, change: `Removed <@&${id}> from role log blacklist.` });
   await submitted.reply({ content: `Removed <@&${id}> from role log blacklist.`, flags: 1<<6 });
     }
