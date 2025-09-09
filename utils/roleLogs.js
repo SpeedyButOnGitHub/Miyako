@@ -3,15 +3,13 @@ const { config } = require("./storage");
 const theme = require("./theme");
 const { applyStandardFooter } = require("./ui");
 const { ROLE_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
+const { logError } = require("./errorUtil");
 
 async function logRoleChange(client, member, role, action) {
   if (config.roleLogBlacklist.includes(role.id)) return;
 
   const logChannelId = config.testingMode ? TEST_LOG_CHANNEL : ROLE_LOG_CHANNEL;
-  const channel = await client.channels.fetch(logChannelId).catch(err => {
-    console.error("[Role Log Error]:", err);
-    return null;
-  });
+  const channel = await client.channels.fetch(logChannelId).catch(err => { logError('roleLogs:fetch', err); return null; });
   if (!channel) return;
 
   const embed = new EmbedBuilder()
@@ -25,7 +23,7 @@ async function logRoleChange(client, member, role, action) {
     .setTimestamp();
   applyStandardFooter(embed, member.guild, { testingMode: config.testingMode });
 
-  await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+  try { await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }); } catch (e) { logError('roleLogs:send', e); }
 }
 
 module.exports = {

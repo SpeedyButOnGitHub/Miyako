@@ -338,3 +338,26 @@ ActiveMenus.registerHandler("profile", async (interaction, session) => {
 });
 
 module.exports = { handleProfileCommand, buildLeaderboardEmbed, buildRows, buildRankEmbed };
+// Alias: provide a dedicated rank command (legacy `.level`) without duplicating legacy level.js logic
+async function handleRankCommand(client, message) {
+  const member = message.member;
+  if (!member) return;
+  const uid = member.id;
+  const mode = 'text';
+  const xp = getXP(uid);
+  const lvl = getLevel(uid);
+  const next = lvl + 1;
+  const xpNext = getLevelXP(next);
+  const xpCurr = getLevelXP(lvl);
+  const into = Math.max(0, xp - xpCurr);
+  const need = Math.max(1, xpNext - xpCurr);
+  const bar = createProgressBar(into, need, 20);
+  const rank = getRankFromLeaderboard(levels, uid);
+  const embed = buildRankEmbed(member, rank, lvl, bar, mode);
+  const sent = await message.reply({ embeds: [embed], components: buildRows('rank', 1, 1, mode) }).catch(() => null);
+  if (sent) {
+    ActiveMenus.registerMessage(sent, { type: 'profile', userId: uid, data: { view: 'rank', mode } });
+  }
+}
+
+module.exports.handleRankCommand = handleRankCommand;

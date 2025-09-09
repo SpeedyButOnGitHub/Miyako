@@ -1,7 +1,9 @@
 const fs = require("fs");
 const path = require("path");
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const theme = require("../utils/theme");
+const { applyFooterWithPagination, paginationRow } = require("../utils/ui");
+const ActiveMenus = require("../utils/activeMenus");
 
 // Recursively collect .js files excluding common non-source folders
 function walkForJS(dir, baseDir, out = []) {
@@ -36,64 +38,55 @@ function chunk(arr, size) {
   return out;
 }
 
-function buildEmbed(pageItems, page, totalPages, totalFiles, totalLines) {
+function buildEmbed(guild, pageItems, page, totalPages, totalFiles, totalLines) {
   const desc = pageItems
     .map((it, idx) => `**${(page * 10) + idx + 1}.** ${it.file} — ${it.lines.toLocaleString()} line${it.lines === 1 ? "" : "s"}`)
     .join("\n");
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle("📜 Scripts Leaderboard")
     .setColor(theme.colors.primary)
     .setDescription(desc || "*No .js files found*")
-    .setFooter({ text: `Page ${page + 1}/${totalPages} • ${totalFiles} files • ${totalLines.toLocaleString()} total lines` })
     .setTimestamp();
+  applyFooterWithPagination(embed, guild, { page: page + 1, totalPages, extra: `${totalFiles} files • ${totalLines.toLocaleString()} lines` });
+  return embed;
 }
 
 async function handleScriptsCommand(client, message) {
-  // Build dataset
   const baseDir = path.resolve(__dirname, "..");
-  const files = walkForJS(baseDir, baseDir);
-  files.sort((a, b) => b.lines - a.lines || a.file.localeCompare(b.file));
+  const files = walkForJS(baseDir, baseDir).sort((a, b) => b.lines - a.lines || a.file.localeCompare(b.file));
   const totalFiles = files.length;
   const totalLines = files.reduce((s, f) => s + f.lines, 0);
-
   const pages = chunk(files, 10);
   const totalPages = Math.max(1, pages.length);
-  let page = 0;
-  const embed = buildEmbed(pages[page] || [], page, totalPages, totalFiles, totalLines);
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("scripts_prev").setLabel("Prev").setStyle(ButtonStyle.Secondary).setDisabled(page === 0),
-    new ButtonBuilder().setCustomId("scripts_next").setLabel("Next").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages - 1),
+  const page = 1;
+  const embed = buildEmbed(message.guild, pages[page - 1] || [], page - 1, totalPages, totalFiles, totalLines);
+  const row = paginationRow("scripts", page, totalPages);
+  const close = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("scripts_close").setLabel("Close").setStyle(ButtonStyle.Danger)
   );
-
-  const reply = await message.reply({ embeds: [embed], components: [row], allowedMentions: { repliedUser: false } });
-
-  const collector = reply.createMessageComponentCollector({ componentType: ComponentType.Button, time: 2 * 60 * 1000 });
-  collector.on("collect", async (interaction) => {
-    if (interaction.customId === "scripts_close") {
-      collector.stop();
-      return interaction.update({ components: [] });
-    }
-    if (interaction.customId === "scripts_prev" && page > 0) page--;
-    if (interaction.customId === "scripts_next" && page < totalPages - 1) page++;
-    const newEmbed = buildEmbed(pages[page] || [], page, totalPages, totalFiles, totalLines);
-    const newRow = new ActionRowBuilder().addComponents(
-      ButtonBuilder.from(row.components[0]).setDisabled(page === 0),
-      ButtonBuilder.from(row.components[1]).setDisabled(page >= totalPages - 1),
-      ButtonBuilder.from(row.components[2])
-    );
-    await interaction.update({ embeds: [newEmbed], components: [newRow] });
-  });
-
-  collector.on("end", async () => {
-    try {
-      const { timeoutRow } = require("../utils/activeMenus");
-      await reply.edit({ components: timeoutRow() });
-    } catch {
-      try { await reply.edit({ components: [] }); } catch {}
-    }
-  });
+  const sent = await message.reply({ embeds: [embed], components: [row, close], allowedMentions: { repliedUser: false } }).catch(() => null);
+  if (!sent) return;
+  ActiveMenus.registerMessage(sent, { type: "scripts", userId: message.author.id, data: { files, totalFiles, totalLines, page, totalPages } });
 }
+
+ActiveMenus.registerHandler("scripts", async (interaction, session) => {
+  if (!interaction.isButton()) return;
+  if (interaction.user.id !== session.userId) { try { await interaction.reply({ content: "Not your session.", ephemeral: true }); } catch {} return; }
+  if (interaction.customId === "scripts_close") {
+    try { await interaction.update({ components: [] }); } catch {}
+    return;
+  }
+  let { page, totalPages, files, totalFiles, totalLines } = session.data;
+  if (interaction.customId === "scripts_prev") page = Math.max(1, page - 1);
+  else if (interaction.customId === "scripts_next") page = Math.min(totalPages, page + 1);
+  session.data.page = page;
+  const pages = chunk(files, 10);
+  const embed = buildEmbed(interaction.guild, pages[page - 1] || [], page - 1, totalPages, totalFiles, totalLines);
+  const row = paginationRow("scripts", page, totalPages);
+  const close = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("scripts_close").setLabel("Close").setStyle(ButtonStyle.Danger)
+  );
+  await interaction.update({ embeds: [embed], components: [row, close] }).catch(() => {});
+});
 
 module.exports = { handleScriptsCommand };

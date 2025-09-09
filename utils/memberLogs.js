@@ -3,14 +3,16 @@ const { config } = require("./storage");
 const theme = require("./theme");
 const { applyStandardFooter } = require("./ui");
 const { MEMBER_LEAVE_LOG_CHANNEL, TEST_LOG_CHANNEL } = require("./logChannels");
+const { logError } = require("./errorUtil");
 
 /**
  * Logs when a member leaves the guild.
  */
 async function logMemberLeave(client, member, isTest = false) {
   const logChannelId = config.testingMode || isTest ? TEST_LOG_CHANNEL : MEMBER_LEAVE_LOG_CHANNEL;
-  const channel = await client.channels.fetch(logChannelId).catch(() => null);
-  if (!channel || !member) return;
+  let channel = null;
+  try { channel = await client.channels.fetch(logChannelId).catch(() => null); } catch (e) { logError('memberLogs:fetch', e); }
+  if (!channel || !member || !member.user) return;
 
   const joinedAt = member.joinedTimestamp;
   const leftAt = Date.now();
@@ -35,7 +37,7 @@ async function logMemberLeave(client, member, isTest = false) {
     .setTimestamp();
   applyStandardFooter(embed, member.guild, { testingMode: config.testingMode });
 
-  await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => {});
+  try { await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }); } catch (e) { logError('memberLogs:send', e); }
 }
 
 module.exports = {

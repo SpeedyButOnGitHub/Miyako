@@ -111,6 +111,14 @@ function registerMessage(message, session) {
   // schedule when client attached via processInteraction
 }
 
+function snapshotSessions() {
+  const out = [];
+  for (const [id, s] of sessions.entries()) {
+    out.push({ id, type: s.type, userId: s.userId, channelId: s.channelId, expiresIn: s.expiresAt - Date.now() });
+  }
+  return out.sort((a,b)=>a.expiresIn - b.expiresIn);
+}
+
 async function processInteraction(interaction) {
   const messageId = interaction.message?.id;
   if (!messageId) return { handled: false };
@@ -160,6 +168,7 @@ module.exports = {
   registerHandler,
   registerMessage,
   processInteraction,
+  snapshotSessions,
   // expose standardized timeout row for other ephemeral collectors
   timeoutRow
 };

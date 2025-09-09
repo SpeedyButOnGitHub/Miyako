@@ -1,221 +1,124 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { isModerator } = require("./moderation/index");
-const { handleMessageCreate } = require("./configMenu");
 const { OWNER_ID } = require("./moderation/permissions");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
-const { applyStandardFooter } = require("../utils/ui");
+const { applyStandardFooter, paginationRow } = require("../utils/ui");
 
-const EMOJI_ERROR = "❌";
-
-// If this file defines interactive help menus elsewhere, consider routing through ActiveMenus
-
-const categories = [
+// Simple categorized help. We keep static for now; could be dynamic later.
+const HELP_CATEGORIES = [
   {
-    name: "Moderation",
-    emoji: "🛡️",
+    id: 'general',
+    label: 'General',
     commands: [
-      { name: "Mute", value: "`mute (user) (time) (reason)`\nDefault duration: 1 hour" },
-      { name: "Unmute", value: "`unmute (user)`" },
-      { name: "Timeout", value: "`timeout (user) (time) (reason)`\nDefault duration: 1 hour" },
-      { name: "Untimeout", value: "`untimeout (user)`" },
-      { name: "Ban", value: "`ban (user) (reason)`" },
-      { name: "Kick", value: "`kick (user) (reason)`" },
-      { name: "Warn", value: "`warn (user) (reason)`\nDefault reason: 'You have been warned in Late Night Hours'." },
-      { name: "Remove Warning", value: "`removewarn (user) (index)`\nRemoves a specific warning by index or the latest if no index is given." },
-      { name: "Warnings", value: "`warnings (user)`\nShows all warnings for a user." }
+      '.help - show this menu',
+      '.profile - show your profile',
+      '.leaderboard - show leaderboard',
+      '.cash - show wallet balance'
     ]
   },
   {
-    name: "Leveling",
-    emoji: "🧮",
+    id: 'level',
+    label: 'Leveling',
     commands: [
-      { name: "Level", value: "`level`\nShows your current level and XP progress." },
-      { name: "Profile", value: "`profile` or `p`\nOpens your profile with progress, bonuses, and rewards." },
-      { name: "Leaderboard", value: "`leaderboard` or `lb`\nShows the top users by level and XP." }
+      '.rank / .level - show rank card',
+      '.leaderboard - text leveling leaderboard',
+      '.profile vc - show VC stats'
     ]
   },
   {
-    name: "Misc",
-    emoji: "✨",
+    id: 'economy',
+    label: 'Economy',
     commands: [
-      { name: "Snipe", value: "`snipe` or `s`\nShows the last deleted message in this channel." },
-      { name: "Delete Snipe", value: "`ds`\nDeletes the last snipe in this channel." },
-      { name: "Scripts Leaderboard", value: "`scripts`\nLists repo .js files by line count with pagination." },
-      { name: "Help", value: "`help`\nShows this help menu." }
+      '.balance - open bank & wallet UI',
+      '.deposit <amount> - deposit into bank',
+      '.withdraw <amount> - withdraw from bank'
+    ]
+  },
+  {
+    id: 'moderation',
+    label: 'Moderation',
+    modOnly: true,
+    commands: [
+      '.mute <@user> [time] [reason]',
+      '.unmute <@user>',
+      '.timeout <@user> <time> [reason]',
+      '.ban <@user> [reason]',
+      '.kick <@user> [reason]',
+      '.warn <@user> <reason>',
+      '.warnings [@user]',
+      '.removewarn <@user> <index>'
+    ]
+  },
+  {
+    id: 'config',
+    label: 'Config',
+    ownerOnly: true,
+    commands: [
+      '.config - open configuration menu',
+      '.test - owner test utilities'
     ]
   }
 ];
 
-async function handleHelpCommand(client, message) {
-  if (!message.guild) return;
-
-  // Determine which categories to show
-  let shownCategories;
-  const isOwner = message.author?.id === OWNER_ID;
-  const isMod = message.member && isModerator(message.member);
-  if (isOwner || isMod) {
-    shownCategories = categories;
-  } else {
-    shownCategories = categories.filter(cat => cat.name === "Misc");
-  }
-
-  // Build main help menu embed
-  const embed = new EmbedBuilder()
-    .setTitle(`${theme.emojis.info} Command Help Menu`)
-    .setColor(theme.colors.primary)
-    .setDescription(
-  "Welcome to the help menu!\n\n" +
-  "Tip: durations accept values like `30m`, `2h`, `1d`.\n\n" +
-  "Select a category below to view available commands.\n\n" +
-      shownCategories.map(cat => `${cat.emoji} **${cat.name}**`).join("\n")
-    );
-
-  const user = message.author;
-  let avatarURL = null;
-  let tag = null;
-
-  // If it's a real User object, use its methods
-  if (user && typeof user.displayAvatarURL === "function") {
-    avatarURL = user.displayAvatarURL({ dynamic: true });
-    tag = user.tag;
-  } else if (message.member && message.member.user) {
-    avatarURL = message.member.user.displayAvatarURL({ dynamic: true });
-    tag = message.member.user.tag;
-  } else if (user && user.id) {
-    // Fallback: use default avatar and ID as tag
-    avatarURL = `https://cdn.discordapp.com/embed/avatars/0.png`;
-    tag = `User ${user.id}`;
-  }
-
-  embed.setTimestamp();
-  applyStandardFooter(embed, message.guild, { testingMode: false });
-
-  // Buttons for categories and config
-  const row = new ActionRowBuilder();
-  shownCategories.forEach(cat => {
-    const style = ButtonStyle.Secondary; // uniform base style
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`help_${cat.name.toLowerCase()}`)
-        .setLabel(cat.name)
-        .setStyle(style)
-        .setEmoji(cat.emoji)
-    );
-  });
-  // Config button (owner only)
-  if (isOwner) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId("help_config")
-        .setLabel("Config Menu")
-        .setStyle(ButtonStyle.Primary)
-        .setEmoji(theme.emojis.settings)
-    );
-  }
-
-  const replyMsg = await message.reply({ embeds: [embed], components: [row] });
-
-  // Button interaction for category details
-  const collector = replyMsg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000 });
-  collector.on("collect", async interaction => {
-    try {
-      const id = interaction.customId;
-
-      // Open Config (owner only)
-      if (id === "help_config") {
-        if (interaction.user.id !== OWNER_ID) {
-          await interaction.reply({ content: "Only the Owner can use this", ephemeral: true }).catch(() => {});
-          return;
-        }
-
-        // Stop this collector first so its 'end' handler won't race and delete after we switch
-        try { collector.stop("switch"); } catch {}
-
-        // Ack, delete help, then open config
-        await interaction.deferUpdate();
-        await replyMsg.delete().catch(() => {});
-        const fakeMessage = {
-          author: { id: interaction.user.id },
-          content: ".config",
-          guild: interaction.guild,
-          channel: interaction.channel,
-          reply: (...args) => interaction.channel.send(...args)
-        };
-        await handleMessageCreate(client, fakeMessage);
-        return;
-      }
-
-      // Moderation gate (no ack yet; reply ephemerally if blocked)
-      if (id === "help_moderation") {
-        const isMod = interaction.member && isModerator(interaction.member);
-        const isOwner = interaction.user.id === OWNER_ID;
-        if (!isMod && !isOwner) {
-          await interaction.reply({ content: "Only Moderators can use this", ephemeral: true }).catch(() => {});
-          return;
-        }
-      }
-
-      // Category buttons
-      const selectedCat = shownCategories.find(cat => `help_${cat.name.toLowerCase()}` === id);
-      if (selectedCat) {
-        if (selectedCat.name === "Moderation") {
-          const isMod = interaction.member && isModerator(interaction.member);
-          const isOwner = interaction.user.id === OWNER_ID;
-          if (!isMod && !isOwner) {
-            await interaction.reply({ content: "Only Moderators can use this", ephemeral: true }).catch(() => {});
-            return;
-          }
-        }
-
-        const footerIcon = (message.member && message.member.user && typeof message.member.user.displayAvatarURL === "function")
-          ? message.member.user.displayAvatarURL({ dynamic: true })
-          : (typeof message.author.displayAvatarURL === "function"
-            ? message.author.displayAvatarURL({ dynamic: true })
-            : "https://cdn.discordapp.com/embed/avatars/0.png");
-
-        const catEmbed = new EmbedBuilder()
-          .setTitle(`${selectedCat.emoji} ${selectedCat.name} Commands`)
-          .setColor(theme.colors.primary)
-          .setDescription(selectedCat.commands.map(cmd => `**${cmd.name}:**\n${cmd.value}`).join("\n\n"))
-          .setTimestamp();
-        applyStandardFooter(catEmbed, message.guild, { testingMode: false });
-
-        const backRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId("help_back")
-            .setLabel("Back")
-            .setEmoji(theme.emojis.back)
-            .setStyle(ButtonStyle.Secondary)
-        );
-        await interaction.deferUpdate();
-        await replyMsg.edit({ embeds: [catEmbed], components: [backRow] }).catch(() => {});
-        return;
-      }
-
-      // Back button
-      if (id === "help_back") {
-        await interaction.deferUpdate();
-        await replyMsg.edit({ embeds: [embed], components: [row] }).catch(() => {});
-        return;
-      }
-
-      await interaction.reply({ content: `${EMOJI_ERROR} Please provide a valid input.`, ephemeral: true }).catch(() => {});
-    } catch (err) {
-      try { await interaction.reply({ content: "❌ Something went wrong.", ephemeral: true }); } catch {}
-    }
-  });
-  collector.on("end", async (_collected, reason) => {
-    if (reason === "switch") return; // already handled when opening config
-    try {
-      const { timeoutRow } = require("../utils/activeMenus");
-      await replyMsg.edit({ components: timeoutRow() });
-    } catch {
-      try { await replyMsg.edit({ components: [] }); } catch {}
-    }
+function visibleCategories(member) {
+  return HELP_CATEGORIES.filter(cat => {
+    if (cat.ownerOnly) return String(member.id) === String(OWNER_ID);
+    if (cat.modOnly) return isModerator(member);
+    return true;
   });
 }
 
-module.exports = {
-  handleHelpCommand
-};
+function buildHelpEmbed(guild, cats, page, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(cats.length / pageSize));
+  page = Math.min(totalPages, Math.max(1, page));
+  const slice = cats.slice((page - 1) * pageSize, page * pageSize);
+  const embed = new EmbedBuilder()
+    .setTitle('Help')
+    .setColor(theme.colors.primary || 0x5865F2)
+    .setDescription('Command reference. Use the buttons below to switch pages.');
+  for (const cat of slice) {
+    embed.addFields({ name: cat.label, value: cat.commands.map(c => `• ${c}`).join('\n') || '*None*' });
+  }
+  applyStandardFooter(embed, guild, { testingMode: false });
+  return { embed, totalPages, page };
+}
+
+async function handleHelpCommand(client, message) {
+  const member = message.member;
+  if (!member) return;
+  const cats = visibleCategories(member);
+  const PAGE_SIZE = 2;
+  const page = 1;
+  const { embed, totalPages } = buildHelpEmbed(message.guild, cats, page, PAGE_SIZE);
+  const row = paginationRow(`help_${page}`, page, totalPages);
+  const msg = await message.reply({ embeds: [embed], components: [row] }).catch(() => null);
+  if (!msg) return;
+  ActiveMenus.registerMessage(msg, {
+    type: 'help',
+    userId: message.author.id,
+    page,
+    totalPages,
+    pageSize: PAGE_SIZE,
+  });
+}
+
+ActiveMenus.registerHandler('help', async (interaction, session) => {
+  const member = interaction.guild?.members?.cache?.get(interaction.user.id) || interaction.member;
+  const cats = visibleCategories(member);
+  if (!interaction.isButton()) return;
+  const m = interaction.customId.match(/^help_(\d+)_(prev|next|page)$/);
+  if (!m) return;
+  let cur = Number(m[1]) || 1;
+  const action = m[2];
+  const totalPages = Math.max(1, Math.ceil(cats.length / session.pageSize));
+  if (action === 'prev') cur = Math.max(1, cur - 1);
+  else if (action === 'next') cur = Math.min(totalPages, cur + 1);
+  const { embed } = buildHelpEmbed(interaction.guild, cats, cur, session.pageSize);
+  const row = paginationRow(`help_${cur}`, cur, totalPages);
+  session.page = cur;
+  session.totalPages = totalPages;
+  await interaction.update({ embeds: [embed], components: [row] }).catch(() => {});
+});
+
+module.exports = { handleHelpCommand };

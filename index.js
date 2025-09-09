@@ -21,6 +21,7 @@ const { attachInteractionEvents } = require("./events/interactionEvents");
 const { startScheduler } = require("./utils/scheduler");
 const ActiveMenus = require("./utils/activeMenus");
 const { startVoiceLeveling } = require("./utils/voiceLeveling");
+const { validateConfig } = require("./utils/configValidate");
 const { startCashDrops } = require("./utils/cashDrops");
 // Load daily deposit progress tracker
 try { require("./utils/depositProgress").load(); } catch {}
@@ -133,6 +134,24 @@ client.once("ready", async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   await sendBotStatusMessage();
   await setStatusChannelName(true);
+
+    // Config validation report
+    try {
+      const guild = client.guilds.cache.first();
+      const issues = validateConfig(guild);
+      if (issues.length) {
+        console.warn(`[config] ${issues.length} issue(s):`);
+        for (const i of issues) console.warn(' -', i);
+        const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(()=>null);
+        if (channel) {
+          channel.send({ content: `⚠️ Config validation found ${issues.length} issue(s):\n` + issues.map(i=>`• ${i}`).join('\n') }).catch(()=>{});
+        }
+      } else {
+        console.log('[config] validation passed');
+      }
+    } catch (err) {
+      console.error('[config] validation error', err);
+    }
   // Changelog now included inside the status embed above
 
   // Initialize global button/session manager (restores timers and disables expired UIs)

@@ -1,5 +1,5 @@
 // Centralized theme: colors and emojis used across embeds
-module.exports = {
+const theme = {
   colors: {
     primary: 0x5865F2,
     success: 0x00ff00,
@@ -23,6 +23,7 @@ module.exports = {
     delete: "🗑️",
     back: "⬅️",
     select: "🎯",
+    events: "📅",
     times: "🕒",
     days: "📅",
     message: "📝",
@@ -49,5 +50,9 @@ module.exports = {
     unmute: "🔊",
     kick: "👢",
     ban: "🔨"
-  }
+  },
+  color(name, fallback = 0x2f3136) { return this.colors[name] ?? fallback; },
+  emoji(name, fallback = "❔") { return this.emojis[name] ?? fallback; }
 };
+
+module.exports = theme;

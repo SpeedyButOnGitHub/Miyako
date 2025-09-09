@@ -5,7 +5,7 @@ const { sendModLog } = require("../../utils/modLogs");
 const { isModerator } = require("./permissions");
 const { config, saveConfig } = require("../../utils/storage");
 const theme = require("../../utils/theme");
-const { applyFooterWithPagination } = require("../../utils/ui");
+const { applyFooterWithPagination, paginationRow } = require("../../utils/ui");
 
 const PAGE_SIZE = 10; // users per page in dashboard
 const MAX_WARNING_LIST = 6; // entries shown inline in user view
@@ -160,24 +160,18 @@ function buildDashboardEmbed(guild, page) {
   }));
 
   const rows = [];
+  // User selector row
   rows.push(new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId(`warns:selectuser:${curPage}`)
+      .setCustomId(`warns_select_user_${curPage}`)
       .setPlaceholder(userOptions.length ? "Select a user to view" : "No users to select")
       .setMinValues(1)
       .setMaxValues(1)
       .addOptions(userOptions.length ? userOptions : [{ label: "No users", value: "noop", default: true }])
       .setDisabled(!userOptions.length)
   ));
-
-  // Pagination controls: only show Prev/Next if multiple pages are needed
-  if (totalPages > 1) {
-    rows.push(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`warns:list:prev:${curPage}`).setLabel("◀ Previous").setStyle(ButtonStyle.Secondary).setDisabled(curPage <= 1),
-      new ButtonBuilder().setCustomId(`warns:list:next:${curPage}`).setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(curPage >= totalPages)
-    ));
-  }
-
+  // Shared pagination row (always present for consistency; disabled internally if not needed)
+  rows.push(paginationRow(`warns_dash_${curPage}`, curPage, totalPages));
   return { embed, rows, page: curPage, totalPages };
 }
 
@@ -204,25 +198,15 @@ function buildUserView(guild, userId, page = 1, opts = {}) {
   applyFooterWithPagination(embed, guild, { testingMode: config.testingMode, page: Math.min(page, totalPages), totalPages, extra: `Total: ${total} • Mute at ${muteT} • Kick at ${kickT}` });
 
   const rows = [];
-  const row = new ActionRowBuilder();
-  // Show Prev/Next only if more than one page
-  if (totalPages > 1) {
-    row.addComponents(
-      new ButtonBuilder().setCustomId(`warns:user:prev:${userId}:${page}`).setLabel("◀ Previous").setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
-      new ButtonBuilder().setCustomId(`warns:user:next:${userId}:${page}`).setLabel("Next ▶").setStyle(ButtonStyle.Secondary).setDisabled(page >= totalPages)
-    );
-  }
-  // Primary actions
-  row.addComponents(
-    new ButtonBuilder().setCustomId(`warns:add:${userId}`).setLabel("Add Warning").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`warns:remove:${userId}`).setLabel("Remove Warning").setStyle(ButtonStyle.Danger).setDisabled(!total)
+  // Pagination row first
+  rows.push(paginationRow(`warns_user_${userId}_${page}`, page, totalPages));
+  // Actions row
+  const actions = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`warns_add_${userId}`).setLabel("Add Warning").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`warns_remove_${userId}`).setLabel("Remove Warning").setStyle(ButtonStyle.Danger).setDisabled(!total)
   );
-  // Back button goes at the end
-  if (includeBack) {
-    row.addComponents(new ButtonBuilder().setCustomId("warns:user:back").setLabel("Back to list").setStyle(ButtonStyle.Secondary));
-  }
-  rows.push(row);
-
+  if (includeBack) actions.addComponents(new ButtonBuilder().setCustomId("warns_user_back").setLabel("Back to list").setStyle(ButtonStyle.Secondary));
+  rows.push(actions);
   return { embed, rows, total, totalPages, page };
 }
 
@@ -257,7 +241,7 @@ function buildRemoveSelect(guild, userId) {
   }));
   const row = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId(`warns:remove:pick:${userId}`)
+      .setCustomId(`warns_remove_pick_${userId}`)
       .setPlaceholder("Select warning(s) to remove")
       .setMinValues(1)
       .setMaxValues(Math.max(1, Math.min(25, opts.length)))
@@ -272,72 +256,83 @@ async function handleWarningButtons(client, interaction) {
   try {
     if (interaction.isButton()) {
       const id = interaction.customId;
-      if (!id.startsWith("warns:")) return;
-      const parts = id.split(":");
-  // List pagination
-  if (parts[1] === "list") {
-        if (parts[2] === "prev" || parts[2] === "next") {
-          const cur = Number(parts[3] || 1) || 1;
-          const page = parts[2] === "prev" ? Math.max(1, cur - 1) : cur + 1;
-          const dash = buildDashboardEmbed(interaction.guild, page);
-          await interaction.update({ embeds: [dash.embed], components: dash.rows }).catch(() => {});
+      const isRelevant = id.startsWith("warns_dash_") || id.startsWith("warns_user_") || id.startsWith("warns_add_") || id.startsWith("warns_remove_") || id === "warns_user_back";
+      if (!isRelevant) return;
+
+      // Dashboard pagination
+      if (id.startsWith("warns_dash_")) {
+        const m = id.match(/^warns_dash_(\d+)_(prev|next|page)$/);
+        if (m) {
+          const cur = Number(m[1]) || 1;
+          const action = m[2];
+          if (action === 'prev' || action === 'next') {
+            const page = action === 'prev' ? Math.max(1, cur - 1) : cur + 1;
+            const dash = buildDashboardEmbed(interaction.guild, page);
+            await interaction.update({ embeds: [dash.embed], components: dash.rows }).catch(() => {});
+          } else {
+            await interaction.deferUpdate().catch(() => {});
+          }
           return;
         }
       }
-      // User view paging
-      if (parts[1] === "user") {
-        if (parts[2] === "back") {
-          const dash = buildDashboardEmbed(interaction.guild, 1);
-    await interaction.update({ embeds: [dash.embed], components: dash.rows }).catch(() => {});
-          return;
-        }
-        if (parts[2] === "prev" || parts[2] === "next") {
-          const userId = parts[3];
-          const cur = Number(parts[4] || 1) || 1;
-          const page = parts[2] === "prev" ? Math.max(1, cur - 1) : cur + 1;
-          const view = buildUserView(interaction.guild, userId, page);
-          await interaction.update({ embeds: [view.embed], components: view.rows }).catch(() => {});
+  // User view pagination
+      if (id.startsWith("warns_user_")) {
+        const m = id.match(/^warns_user_(\d+)_(\d+)_(prev|next|page)$/);
+        if (m) {
+          const userId = m[1];
+          const cur = Number(m[2]) || 1;
+          const action = m[3];
+          if (action === 'prev' || action === 'next') {
+            const page = action === 'prev' ? Math.max(1, cur - 1) : cur + 1;
+            const view = buildUserView(interaction.guild, userId, page);
+            await interaction.update({ embeds: [view.embed], components: view.rows }).catch(() => {});
+          } else {
+            await interaction.deferUpdate().catch(() => {});
+          }
           return;
         }
       }
-      // Add warn -> modal
-      if (parts[1] === "add") {
-        const userId = parts[2];
+
+      if (id === "warns_user_back") {
+        const dash = buildDashboardEmbed(interaction.guild, 1);
+        await interaction.update({ embeds: [dash.embed], components: dash.rows }).catch(() => {});
+        return;
+      }
+      if (id.startsWith("warns_add_")) {
+        const userId = id.substring("warns_add_".length);
         const modal = new ModalBuilder()
-          .setCustomId(`warns:add:${userId}`)
+          .setCustomId(`warns_add_${userId}`)
           .setTitle("Add warning");
         modal.addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId("reason").setLabel("Reason").setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(400)
           )
         );
-  await interaction.showModal(modal);
+        await interaction.showModal(modal);
         return;
       }
-      // Remove -> show select menu
-      if (parts[1] === "remove") {
-        const userId = parts[2];
+      if (id.startsWith("warns_remove_")) {
+        const userId = id.substring("warns_remove_".length);
         const view = buildUserView(interaction.guild, userId, 1);
         const selectRow = buildRemoveSelect(interaction.guild, userId);
         const rows = [selectRow, ...view.rows];
-  await interaction.update({ embeds: [view.embed], components: rows }).catch(() => {});
+        await interaction.update({ embeds: [view.embed], components: rows }).catch(() => {});
         return;
       }
       return;
     }
 
-    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("warns:")) {
-      const parts = interaction.customId.split(":");
-      // Select a user from dashboard
-      if (parts[1] === "selectuser") {
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith("warns_")) {
+      const id = interaction.customId;
+      if (id.startsWith("warns_select_user_")) {
         const uid = interaction.values?.[0] || "";
         if (!uid || uid === "noop") { await interaction.deferUpdate().catch(() => {}); return; }
         const view = buildUserView(interaction.guild, uid, 1);
-  await interaction.update({ embeds: [view.embed], components: view.rows }).catch(() => {});
+        await interaction.update({ embeds: [view.embed], components: view.rows }).catch(() => {});
         return;
       }
-      if (parts[1] === "remove" && parts[2] === "pick") {
-        const userId = parts[3];
+      if (id.startsWith("warns_remove_pick_")) {
+        const userId = id.substring("warns_remove_pick_".length);
         const idxs = (interaction.values || []).map(v => Number(v)).filter(n => Number.isInteger(n));
         ensureWarningsMap();
         // If only seeded exists in testing, copy it to explicit store before modifying
@@ -383,8 +378,8 @@ async function handleWarningButtons(client, interaction) {
       }
     }
 
-    if (interaction.isModalSubmit() && interaction.customId.startsWith("warns:add:")) {
-      const userId = interaction.customId.split(":")[2];
+    if (interaction.isModalSubmit() && interaction.customId.startsWith("warns_add_")) {
+      const userId = interaction.customId.substring("warns_add_".length);
       const reason = interaction.fields.getTextInputValue("reason").trim() || "No reason provided";
   ensureWarningsMap();
   // In testing mode, avoid carrying over seeded items; start explicit list

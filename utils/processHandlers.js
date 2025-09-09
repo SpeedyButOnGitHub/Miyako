@@ -1,5 +1,7 @@
 const { config, saveConfig } = require("./storage");
 const { sendBotShutdownMessage, setStatusChannelName } = require("./botStatus");
+const { recordShutdown } = require("./shutdownState");
+const { logError } = require("./errorUtil");
 
 
 module.exports = function(client) {
@@ -10,35 +12,29 @@ module.exports = function(client) {
       try {
         config.testingMode = false;
         saveConfig();
+        recordShutdown();
         if (client?.isReady && client.isReady()) {
           await setStatusChannelName(client, false);
           await sendBotShutdownMessage(client);
         }
       } catch (err) {
-        console.error("Error during shutdown sequence:", err);
-      } finally {
-        process.exit(0);
-      }
+        logError('shutdown', err);
+      } finally { process.exit(0); }
     });
   });
 
   process.on("uncaughtException", async (err) => {
     try {
-      console.error("Uncaught Exception:", err);
-      config.testingMode = false;
-      saveConfig();
+      logError('uncaughtException', err);
+      config.testingMode = false; saveConfig(); recordShutdown();
       if (client?.isReady && client.isReady()) {
         await setStatusChannelName(client, false);
         await sendBotShutdownMessage(client);
       }
-    } catch (e) {
-      console.error("Error handling uncaughtException:", e);
-    } finally {
-      process.exit(1);
-    }
+    } catch (e) { logError('uncaughtException:handler', e); } finally { process.exit(1); }
   });
 
   process.on("unhandledRejection", (reason, promise) => {
-    console.error("Unhandled Rejection at:", promise, "reason:", reason);
+    logError('unhandledRejection', reason || promise);
   });
 };

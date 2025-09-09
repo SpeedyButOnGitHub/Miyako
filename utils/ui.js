@@ -75,4 +75,11 @@ function paginationRow(prefix, page, totalPages) {
   return row;
 }
 
-module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow };
+// Standard close row (single row with a destructive-style Close button)
+function closeRow(id = 'close_menu', label = 'Close') {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.close || '✖')
+  );
+}
+
+module.exports = { btn, navBtn, toggleModeBtn, backButton, primaryEmbed, sectionField, progressBar, applyStandardFooter, paginationLabel, applyFooterWithPagination, paginationRow, closeRow };

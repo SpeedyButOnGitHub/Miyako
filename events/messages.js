@@ -3,7 +3,8 @@ const { handleModerationCommands } = require("../commands/moderation/moderationC
 const { handleWarningsCommand } = require("../commands/moderation/warnings");
 const { handleSnipeCommands } = require("../commands/snipes");
 const { handleMessageCreate } = require("../commands/configMenu");
-const { handleLevelCommand } = require("../commands/level");
+// Rank/profile consolidated in profile command
+const { handleRankCommand } = require("../commands/profile");
 const { handleTestCommand } = require("../commands/test");
 const { handleLeaderboardCommand } = require("../commands/leaderboard");
 const { handleProfileCommand } = require("../commands/profile");
@@ -17,6 +18,10 @@ const { handleCashCommand } = require("../commands/cash");
 const { handleBalanceCommand } = require("../commands/balance");
 const theme = require("../utils/theme");
 const { TEST_LOG_CHANNEL } = require("../utils/logChannels");
+const { snapshotSessions } = require("../utils/activeMenus");
+const { levels } = require("../utils/levels");
+const { vcLevels } = require("../utils/vcLevels");
+const { getTopCash } = require("../utils/cash");
 
 const LEVEL_ROLES = {
   5: "1232701768362754147",
@@ -85,8 +90,8 @@ function attachMessageEvents(client) {
         await handleWarningsCommand(client, message);
       } else if (command === "config") {
         await handleMessageCreate(client, message);
-      } else if (command === "level") {
-        await handleLevelCommand(client, message);
+      } else if (command === "level" || command === "rank") {
+        await handleRankCommand(client, message);
       } else if (command === "profile" || command === "p") {
         await handleProfileCommand(client, message);
       } else if (command === "test") {
@@ -114,6 +119,17 @@ function attachMessageEvents(client) {
         await handleCashCommand(client, message);
       } else if (command === "balance" || command === "bal") {
         await handleBalanceCommand(client, message);
+      } else if (command === "diag" || command === "diagnostics") {
+        const sessions = snapshotSessions();
+        const lines = [];
+        lines.push(`Sessions: ${sessions.length}`);
+        if (sessions.length) {
+          lines.push(...sessions.slice(0,10).map(s=>`• ${s.type} ${s.id} ${(s.expiresIn/1000).toFixed(0)}s`));
+        }
+        lines.push(`Levels: ${Object.keys(levels).length}`);
+        lines.push(`VC Levels: ${Object.keys(vcLevels).length}`);
+        try { const top = getTopCash(3); lines.push(`Top cash: ${top.map(t=>t.userId+':'+t.amount).join(', ')||'none'}`); } catch {}
+        await message.reply({ content: '🩺 Diagnostics\n'+lines.join('\n'), allowedMentions: { repliedUser: false } }).catch(()=>{});
       }
     } catch (err) {
       console.error(`[Message Command Error]:`, err);
