@@ -15,7 +15,7 @@ const { addProgress } = require("../utils/depositProgress");
 const { depositToBank, withdrawFromBank, amountToNextThreshold, quoteDeposit, getBank, getBaseLimit, computeMaxAffordableDeposit, computeTaxForDeposit } = require("../utils/bank");
 const { getCash, getTestingCash } = require("../utils/cash");
 const theme = require("../utils/theme");
-const { semanticButton } = require("../utils/ui");
+const { semanticButton, buildNavRow } = require("../utils/ui");
 
 // Pending Kick/Ban confirmations: key = `${userId}:${action}:${moderatorId}` -> { reason: string|null, originChannelId?:string, originMessageId?:string }
 const pendingPunishments = new Map();
@@ -336,9 +336,9 @@ function attachInteractionEvents(client) {
             const count = Array.isArray(store[uid]) ? store[uid].length : 0;
             const rows = [
               new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`modact:addwarn:${uid}`).setLabel("Add Warn").setStyle(ButtonStyle.Secondary).setEmoji("➕"),
-                new ButtonBuilder().setCustomId(`modact:removewarn:${uid}`).setLabel("Remove Warn").setStyle(ButtonStyle.Secondary).setEmoji("➖").setDisabled(count === 0),
-                new ButtonBuilder().setCustomId(`modact:back:${uid}`).setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+                semanticButton('nav', { id: `modact:addwarn:${uid}`, label: 'Warn+', emoji: '➕' }),
+                semanticButton('nav', { id: `modact:removewarn:${uid}`, label: 'Warn-', emoji: '➖', enabled: count !== 0 }),
+                semanticButton('nav', { id: `modact:back:${uid}`, label: 'Back', emoji: '⬅️' })
               )
             ];
             await swapRows(rows);
@@ -347,14 +347,14 @@ function attachInteractionEvents(client) {
             const isTimedOut = !!(targetMember?.communicationDisabledUntilTimestamp && targetMember.communicationDisabledUntilTimestamp > Date.now());
             const rows = [
               new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`modact:mute:${uid}:3600000`).setLabel("1h").setStyle(ButtonStyle.Danger).setEmoji("⏱️"),
-                new ButtonBuilder().setCustomId(`modact:mute:${uid}:7200000`).setLabel("2h").setStyle(ButtonStyle.Danger).setEmoji("⏱️"),
-                new ButtonBuilder().setCustomId(`modact:mute:${uid}:21600000`).setLabel("6h").setStyle(ButtonStyle.Danger).setEmoji("⏱️"),
-                new ButtonBuilder().setCustomId(`modact:mute:${uid}:86400000`).setLabel("24h").setStyle(ButtonStyle.Danger).setEmoji("⏱️")
+                semanticButton('danger', { id: `modact:mute:${uid}:3600000`, label: '1h', emoji: '⏱️' }),
+                semanticButton('danger', { id: `modact:mute:${uid}:7200000`, label: '2h', emoji: '⏱️' }),
+                semanticButton('danger', { id: `modact:mute:${uid}:21600000`, label: '6h', emoji: '⏱️' }),
+                semanticButton('danger', { id: `modact:mute:${uid}:86400000`, label: '24h', emoji: '⏱️' })
               ),
               new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`modact:unmute:${uid}`).setLabel("Unmute").setStyle(ButtonStyle.Success).setEmoji("✅").setDisabled(!isTimedOut),
-                new ButtonBuilder().setCustomId(`modact:back:${uid}`).setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+                semanticButton('success', { id: `modact:unmute:${uid}`, label: 'Unmute', emoji: '✅', enabled: isTimedOut }),
+                semanticButton('nav', { id: `modact:back:${uid}`, label: 'Back', emoji: '⬅️' })
               )
             ];
             await swapRows(rows);
@@ -398,9 +398,9 @@ function attachInteractionEvents(client) {
           const reasonText = reason && reason.trim() ? reason.trim() : "None";
           const content = `<@${uid}> will be ${flowAction === "kick" ? "kicked" : "banned"}.\nAre you sure you would like to proceed?\n\nReason provided: ${reasonText}`;
           const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`modact:confirm:${flowAction}:${uid}`).setLabel("Confirm").setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`modact:cancel:${flowAction}:${uid}`).setLabel("Cancel").setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`modact:changeReason:${flowAction}:${uid}`).setLabel("Change Reason").setStyle(ButtonStyle.Primary)
+            semanticButton('success', { id: `modact:confirm:${flowAction}:${uid}`, label: 'Confirm' }),
+            semanticButton('danger', { id: `modact:cancel:${flowAction}:${uid}`, label: 'Cancel' }),
+            semanticButton('primary', { id: `modact:changeReason:${flowAction}:${uid}`, label: 'Reason' })
           );
           await submitted.reply({ content, components: [row], flags: 1<<6 }).catch(() => {});
           return;
@@ -441,9 +441,9 @@ function attachInteractionEvents(client) {
               const reasonText = newReason ? newReason : "None";
               const content = `<@${uid}> will be ${flowAction === "kick" ? "kicked" : "banned"}.\nAre you sure you would like to proceed?\n\nReason provided: ${reasonText}`;
               const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`modact:confirm:${flowAction}:${uid}`).setLabel("Confirm").setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId(`modact:cancel:${flowAction}:${uid}`).setLabel("Cancel").setStyle(ButtonStyle.Danger),
-                new ButtonBuilder().setCustomId(`modact:changeReason:${flowAction}:${uid}`).setLabel("Change Reason").setStyle(ButtonStyle.Primary)
+                semanticButton('success', { id: `modact:confirm:${flowAction}:${uid}`, label: 'Confirm' }),
+                semanticButton('danger', { id: `modact:cancel:${flowAction}:${uid}`, label: 'Cancel' }),
+                semanticButton('primary', { id: `modact:changeReason:${flowAction}:${uid}`, label: 'Reason' })
               );
               await submitted.reply({ content, components: [row], flags: 1<<6 }).catch(() => {});
             }
@@ -540,9 +540,9 @@ function attachInteractionEvents(client) {
           const count = arr.length;
           const rows = [
             new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId(`modact:addwarn:${uid}`).setLabel("Add Warn").setStyle(ButtonStyle.Secondary).setEmoji("➕"),
-              new ButtonBuilder().setCustomId(`modact:removewarn:${uid}`).setLabel("Remove Warn").setStyle(ButtonStyle.Secondary).setEmoji("➖").setDisabled(count === 0),
-              new ButtonBuilder().setCustomId(`modact:back:${uid}`).setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+              semanticButton('nav', { id: `modact:addwarn:${uid}`, label: 'Warn+', emoji: '➕' }),
+              semanticButton('nav', { id: `modact:removewarn:${uid}`, label: 'Warn-', emoji: '➖', enabled: count !== 0 }),
+              semanticButton('nav', { id: `modact:back:${uid}`, label: 'Back', emoji: '⬅️' })
             )
           ];
           await interaction.deferUpdate().catch(() => {});
@@ -575,9 +575,9 @@ function attachInteractionEvents(client) {
           const count = arr.length;
           const rows = [
             new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId(`modact:addwarn:${uid}`).setLabel("Add Warn").setStyle(ButtonStyle.Secondary).setEmoji("➕"),
-              new ButtonBuilder().setCustomId(`modact:removewarn:${uid}`).setLabel("Remove Warn").setStyle(ButtonStyle.Secondary).setEmoji("➖").setDisabled(count === 0),
-              new ButtonBuilder().setCustomId(`modact:back:${uid}`).setLabel("Back").setStyle(ButtonStyle.Secondary).setEmoji("⬅️")
+              semanticButton('nav', { id: `modact:addwarn:${uid}`, label: 'Warn+', emoji: '➕' }),
+              semanticButton('nav', { id: `modact:removewarn:${uid}`, label: 'Warn-', emoji: '➖', enabled: count !== 0 }),
+              semanticButton('nav', { id: `modact:back:${uid}`, label: 'Back', emoji: '⬅️' })
             )
           ];
           await interaction.deferUpdate().catch(() => {});

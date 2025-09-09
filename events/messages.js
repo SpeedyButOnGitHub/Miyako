@@ -14,6 +14,7 @@ const { handleScheduleCommand } = require("../commands/schedule");
 const { handleScriptsCommand } = require("../commands/scripts");
 const { maybeSpawnDrop, tryClaimDrop } = require("../utils/cashDrops");
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { semanticButton, buildNavRow } = require('../utils/ui');
 const { config } = require("../utils/storage");
 const { handleCashCommand } = require("../commands/cash");
 const { handleBalanceCommand } = require("../commands/balance");
@@ -57,9 +58,9 @@ function attachMessageEvents(client) {
         .setDescription(`Looks like someone snagged the bag! You received **$${claimed.amount.toLocaleString()}**.`)
         .addFields({ name: "New Balance", value: `${claimed.testing ? "(test) " : ""}$${Number(claimed.newBalance || 0).toLocaleString()}` , inline: true })
         .setFooter({ text: "Keep chatting for more surprise drops!" });
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(claimed.testing ? "cash:check:test" : "cash:check").setLabel("Check Balance").setEmoji("💳").setStyle(ButtonStyle.Primary)
-      );
+      const row = buildNavRow([
+        semanticButton('primary', { id: claimed.testing ? 'cash:check:test' : 'cash:check', label: 'Balance', emoji: '💳' })
+      ]);
       try { await message.reply({ embeds: [claimEmbed], components: [row], allowedMentions: { repliedUser: false } }); } catch {}
     } else {
       const drop = maybeSpawnDrop(message, config);
@@ -201,11 +202,11 @@ function attachMessageEvents(client) {
           return embed;
         };
         const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-        const row = (page) => new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('err_prev').setLabel('Prev').setStyle(ButtonStyle.Secondary).setDisabled(page===0),
-          new ButtonBuilder().setCustomId('err_next').setLabel('Next').setStyle(ButtonStyle.Secondary).setDisabled(page>=totalPages-1),
-          new ButtonBuilder().setCustomId('err_refresh').setLabel('Refresh').setStyle(ButtonStyle.Primary)
-        );
+        const row = (page) => buildNavRow([
+          semanticButton('nav', { id: 'err_prev', label: 'Prev', enabled: page!==0 }),
+          semanticButton('nav', { id: 'err_next', label: 'Next', enabled: page < totalPages-1 }),
+          semanticButton('primary', { id: 'err_refresh', label: 'Refresh' })
+        ]);
         const sent = await message.reply({ embeds: [buildPage(0)], components: [row(0)], allowedMentions: { repliedUser: false } });
         ActiveMenus.registerMessage(sent, { type: 'errors', userId: message.author.id, data: { page: 0, limit } });
       } else if (command === 'clearerrors' || command === 'cerr') {
@@ -264,12 +265,12 @@ try {
   const embed = createEmbed({ title: '🧾 Recent Errors', description: `Page ${page+1}/${totalPages} • ${rows.length} item(s)`, color: 'danger' });
   for (const r of slice) safeAddField(embed, `#${r.idx} [${r.scope}] ${r.ts.split(' ')[1]}`, r.first || '(no message)');
     const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('err_prev').setLabel('Prev').setStyle(ButtonStyle.Secondary).setDisabled(page===0),
-      new ButtonBuilder().setCustomId('err_next').setLabel('Next').setStyle(ButtonStyle.Secondary).setDisabled(page>=totalPages-1),
-      new ButtonBuilder().setCustomId('err_refresh').setLabel('Refresh').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId('err_close').setLabel('Close').setStyle(ButtonStyle.Danger)
-    );
+    const row = buildNavRow([
+      semanticButton('nav', { id: 'err_prev', label: 'Prev', enabled: page!==0 }),
+      semanticButton('nav', { id: 'err_next', label: 'Next', enabled: page < totalPages-1 }),
+      semanticButton('primary', { id: 'err_refresh', label: 'Refresh' }),
+      semanticButton('danger', { id: 'err_close', label: 'Close' })
+    ]);
     session.data.page = page;
     try { await interaction.update({ embeds: [embed], components: [row] }); } catch {}
   });

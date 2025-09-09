@@ -3,6 +3,7 @@ require('./utils/crashReporter').initEarly();
 require("dotenv/config");
 // (ephemeralShim removed; all interactions now use flags:1<<6 directly)
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { semanticButton, buildNavRow } = require('./utils/ui');
 const fs = require("fs");
 const path = require("path");
 const { config, saveConfig } = require("./utils/storage");
@@ -165,9 +166,9 @@ async function sendBotStatusMessage() {
     // Components: Details button only if we have detail lines
     let components = [];
     if (changelogSession && changelogSession.detailLines && changelogSession.detailLines.length) {
-      components = [ new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('status_show').setLabel('Details').setStyle(ButtonStyle.Primary)
-        ) ];
+      components = [ buildNavRow([
+        semanticButton('primary', { id: 'status_show', label: 'Details' })
+      ]) ];
     }
     const sent = await channel.send({ embeds: [embed], components }).catch(() => null);
     if (sent && changelogSession) {
@@ -298,9 +299,9 @@ try {
         if (chunked[1]) filtered.push({ name: 'Details (cont.)', value: chunked[1].slice(0,1024) });
       }
       embed.setFields(filtered);
-      const rows = [ new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('status_hide').setLabel('Hide').setStyle(ButtonStyle.Secondary)
-        ) ];
+      const rows = [ buildNavRow([
+        semanticButton('nav', { id: 'status_hide', label: 'Hide' })
+      ]) ];
       await interaction.update({ embeds: [embed], components: rows });
       session.data = data;
       return;
@@ -311,9 +312,9 @@ try {
       const fields = (embed.data.fields||[]).filter(f => !f.name.startsWith('Details'));
       // Ensure overview field name is 'Changelog Overview'
       embed.setFields(fields.map(f => f.name === 'Changelog' ? { ...f, name: 'Changelog Overview' } : f));
-      const rows = [ new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('status_show').setLabel('Details').setStyle(ButtonStyle.Primary)
-        ) ];
+      const rows = [ buildNavRow([
+        semanticButton('primary', { id: 'status_show', label: 'Details' })
+      ]) ];
       await interaction.update({ embeds: [embed], components: rows });
       session.data = data;
       return;

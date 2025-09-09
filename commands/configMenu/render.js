@@ -1,4 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { semanticButton, buildNavRow } = require('../../utils/ui');
 const theme = require("../../utils/theme");
 const { config } = require("../../utils/storage");
 const { configCategories } = require("./constants");
@@ -24,7 +25,7 @@ function buildRootEmbed() {
 
 // Build category navigation as buttons (uniform with Help UI)
 function buildCategorySelect(currentCategory) {
-  const row = new ActionRowBuilder();
+  const row = buildNavRow([]);
   const emojiByCat = {
     Sniping: "🔭",
     Moderation: "🛡️",
@@ -34,12 +35,9 @@ function buildCategorySelect(currentCategory) {
   };
   for (const name of Object.keys(configCategories)) {
     const active = currentCategory === name;
-    const btn = new ButtonBuilder()
-      .setCustomId(`cfg:cat:${name}`)
-      .setLabel(name)
-      .setEmoji(emojiByCat[name] || theme.emojis.settings)
-      .setStyle(active ? ButtonStyle.Primary : ButtonStyle.Secondary);
-    if (row.components.length < 5) row.addComponents(btn);
+    if (row.components.length < 5) row.addComponents(
+      semanticButton(active ? 'primary' : 'nav', { id: `cfg:cat:${name}`, label: name, emoji: emojiByCat[name] || theme.emojis.settings, active })
+    );
   }
   return row;
 }
@@ -50,13 +48,11 @@ function buildSettingButtons(categoryName, settingName) {
   if (!setting) return [];
 
   const rows = [];
-  let row = new ActionRowBuilder();
+  let row = buildNavRow([]);
   for (const btn of (setting.buttons || [])) {
-    const b = new ButtonBuilder()
-      .setCustomId(`config:${categoryName}:${settingName}:${btn.id}`)
-      .setLabel(btn.label)
-      .setEmoji(btn.emoji || undefined)
-      .setStyle(btn.style);
+  const compact = (btn.label || '').length > 14 ? btn.label.slice(0,11) + '…' : btn.label;
+  const kind = btn.style === ButtonStyle.Danger ? 'danger' : (btn.style === ButtonStyle.Success ? 'success' : (btn.style === ButtonStyle.Primary ? 'primary' : 'nav'));
+  const b = semanticButton(kind, { id: `config:${categoryName}:${settingName}:${btn.id}`, label: compact, emoji: btn.emoji });
     if (row.components.length >= 5) {
       rows.push(row);
       row = new ActionRowBuilder();
@@ -108,74 +104,42 @@ function buildSettingEmbed(categoryName, settingName) {
 // Build per-category setting list as a single row of buttons + Back
 function buildSettingSelect(categoryName) {
   const cat = configCategories[categoryName];
-  const row = new ActionRowBuilder();
+  const row = buildNavRow([]);
   for (const name of Object.keys(cat.settings)) {
     if (row.components.length >= 4) break; // leave room for Back
     const s = cat.settings[name];
     const label = s.getLabel ? s.getLabel() : name;
-    const btn = new ButtonBuilder()
-      .setCustomId(`cfg:set:${categoryName}:${name}`)
-      .setLabel(label)
-  .setEmoji(theme.emojis.edit)
-      .setStyle(ButtonStyle.Primary);
-    row.addComponents(btn);
+    const compact = label.length > 12 ? label.slice(0,9)+'…' : label;
+    row.addComponents(semanticButton('primary', { id: `cfg:set:${categoryName}:${name}`, label: compact, emoji: theme.emojis.edit }));
   }
   // Back to root
-  row.addComponents(
-    new ButtonBuilder()
-      .setCustomId('cfg:back:root')
-      .setLabel('Back')
-      .setEmoji(theme.emojis.back)
-      .setStyle(ButtonStyle.Secondary)
-  );
+  row.addComponents(semanticButton('nav', { id: 'cfg:back:root', label: 'Back', emoji: theme.emojis.back }));
   return row;
 }
 
 // Build a single row for a specific setting: optional mode toggles + actions + Back
 function buildSettingRow(categoryName, settingName) {
-  const row = new ActionRowBuilder();
+  const row = buildNavRow([]);
   const isSnipingChannels = categoryName === "Sniping" && settingName === "ChannelList";
   const isLevelingChannels = categoryName === "Leveling" && settingName === "LevelingChannels";
   if (isSnipingChannels || isLevelingChannels) {
     const mode = isSnipingChannels ? (config.snipeMode || "whitelist") : (config.levelingMode || "blacklist");
     const wlActive = mode === "whitelist";
     const blActive = mode === "blacklist";
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`settingMode_${categoryName}_${settingName}_whitelist`)
-        .setLabel('Whitelist')
-  .setEmoji(theme.emojis.enable)
-        .setStyle(wlActive ? ButtonStyle.Success : ButtonStyle.Secondary)
-    );
+    row.addComponents(semanticButton(wlActive ? 'success' : 'nav', { id: `settingMode_${categoryName}_${settingName}_whitelist`, label: 'White', emoji: theme.emojis.enable, active: wlActive }));
     if (row.components.length < 4) {
-      row.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`settingMode_${categoryName}_${settingName}_blacklist`)
-          .setLabel('Blacklist')
-          .setEmoji(theme.emojis.disable)
-          .setStyle(blActive ? ButtonStyle.Danger : ButtonStyle.Secondary)
-      );
+      row.addComponents(semanticButton(blActive ? 'danger' : 'nav', { id: `settingMode_${categoryName}_${settingName}_blacklist`, label: 'Black', emoji: theme.emojis.disable, active: blActive }));
     }
   }
   const cat = configCategories[categoryName];
   const setting = cat?.settings?.[settingName];
   for (const btn of (setting?.buttons || [])) {
     if (row.components.length >= 4) break; // leave room for Back
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`config:${categoryName}:${settingName}:${btn.id}`)
-        .setLabel(btn.label)
-  .setEmoji(btn.emoji || undefined)
-        .setStyle(btn.style)
-    );
+    const compactBtn = btn.label.length > 12 ? btn.label.slice(0,9)+'…' : btn.label;
+    const kind = btn.style === ButtonStyle.Danger ? 'danger' : (btn.style === ButtonStyle.Success ? 'success' : (btn.style === ButtonStyle.Primary ? 'primary' : 'nav'));
+    row.addComponents(semanticButton(kind, { id: `config:${categoryName}:${settingName}:${btn.id}`, label: compactBtn, emoji: btn.emoji }));
   }
-  row.addComponents(
-    new ButtonBuilder()
-      .setCustomId(`cfg:back:${categoryName}`)
-      .setLabel('Back')
-      .setEmoji(theme.emojis.back)
-      .setStyle(ButtonStyle.Secondary)
-  );
+  row.addComponents(semanticButton('nav', { id: `cfg:back:${categoryName}`, label: 'Back', emoji: theme.emojis.back }));
   return row;
 }
 
