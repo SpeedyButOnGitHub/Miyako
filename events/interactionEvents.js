@@ -859,13 +859,21 @@ function attachInteractionEvents(client) {
         if (!ev) {
           try { const { getEvent: ge } = require('../utils/eventsStorage'); ev = ge(evId); } catch {}
         }
+        // Fallback: try to resolve by message id if the event id was not found (e.g., after restart)
+        if (!ev && interaction.message?.id) {
+          try {
+            const { getEvents } = require('../utils/eventsStorage');
+            const all = getEvents();
+            ev = all.find(e => Array.isArray(e.__clockIn?.messageIds) && e.__clockIn.messageIds.includes(interaction.message.id)) || null;
+          } catch {}
+        }
         if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
         const member = interaction.member;
   if (!member) { await interaction.reply({ content:'Member not found.', flags:1<<6 }).catch(()=>{}); return; }
         const choice = interaction.values[0];
         const ROLE_REQUIRED = '1375958480380493844';
         const POS_META = {
-          'instance_manager': { label: 'Instance Master', max:1, role: ROLE_REQUIRED },
+          'instance_manager': { label: 'Instance Manager', max:1, role: ROLE_REQUIRED },
           'manager': { label: 'Manager', max:Infinity, role: ROLE_REQUIRED },
           'bouncer': { label: 'Bouncer', max:Infinity },
           'bartender': { label: 'Bartender', max:Infinity },
@@ -901,7 +909,7 @@ function attachInteractionEvents(client) {
           const nameSafe = ev.name || 'Event';
           const embed = {
             title: `🕒 Staff Clock In — ${nameSafe}`,
-            description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.',
+            description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
             color: 3447003,
             fields: [
               { name: '📝 Instance Manager (1 slot)', value: `${(state.positions.instance_manager||[]).length} / 1\n${fmtMentions(state.positions.instance_manager)}`, inline: false },
@@ -914,9 +922,11 @@ function attachInteractionEvents(client) {
             ],
             footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
           };
+          // Choose a channel: prefer stored clock-in channel, then event channel, finally current interaction channel
+          const chId = (ev.__clockIn && ev.__clockIn.channelId) || ev.channelId || interaction.channelId;
+          const channel = chId ? (await interaction.client.channels.fetch(chId).catch(()=>null)) : null;
           for (const mid of state.messageIds || []) {
             try {
-              const channel = await interaction.channel?.guild?.channels?.fetch(ev.channelId).catch(()=>null) || await interaction.client.channels.fetch(ev.channelId).catch(()=>null);
               const msg = channel && channel.messages ? await channel.messages.fetch(mid).catch(()=>null) : null;
               if (msg) await msg.edit({ content: '', embeds:[embed] }).catch(()=>{});
             } catch {}

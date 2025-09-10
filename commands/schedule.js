@@ -520,7 +520,7 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     // Build embed JSON per template
     const embedJson = {
       title: `🕒 Staff Clock In — ${nameSafe}`,
-      description: "Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.",
+      description: "Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.",
       color: 3447003,
       fields: [
         {
@@ -559,6 +559,7 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
       notif.__skipUntil = Date.now() + 60*60*1000; // skip for an hour
       notif.lastManualTrigger = Date.now();
       ev.__clockIn.lastSentTs = Date.now();
+      ev.__clockIn.channelId = channel.id;
       updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn });
     }
     return !!sent;
@@ -704,6 +705,9 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
   if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
+  // Compute a suggested TTL string based on current value (per-notif or default)
+  const currentTTL = Number.isFinite(notif.deleteAfterMs) ? notif.deleteAfterMs : (config.autoMessages?.defaultDeleteMs || 0);
+  const suggestTTL = currentTTL<=0 ? '0' : (currentTTL%3600000===0 ? `${Math.floor(currentTTL/3600000)}h` : (currentTTL%60000===0 ? `${Math.floor(currentTTL/60000)}m` : `${Math.max(1,Math.floor(currentTTL/1000))}s`));
     const modal = new ModalBuilder().setCustomId(`notif_edit_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Auto Message')
       .addComponents(
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setValue(notif.channelId||'')),
@@ -1020,6 +1024,8 @@ async function handleEventNotificationModal(interaction) {
   if (cleanedChan && !/^\d{1,32}$/.test(cleanedChan)) return interaction.reply({ content:'❌ Invalid channel id.', flags:1<<6 });
     const offsetRaw = interaction.fields.getTextInputValue('offset');
     let offset = parseOffsetInput(offsetRaw);
+  const deleteAfterRaw = interaction.fields.getTextInputValue('deleteafter');
+  const deleteAfterMs = parseDeleteAfterMs(deleteAfterRaw);
     const msgRaw = interaction.fields.getTextInputValue('message');
     let messageJSON = null; const healed = healJSON(msgRaw); if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
     const entry = list[idx];
@@ -1035,7 +1041,8 @@ async function handleEventNotificationModal(interaction) {
     updatedEv = updateEvent(ev.id, { autoMessages: newList });
     console.log(`[Events] Updated all auto messages for event ${ev.id} (${ev.name}).`);
     await interaction.reply({ content:`✅ Auto messages updated for this event.`, flags:1<<6 }).catch(()=>{});
-// Refresh previously tracked auto messages for the event (non-clock-in)
+  // Refresh previously tracked auto messages for the event (and clock-in embeds)
+  try { await refreshTrackedAutoMessages(interaction.client, updatedEv); } catch {}
   } else if (kind==='deleteafter') {
     // Modal id pattern: notif_deleteafter_modal_<eventId>_<notifId>_<managerMessageId>
     const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
@@ -1071,4 +1078,69 @@ async function handleEventNotificationModal(interaction) {
   }
 }
 
-module.exports = { handleScheduleCommand, handleScheduleModal, handleEventCreateModal, handleEventEditModal, handleEventNotificationModal, ensureAnchor, manualTriggerAutoMessage };
+// Refresh helper: edits recently-tracked messages to match the latest event/notif definitions
+async function refreshTrackedAutoMessages(client, ev) {
+  try {
+    // Regular auto messages
+    const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? ev.__notifMsgs : null;
+    if (map && Array.isArray(ev.autoMessages)) {
+      for (const notif of ev.autoMessages) {
+        const rec = map[notif.id];
+        if (!rec || !rec.channelId || !Array.isArray(rec.ids) || rec.ids.length===0) continue;
+        const channel = await client.channels.fetch(rec.channelId).catch(()=>null);
+        if (!channel || !channel.messages) continue;
+        // Build fresh payload
+        let payload;
+        if (notif.messageJSON && typeof notif.messageJSON==='object') {
+          const base = { ...notif.messageJSON };
+          if (base.embeds && !Array.isArray(base.embeds)) base.embeds = [base.embeds];
+          if (!base.content && !base.embeds) base.content = notif.message || `Auto message (${ev.name})`;
+          payload = applyPlaceholdersToJsonPayload(base, ev);
+        } else {
+          const { applyTimestampPlaceholders } = require('../utils/timestampPlaceholders');
+          let content = notif.message || `Auto message (${ev.name})`;
+          content = applyTimestampPlaceholders(content, ev);
+          if (config.testingMode) content = sanitizeMentionsForTesting(content);
+          payload = { content };
+        }
+        // Edit last few tracked messages
+        for (const mid of rec.ids.slice(-3)) {
+          try { const msg = await channel.messages.fetch(mid).catch(()=>null); if (msg) await msg.edit(payload).catch(()=>{}); } catch {}
+        }
+      }
+    }
+    // Staff clock-in messages
+    if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length) {
+      const chId = ev.__clockIn.channelId || ev.channelId;
+      const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
+      if (channel && channel.messages) {
+        const fmtMentions = (arr=[]) => {
+          if (!Array.isArray(arr) || arr.length === 0) return '*None*';
+          const s = arr.map(id=>`<@${id}>`).join(', ');
+          return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
+        };
+        const nameSafe = ev.name || 'Event';
+        const embed = {
+          title: `🕒 Staff Clock In — ${nameSafe}`,
+          description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
+          color: 3447003,
+          fields: [
+            { name: '📝 Instance Manager (1 slot)', value: `${(ev.__clockIn.positions?.instance_manager||[]).length} / 1\n${fmtMentions(ev.__clockIn.positions?.instance_manager)}`, inline: false },
+            { name: '🛠️ Manager',   value: fmtMentions(ev.__clockIn.positions?.manager),   inline: true },
+            { name: '🛡️ Bouncer',   value: fmtMentions(ev.__clockIn.positions?.bouncer),   inline: true },
+            { name: '🍸 Bartender', value: fmtMentions(ev.__clockIn.positions?.bartender), inline: true },
+            { name: '🎯 Backup',    value: fmtMentions(ev.__clockIn.positions?.backup),    inline: true },
+            { name: '⏳ Maybe / Late', value: fmtMentions(ev.__clockIn.positions?.maybe), inline: false },
+            { name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
+          ],
+          footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
+        };
+        for (const mid of ev.__clockIn.messageIds.slice(-3)) {
+          try { const msg = await channel.messages.fetch(mid).catch(()=>null); if (msg) await msg.edit({ content:'', embeds:[embed] }).catch(()=>{}); } catch {}
+        }
+      }
+    }
+  } catch {}
+}
+
+module.exports = { handleScheduleCommand, handleScheduleModal, handleEventCreateModal, handleEventEditModal, handleEventNotificationModal, ensureAnchor, manualTriggerAutoMessage, refreshTrackedAutoMessages };

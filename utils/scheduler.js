@@ -363,7 +363,7 @@ function startScheduler(client, opts = {}) {
                         const nameSafe = ev.name || 'Event';
                         const embed = {
                           title: `🕒 Staff Clock In — ${nameSafe}`,
-                          description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.',
+                          description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
                           color: 3447003,
                           fields: [
                             { name: '📝 Instance Manager (1 slot)', value: `${(state.positions.instance_manager||[]).length} / 1\n${fmtMentions(state.positions.instance_manager)}`, inline: false },

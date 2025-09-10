@@ -70,14 +70,11 @@ function buildTimestampMap(ev) {
     map.opening1 = map.timestamp_opening1;
     map.closing1 = `<t:${r.endSec}:t>`;
     map.timestamp_closing1 = map.closing1;
-  // Backwards compatible aliases (un-numbered forms)
+  // Backwards compatible aliases (timestamp_* only; avoid bare common words)
   map.timestamp_opening = map.timestamp_opening1;
-  map.opening = map.opening1;
   map.timestamp_closing = map.timestamp_closing1;
-  map.closing = map.closing1;
   // Additional close alias requested: timestamp_close -> timestamp_closing1
   map.timestamp_close = map.timestamp_closing1;
-  map.close = map.closing1;
   }
   // Static placeholders for second opening per user instruction
   map.timestamp_opening2 = '<t:1757412000:t>';
@@ -93,7 +90,7 @@ function applyTimestampPlaceholders(text, ev) {
   let out = text;
   // First, handle angle-bracket tokens like <timestamp_close:t> or <timestamp_closing:t>
   // We only rewrite those we know, leaving others as-is.
-  out = out.replace(/<\s*(timestamp_(?:opening|closing|open|close)\d?|opening\d?|closing\d?|timestamp_(?:opening|closing)|opening|closing|timestamp_close|close)\s*:\s*t\s*>/g, (m, p1) => {
+  out = out.replace(/<\s*(timestamp_(?:opening|closing|open|close)\d?|opening\d?|closing\d?|timestamp_(?:opening|closing)|timestamp_close)\s*:\s*t\s*>/g, (m, p1) => {
     const key = String(p1).replace(/\s+/g, '');
     const replacement = map[key] || null;
     return replacement ? replacement : m; // preserve if unknown

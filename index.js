@@ -257,6 +257,18 @@ client.once("clientReady", async () => {
     }
   } catch {}
 
+  // After boot, refresh recent auto/clock-in messages to apply latest patches
+  try {
+    const { getEvents } = require('./utils/eventsStorage');
+    const { refreshTrackedAutoMessages } = require('./commands/schedule');
+    const evs = getEvents();
+    for (const ev of evs) {
+      // Light throttle to avoid rate limits on large sets
+      try { await refreshTrackedAutoMessages(client, ev); } catch {}
+      await new Promise(r => setTimeout(r, 150));
+    }
+  } catch (e) { console.error('[Startup Refresh] error', e); }
+
   // Cleanup lingering menus on restart
   if (fs.existsSync(ACTIVE_MENUS_FILE)) {
     try {
