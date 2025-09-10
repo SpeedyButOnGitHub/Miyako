@@ -148,6 +148,12 @@ async function runScheduleOnce(client, schedule) {
   const chId = config.testingMode ? (schedule.logChannelId || CONFIG_LOG_CHANNEL || schedule.channelId) : schedule.channelId;
   const channel = await client.channels.fetch(chId).catch(() => null);
     if (!channel || !channel.send) throw new Error("Invalid channel");
+    // Best-effort dedup if loop jitter causes double fire
+    try {
+      const { seenRecently } = require('./sendOnce');
+      const key = `sched:${schedule.id}:${chId}`;
+      if (seenRecently(key, 8000)) return; // skip duplicate within 8s
+    } catch {}
     // Support simple content or JSON payloads + timestamp placeholders
     // If messageJSON exists, prefer its content (even if empty) and do not fallback to the raw string in schedule.message.
     let content = '';
@@ -301,6 +307,12 @@ function startScheduler(client, opts = {}) {
                     const targetChannelId = config.testingMode ? CONFIG_LOG_CHANNEL : (m.channelId || ev.channelId);
                     const channel = await client.channels.fetch(targetChannelId).catch(()=>null);
                     if (channel && channel.send) {
+                      // TTL send guard to prevent duplicate racing across intervals
+                      try {
+                        const { seenRecently } = require('./sendOnce');
+                        const k = `auto:${ev.id}:${m.id}:${t}:${targetChannelId}`;
+                        if (seenRecently(k, 8000)) { throw new Error('dup_guard_skip'); }
+                      } catch {}
                       // Clock-In special behavior
                       if (m.isClockIn) {
                         // Maintain per-event clockIn data structure: { positions: {key: [userId]}, messageIds:[], lastEventStart: timestamp }
@@ -395,7 +407,13 @@ function startScheduler(client, opts = {}) {
                         await channel.send({ content }).catch(()=>{});
                       }
                     }
-                  } catch (e) { console.error('Auto message dispatch failed', ev.id, m.id, e); }
+                  } catch (e) {
+                    if ((e && String(e.message||e).includes('dup_guard_skip'))) {
+                      // skip silently
+                    } else {
+                      console.error('Auto message dispatch failed', ev.id, m.id, e);
+                    }
+                  }
                   ev[fireKey] = now; updateEvent(ev.id, { [fireKey]: now });
                 }
               }

@@ -411,6 +411,12 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   const channel = await interaction.client.channels.fetch(targetChannelId).catch(()=>null);
   if (!channel) throw new Error('Channel not found');
   const { applyTimestampPlaceholders } = require('../utils/timestampPlaceholders');
+  // TTL guard for rapid double-trigger from UI
+  try {
+    const { seenRecently } = require('../utils/sendOnce');
+    const key = `manual:${ev.id}:${notif.id}:${targetChannelId}`;
+    if (seenRecently(key, 7000)) return true; // treat as success, skip duplicate
+  } catch {}
   if (notif.isClockIn) {
     // Build staff clock-in message to match the expected template
     const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
@@ -456,7 +462,7 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
       .addOptions(POSITIONS.map(p => ({ label: p.label, value: p.key, description: `${p.short} slots ${p.cap}` })));
     const row = new ActionRowBuilder().addComponents(menu);
     // Content is intentionally empty to match template
-    const sent = await channel.send({ content: '', embeds:[embed], components:[row] }).catch(()=>null);
+  const sent = await channel.send({ content: '', embeds:[embed], components:[row] }).catch(()=>null);
     if (sent && !config.testingMode) {
       notif.__skipUntil = Date.now() + 60*60*1000; // skip for an hour
       notif.lastManualTrigger = Date.now();

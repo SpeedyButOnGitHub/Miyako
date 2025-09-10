@@ -41,6 +41,9 @@ const { semanticButton, buildNavRow } = require("../utils/ui");
 const pendingPunishments = new Map();
 
 function attachInteractionEvents(client) {
+  // Idempotent attach guard to prevent duplicate listener registration
+  if (client.__interactionListenerAttached) return;
+  client.__interactionListenerAttached = true;
   client.on("interactionCreate", async (interaction) => {
     try {
       // Route persistent session UIs first
