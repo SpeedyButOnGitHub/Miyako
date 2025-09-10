@@ -419,8 +419,8 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   } catch {}
   if (notif.isClockIn) {
     // Build staff clock-in message to match the expected template
-    const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-    const theme = require('../utils/theme');
+  const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+  const { buildClockInEmbed } = require('../utils/clockinEmbed');
     // Capacities per template and standardized labels
     const POSITIONS = [
       { key:'instance_manager', emoji:'🗝️', label:'Instance Manager', cap:1, short:'IM' },
@@ -443,25 +443,16 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
         return true; // treat as success without duplication
       }
     } catch {}
-    // Build embed matching clockInEmbedTemplate.json expectations
-    const title = `🕒 Staff Clock-In — ${ev.name}`;
-    let description = `🕒 Staff Clock-In — ${ev.name}\n\nSelect a position from the menu below. One slot per staff (auto-updates).`;
-    description = applyTimestampPlaceholders(description, ev);
-    if (config.testingMode) description = sanitizeMentionsForTesting(description);
-    const embed = createEmbed({ title, description, color: theme.colors?.primary || 0x5865F2 });
-    for (const p of POSITIONS) {
-      const arr = ev.__clockIn.positions[p.key];
-      const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-      const name = `${p.emoji} ${p.label} (${arr.length}/${p.cap})`;
-      embed.addFields({ name, value: value.substring(0,1024), inline: true });
-    }
+  // Build embed with unified, modern renderer
+  const capacities = POSITIONS.reduce((acc,p)=>{ acc[p.key] = p.cap; return acc; }, {});
+  const embed = buildClockInEmbed(ev, ev.__clockIn.positions, capacities, { compact: true });
     // Build select menu with option descriptions like "IM slots 1"
     const menu = new StringSelectMenuBuilder()
       .setCustomId(`clockin:${ev.id}:${notif.id}`)
       .setPlaceholder('📋 Select a position')
       .addOptions(POSITIONS.map(p => ({ label: p.label, value: p.key, description: `${p.short} slots ${p.cap}` })));
-    const row = new ActionRowBuilder().addComponents(menu);
-    // Content is intentionally empty to match template
+  const row = new ActionRowBuilder().addComponents(menu);
+  // Content intentionally empty; embed contains header/description
   const sent = await channel.send({ content: '', embeds:[embed], components:[row] }).catch(()=>null);
     if (sent && !config.testingMode) {
       notif.__skipUntil = Date.now() + 60*60*1000; // skip for an hour

@@ -887,24 +887,16 @@ function attachInteractionEvents(client) {
         updateEvent(ev.id, { [clockKey]: state });
         // Re-render all clock-in messages for this event
         try {
-          const { EmbedBuilder } = require('discord.js');
-          const theme = require('../utils/theme');
-          const { createEmbed, safeAddField } = require('../utils/embeds');
-          const POSITIONS = ['instance_manager','manager','bouncer','bartender','backup','maybe'];
-          // Standardized header; ignore stored message for uniformity
-          const base = `🕒 Staff Clock-In — ${ev.name}`;
-          const embed = createEmbed({
-            title: `🕒 Staff Clock-In — ${ev.name}`,
-            description: `${base}\n\nSelect a position below. One slot per staff; re-select to move.`,
-            color: theme.colors?.primary || 0x5865F2
-          });
-          for (const k of POSITIONS) {
-            const arr = state.positions[k] || [];
-            const label = POS_META[k].label;
-            const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-            const cap = POS_META[k].max === Infinity ? '' : `/${POS_META[k].max}`;
-            safeAddField(embed, `${label} (${arr.length}${cap})`, value.substring(0,1024), true);
-          }
+          const { buildClockInEmbed } = require('../utils/clockinEmbed');
+          const capacities = {
+            instance_manager: 1,
+            manager: Infinity,
+            bouncer: Infinity,
+            bartender: Infinity,
+            backup: Infinity,
+            maybe: Infinity
+          };
+          const embed = buildClockInEmbed(ev, state.positions, capacities, { compact: true });
           for (const mid of state.messageIds || []) {
             try {
               const channel = await interaction.channel?.guild?.channels?.fetch(ev.channelId).catch(()=>null) || await interaction.client.channels.fetch(ev.channelId).catch(()=>null);

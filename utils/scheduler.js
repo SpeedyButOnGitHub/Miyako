@@ -7,6 +7,7 @@ const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const theme = require('./theme');
 const { createEmbed } = require('./embeds');
 const { CONFIG_LOG_CHANNEL } = require('./logChannels');
+const { buildClockInEmbed } = require('./clockinEmbed');
 
 function applyPlaceholdersToJsonPayload(payload, ev) {
   if (!payload || typeof payload !== 'object') return payload;
@@ -353,27 +354,9 @@ function startScheduler(client, opts = {}) {
                             continue; // skip creating a new clock-in embed
                           }
                         } catch {}
-                        // Build base text (header) and embed fields
-                        // Standardized base text (ignore any custom saved clock-in message to ensure uniformity)
-                        let baseText = `🕒 Staff Clock-In — ${ev.name}`;
-                        baseText = baseText.replace(/{{EVENT_NAME}}/g, ev.name || 'Event');
-                        baseText = applyTimestampPlaceholders(baseText, ev).replace(/\n{3,}/g,'\n\n');
-                        if (config.testingMode) {
-                          // Light sanitization of role/user mentions in testing
-                          baseText = baseText.replace(/<@&?\d+>/g, match => `\`${match}\``);
-                        }
-                        const embed = createEmbed({
-                          title: `🕒 Staff Clock-In — ${ev.name}`,
-                          color: theme.colors?.primary || 0x5865F2,
-                          description: `${baseText}\n\nSelect a position from the menu below. One slot per staff (auto-updates).`,
-                          timestamp: false
-                        });
-                        for (const p of POSITIONS) {
-                          const arr = state.positions[p.key];
-                          const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-                          const name = p.key === 'instance_manager' ? `${p.label} (${arr.length}/1)` : `${p.label} (${arr.length})`;
-                          embed.addFields({ name, value: value.substring(0,1024), inline: true });
-                        }
+                        // Build improved, compact embed using shared renderer
+                        const capacities = { instance_manager: 1, manager: 5, bouncer: 10, bartender: 15, backup: 20, maybe: 50 };
+                        const embed = buildClockInEmbed(ev, state.positions, capacities, { compact: true });
                         const menu = new StringSelectMenuBuilder()
                           .setCustomId(`clockin:${ev.id}:${m.id}`)
                           .setPlaceholder('📋 Select a position')
