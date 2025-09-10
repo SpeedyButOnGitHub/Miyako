@@ -109,40 +109,40 @@ function attachMessageEvents(client) {
   let _logCtx = null; let _sentMsg = null; let _expected = null;
   try {
       if (command === "help") {
-    _logCtx = logStart({ name: 'help', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'help', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleHelpCommand(client, message); markCommand();
       } else if (["mute", "unmute", "timeout", "untimeout", "ban", "kick", "warn", "removewarn"].includes(command)) {
         if (!checkPolicy(command, message)) return;
         if (!cdOk(message.author.id, command, 2500)) return;
-    _logCtx = logStart({ name: command, userId: message.author.id, channelId: message.channelId, params: { args } });
+    _logCtx = logStart({ name: command, userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
     _sentMsg = await handleModerationCommands(client, message, command, args); markCommand();
       } else if (command === 'purge' || command === 'clean') {
         if (!checkPolicy('purge', message)) return;
         if (!cdOk(message.author.id, 'purge', 5000)) return;
-    _logCtx = logStart({ name: 'purge', userId: message.author.id, channelId: message.channelId, params: { args } });
+    _logCtx = logStart({ name: 'purge', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
     _sentMsg = await handlePurgeCommand(client, message, args); markCommand();
       } else if (["snipe", "s", "ds"].includes(command)) {
-    _logCtx = logStart({ name: 'snipe', userId: message.author.id, channelId: message.channelId, params: { alias: command, args } });
+    _logCtx = logStart({ name: 'snipe', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, alias: command, args } });
     _sentMsg = await handleSnipeCommands(client, message, command, args); markCommand();
       } else if (command === "warnings" || command === "warns") {
-    _logCtx = logStart({ name: 'warnings', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'warnings', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleWarningsCommand(client, message); markCommand();
       } else if (command === "config") {
         if (!checkPolicy('config', message)) return;
-    _logCtx = logStart({ name: 'config', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'config', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleMessageCreate(client, message); markCommand();
       } else if (command === "level" || command === "rank") {
-    _logCtx = logStart({ name: 'rank', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'rank', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleRankCommand(client, message); markCommand();
       } else if (command === "profile" || command === "p") {
-    _logCtx = logStart({ name: 'profile', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'profile', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleProfileCommand(client, message); markCommand();
       } else if (command === "test") {
         if (!checkPolicy('test', message)) return;
-    _logCtx = logStart({ name: 'test', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'test', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleTestCommand(client, message); markCommand();
       } else if (command === "leaderboard" || command === "lb") {
-    _logCtx = logStart({ name: 'leaderboard', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'leaderboard', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleLeaderboardCommand(client, message); markCommand();
       } else if (command === "restart") {
         if (message.author.id !== process.env.OWNER_ID) return;
@@ -174,29 +174,30 @@ function attachMessageEvents(client) {
         if (message.author.id !== process.env.OWNER_ID) return;
         await message.reply("🛑 Stopping bot...");
         process.exit(0);
-      } else if (command === "schedule") {
-  _logCtx = logStart({ name: 'schedule', userId: message.author.id, channelId: message.channelId, params: {} });
+    } else if (command === "schedule") {
+  _logCtx = logStart({ name: 'schedule', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleScheduleCommand(client, message);
       } else if (command === "scripts") {
-  _logCtx = logStart({ name: 'scripts', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'scripts', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleScriptsCommand(client, message); markCommand();
       } else if (command === "cash") {
-  _logCtx = logStart({ name: 'cash', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'cash', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleCashCommand(client, message); markCommand();
       } else if (command === "balance" || command === "bal") {
-  _logCtx = logStart({ name: 'balance', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'balance', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleBalanceCommand(client, message); markCommand();
       } else if (command === "diag" || command === "diagnostics") {
-  _logCtx = logStart({ name: 'diagnostics', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'diagnostics', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleDiagnosticsCommand(client, message); markCommand();
       } else if (command === 'metrics') {
-  _logCtx = logStart({ name: 'metrics', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'metrics', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleMetricsCommand(client, message); markCommand();
   } else if (command === 'clockinstate') {
-  _logCtx = logStart({ name: 'clockinstate', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'clockinstate', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleClockInStateCommand(client, message); markCommand();
   } else if (command === 'errors' || command === 'err') {
         if (message.author.id !== process.env.OWNER_ID) return;
+  _logCtx = logStart({ name: 'errors', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
         // Accept patterns: .errors, .errors 25, .errors embed 25, .errors 25 embed
         const embedMode = args.some(a => a.toLowerCase() === 'embed');
         const numArg = args.find(a => /^(\d+)$/.test(a));
@@ -212,7 +213,8 @@ function attachMessageEvents(client) {
         if (!embedMode) {
           const lines = rows.map(r => `#${r.idx} ${r.ts.split(' ')[1]} [${r.scope}] ${r.first}`);
           const content = '🧾 Recent Errors (newest last)\n' + lines.join('\n');
-          return void message.reply({ content: content.slice(0, 1900), allowedMentions: { repliedUser: false } });
+          _sentMsg = await message.reply({ content: content.slice(0, 1900), allowedMentions: { repliedUser: false } });
+          return;
         }
         // Embed mode
         const { createEmbed, safeAddField } = require('../utils/embeds');
@@ -233,23 +235,25 @@ function attachMessageEvents(client) {
           semanticButton('nav', { id: 'err_next', label: 'Next', enabled: page < totalPages-1 }),
           semanticButton('primary', { id: 'err_refresh', label: 'Refresh' })
         ]);
-        const sent = await message.reply({ embeds: [buildPage(0)], components: [row(0)], allowedMentions: { repliedUser: false } });
-        ActiveMenus.registerMessage(sent, { type: 'errors', userId: message.author.id, data: { page: 0, limit } });
+  _sentMsg = await message.reply({ embeds: [buildPage(0)], components: [row(0)], allowedMentions: { repliedUser: false } });
+  ActiveMenus.registerMessage(_sentMsg, { type: 'errors', userId: message.author.id, data: { page: 0, limit } });
       } else if (command === 'clearerrors' || command === 'cerr') {
         if (message.author.id !== process.env.OWNER_ID) return;
         clearErrorLog();
-        await message.reply({ content: '🧹 Error log cleared.', allowedMentions: { repliedUser: false } });
+  _logCtx = logStart({ name: 'clearerrors', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
+  _sentMsg = await message.reply({ content: '🧹 Error log cleared.', allowedMentions: { repliedUser: false } });
       } else if (command === 'errdetail') {
         if (message.author.id !== process.env.OWNER_ID) return;
         const idx = Number(args[0]);
-        if (!Number.isInteger(idx)) return message.reply({ content: 'Provide an index from .errors list.', allowedMentions:{repliedUser:false}});
+  _logCtx = logStart({ name: 'errdetail', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
+  if (!Number.isInteger(idx)) { _sentMsg = await message.reply({ content: 'Provide an index from .errors list.', allowedMentions:{repliedUser:false}}); return; }
         const full = getRecentErrors(100);
-        if (idx < 0 || idx >= full.length) return message.reply({ content: 'Index out of range.', allowedMentions:{repliedUser:false}});
+  if (idx < 0 || idx >= full.length) { _sentMsg = await message.reply({ content: 'Index out of range.', allowedMentions:{repliedUser:false}}); return; }
         const entry = full[idx];
         const { createEmbed, addChunkedField } = require('../utils/embeds');
         const embed = createEmbed({ title: `Error #${idx} [${entry.scope}]`, description: new Date(entry.ts).toISOString(), color: 'danger' });
         addChunkedField(embed, 'Stack / Message', entry.message, 950);
-        await message.reply({ embeds:[embed], allowedMentions:{repliedUser:false}});
+  _sentMsg = await message.reply({ embeds:[embed], allowedMentions:{repliedUser:false}});
       }
     } catch (err) {
       console.error(`[Message Command Error]:`, err);

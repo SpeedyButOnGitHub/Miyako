@@ -61,6 +61,37 @@ function humanizeMinutes(mins) {
   return `${m} minute${m===1?'':'s'} before`;
 }
 
+// Parse delete-after input to milliseconds. Accepts:
+//  - '0', 'off', 'disable', 'none' => 0
+//  - plain number => minutes
+//  - composite durations like 1h30m, 45m, 20s
+function parseDeleteAfterMs(input) {
+  if (!input) return 0;
+  const raw = String(input).trim().toLowerCase();
+  if (["0","off","disable","disabled","none"].includes(raw)) return 0;
+  if (/^-?\d+$/.test(raw)) { const mins = Math.max(0, parseInt(raw,10)); return mins * 60000; }
+  const norm = raw.replace(/minutes?/g,'m').replace(/hours?/g,'h').replace(/hrs?/g,'h').replace(/mins?/g,'m').replace(/seconds?/g,'s').replace(/secs?/g,'s').replace(/ /g,'');
+  let durMs = null;
+  try { durMs = ms(norm); } catch { durMs = null; }
+  if (typeof durMs === 'number' && isFinite(durMs) && durMs >= 0) return Math.floor(durMs);
+  // manual composite fallback
+  const regex = /(\d+)(h|m|s)/g; let match; let total = 0; let any=false;
+  while ((match = regex.exec(norm))) { any=true; const v=parseInt(match[1],10); const u=match[2]; if (u==='h') total+=v*3600000; else if (u==='m') total+=v*60000; else total+=v*1000; }
+  if (any) return total;
+  return 0;
+}
+
+function humanizeMs(msVal) {
+  const n = Number(msVal)||0; if (n<=0) return 'Disabled';
+  const sec = Math.round(n/1000);
+  const h = Math.floor(sec/3600); const m = Math.floor((sec%3600)/60); const s = sec%60;
+  const parts = [];
+  if (h) parts.push(`${h}h`);
+  if (m) parts.push(`${m}m`);
+  if (!h && !m && s) parts.push(`${s}s`);
+  return parts.join(' ');
+}
+
 // --- Event Manager (ActiveMenus) ---
 
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -173,7 +204,15 @@ function buildNotifsEmbed(guild, ev) {
       }
       const chanNote = m.channelId && m.channelId !== ev.channelId ? ` <#${m.channelId}>` : '';
       const clock = m.isClockIn ? ' ⏱️' : '';
-      return `${status} [${off}]${clock}${chanNote} ${preview}`;
+      // TTL label: per-notif deleteAfterMs, else global default, clock-in always off
+      const hasOwn = Number.isFinite(m.deleteAfterMs);
+      let ttlDisp = 'off';
+      if (!m.isClockIn) {
+        if (hasOwn) ttlDisp = m.deleteAfterMs > 0 ? humanizeMs(m.deleteAfterMs) : 'off';
+        else if (config.autoMessages?.defaultDeleteMs > 0) ttlDisp = humanizeMs(config.autoMessages.defaultDeleteMs) + '*';
+      }
+      const ttlLabel = ` [TTL ${ttlDisp}]`;
+      return `${status} [${off}]${clock}${chanNote} ${preview}${ttlLabel}`;
     }).join('\n');
     safeAddField(embed, 'Messages', lines);
   } else {
@@ -199,15 +238,12 @@ function notifSelectRows(ev) {
 
 // Newly added: detailed auto message control rows
 function notifDetailRows(ev, notif) {
-  // Row 1: Toggle / Edit (all) / Channel / Offset / Message
+  // Row 1: Toggle / Edit (consolidated)
   const row1 = buildNavRow([
     semanticButton(notif.enabled ? 'danger' : 'success', { id: `event_notif_toggle_${ev.id}_${notif.id}`, label: notif.enabled ? 'Disable' : 'Enable', emoji: notif.enabled ? theme.emojis.disable : theme.emojis.enable }),
-    semanticButton('primary', { id: `event_notif_edit_${ev.id}_${notif.id}`, label: 'Edit', emoji: theme.emojis.edit || theme.emojis.message || '✏️' }),
-    semanticButton('nav', { id: `event_notif_edit_channel_${ev.id}_${notif.id}`, label: 'Channel', emoji: theme.emojis.channel || '🧵' }),
-    semanticButton('nav', { id: `event_notif_edit_offset_${ev.id}_${notif.id}`, label: 'Offset', emoji: '⏱️' }),
-    semanticButton('nav', { id: `event_notif_edit_msg_${ev.id}_${notif.id}`, label: 'Msg', emoji: theme.emojis.message || '💬' })
+    semanticButton('primary', { id: `event_notif_edit_${ev.id}_${notif.id}`, label: 'Edit', emoji: theme.emojis.edit || theme.emojis.message || '✏️' })
   ]);
-  // Row 2: Trigger / Delete / Back
+  // Row 2: Trigger / Delete
   const row2 = buildNavRow([
     semanticButton('success', { id: `event_notif_trigger_${ev.id}_${notif.id}`, label: 'Trigger', emoji: theme.emojis.enable || '✅' }),
     semanticButton('danger', { id: `event_notif_delete_${ev.id}_${notif.id}`, label: 'Delete', emoji: theme.emojis.delete || '🗑️' })
@@ -225,6 +261,8 @@ function buildNotifDetailEmbed(guild, ev, notif) {
   safeAddField(embed, 'Enabled', notif.enabled? 'Yes':'No', true);
   safeAddField(embed, 'Channel', notif.channelId ? `<#${notif.channelId}>` + (notif.channelId===ev.channelId ? ' (event)' : '') : `<#${ev.channelId}> (event)`, true);
   safeAddField(embed, 'Clock-In', notif.isClockIn ? 'Yes' : 'No', true);
+  const ttlInfo = Number.isFinite(notif.deleteAfterMs) ? humanizeMs(notif.deleteAfterMs) : (config.autoMessages?.defaultDeleteMs ? `${humanizeMs(config.autoMessages.defaultDeleteMs)} (default)` : 'Disabled');
+  safeAddField(embed, 'Delete after', ttlInfo, true);
   const previewVal = (()=>{ if (notif.messageJSON){ if (notif.messageJSON.content) return notif.messageJSON.content.slice(0,200)||'(empty)'; if (Array.isArray(notif.messageJSON.embeds)&&notif.messageJSON.embeds.length) return (notif.messageJSON.embeds[0].title||notif.messageJSON.embeds[0].description||'(embed)').toString().slice(0,200); return 'JSON'; } return (notif.message||'').slice(0,200)||'(empty)';})();
   safeAddField(embed, 'Preview', previewVal);
   applyFooterWithPagination(embed, guild, { page:1, totalPages:1, extra:'Auto Msg Detail' });
@@ -404,6 +442,36 @@ function sanitizeMentionsForTesting(content) {
   return content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
 }
 
+// Apply timestamp placeholders to JSON payload fields similarly to scheduler
+function applyPlaceholdersToJsonPayload(payload, ev) {
+  if (!payload || typeof payload !== 'object') return payload;
+  const { applyTimestampPlaceholders } = require('../utils/timestampPlaceholders');
+  const repl = (s) => applyTimestampPlaceholders(String(s), ev);
+  const sanitize = (s) => (config.testingMode ? String(s).replace(/<@&?\d+>/g, m=>`\`${m}\``) : s);
+  const fixStr = (s) => sanitize(repl(s));
+  const copy = { ...payload };
+  if (typeof copy.content === 'string') copy.content = fixStr(copy.content).slice(0, 2000);
+  if (Array.isArray(copy.embeds)) {
+    copy.embeds = copy.embeds.map(e => {
+      if (!e || typeof e !== 'object') return e;
+      const ee = { ...e };
+      if (typeof ee.title === 'string') ee.title = fixStr(ee.title);
+      if (typeof ee.description === 'string') ee.description = fixStr(ee.description);
+      if (ee.footer && typeof ee.footer.text === 'string') ee.footer = { ...ee.footer, text: fixStr(ee.footer.text) };
+      if (ee.author && typeof ee.author.name === 'string') ee.author = { ...ee.author, name: fixStr(ee.author.name) };
+      if (Array.isArray(ee.fields)) ee.fields = ee.fields.map(f => {
+        if (!f || typeof f !== 'object') return f;
+        const ff = { ...f };
+        if (typeof ff.name === 'string') ff.name = fixStr(ff.name).slice(0, 256);
+        if (typeof ff.value === 'string') ff.value = fixStr(ff.value).slice(0, 1024);
+        return ff;
+      });
+      return ee;
+    });
+  }
+  return copy;
+}
+
 async function manualTriggerAutoMessage(interaction, ev, notif) {
   const { CONFIG_LOG_CHANNEL } = require('../utils/logChannels');
   const targetChannelId = config.testingMode ? CONFIG_LOG_CHANNEL : (notif.channelId || ev.channelId);
@@ -498,18 +566,42 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   // If a JSON payload exists, prefer its content exclusively (even if empty),
   // and do NOT fall back to the raw JSON string saved in notif.message — otherwise
   // the JSON body gets echoed as plain text alongside the embed/components.
-  let content = '';
+  let payload;
   if (notif.messageJSON && typeof notif.messageJSON === 'object') {
-    content = notif.messageJSON.content || '';
+    const base = { ...notif.messageJSON };
+    if (base.embeds && !Array.isArray(base.embeds)) base.embeds = [base.embeds];
+    // Ensure there's some content fallback for empty JSON
+    if (!base.content && !base.embeds) base.content = notif.message || `Auto message (${ev.name})`;
+    payload = applyPlaceholdersToJsonPayload(base, ev);
   } else {
-    content = notif.message || '';
+    let content = notif.message || '';
+    content = applyTimestampPlaceholders(content, ev);
+    if (config.testingMode) content = sanitizeMentionsForTesting(content);
+    if (!content) content = `Auto message (${ev.name})`;
+    payload = { content };
   }
-  content = applyTimestampPlaceholders(content, ev);
-  if (config.testingMode) content = sanitizeMentionsForTesting(content);
-  if (!content) content = `Auto message (${ev.name})`;
-  const payload = notif.messageJSON ? { ...notif.messageJSON, content } : { content };
   if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
   const sent = await channel.send(payload).catch(()=>null);
+  // Optional auto-delete (non-testing, non-clock-in)
+  try {
+    const delMs = Number(notif.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
+    if (!config.testingMode && sent && delMs > 0) {
+      setTimeout(() => { try { sent.delete().catch(()=>{}); } catch {} }, delMs);
+    }
+  } catch {}
+  // Track for later refresh
+  try {
+    if (sent && sent.id) {
+      const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? { ...ev.__notifMsgs } : {};
+      const rec = map[notif.id] && typeof map[notif.id]==='object' ? { ...map[notif.id] } : { channelId: channel.id, ids: [] };
+      rec.channelId = channel.id;
+      rec.ids = Array.isArray(rec.ids) ? rec.ids : [];
+      rec.ids.push(sent.id);
+      if (rec.ids.length > 20) rec.ids = rec.ids.slice(-20);
+      map[notif.id] = rec;
+      updateEvent(ev.id, { __notifMsgs: map });
+    }
+  } catch {}
   if (sent && !config.testingMode) {
     notif.__skipUntil = Date.now() + 60*60*1000;
     notif.lastManualTrigger = Date.now();
@@ -615,7 +707,8 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
     const modal = new ModalBuilder().setCustomId(`notif_edit_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Auto Message')
       .addComponents(
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setValue(notif.channelId||'')),
-  new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('offset').setLabel('When before start? (e.g. 10m, 2h)').setStyle(TextInputStyle.Short).setRequired(true).setValue(notif.offsetMinutes? `${notif.offsetMinutes}m` : 'start')),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('offset').setLabel('When before start? (e.g. 10m, 2h)').setStyle(TextInputStyle.Short).setRequired(true).setValue(notif.offsetMinutes? `${notif.offsetMinutes}m` : 'start')),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deleteafter').setLabel('Delete after (e.g. 10m, 2h, 0=disable)').setStyle(TextInputStyle.Short).setRequired(true).setValue(suggestTTL)),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message / JSON').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(notif.message || (notif.messageJSON? JSON.stringify(notif.messageJSON,null,2):'')))
       );
     await interaction.showModal(modal); return;
@@ -694,6 +787,18 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
     const modal = new ModalBuilder().setCustomId(`notif_msg_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Auto Message')
       .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message / JSON').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(notif.message || (notif.messageJSON? JSON.stringify(notif.messageJSON,null,2):''))));
+    await interaction.showModal(modal); return;
+  }
+  if (customId.startsWith('event_notif_edit_ttl_')) {
+    const parts = customId.split('_');
+    const evId = parts[4]; const notifId = parts[5];
+    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
+    const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
+    if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
+    const current = Number.isFinite(notif.deleteAfterMs) ? notif.deleteAfterMs : (config.autoMessages?.defaultDeleteMs || 0);
+    const suggest = current<=0 ? '0' : (current%3600000===0 ? `${Math.floor(current/3600000)}h` : (current%60000===0 ? `${Math.floor(current/60000)}m` : `${Math.max(1,Math.floor(current/1000))}s`));
+    const modal = new ModalBuilder().setCustomId(`notif_deleteafter_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Delete After')
+      .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deleteafter').setLabel('Delete after (e.g. 10m, 2h, 0=disable)').setStyle(TextInputStyle.Short).setRequired(true).setValue(suggest)));
     await interaction.showModal(modal); return;
   }
   if (customId.startsWith('event_notif_delete_')) {
@@ -845,6 +950,7 @@ async function handleEventEditModal(interaction) {
 async function handleEventNotificationModal(interaction) {
   if (!interaction.isModalSubmit()) return;
   if (!/^(notif_(add|offset|msg|channel|edit)_modal_)/.test(interaction.customId)) return;
+  if (!/^(notif_(add|offset|msg|channel|edit|deleteafter)_modal_)/.test(interaction.customId)) return;
   const parts = interaction.customId.split('_');
   // Patterns:
   // notif_add_modal_<eventId>_<managerMessageId>
@@ -917,12 +1023,36 @@ async function handleEventNotificationModal(interaction) {
     const msgRaw = interaction.fields.getTextInputValue('message');
     let messageJSON = null; const healed = healJSON(msgRaw); if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
     const entry = list[idx];
-    entry.offsetMinutes = offset;
-    entry.message = msgRaw;
-    entry.messageJSON = messageJSON;
-    if (cleanedChan) entry.channelId = cleanedChan; else delete entry.channelId;
-    updatedEv = updateEvent(ev.id, { autoMessages: list });
-  await interaction.reply({ content:`✅ Auto message updated.`, flags:1<<6 }).catch(()=>{});
+    const newList = list.map(entry => {
+      const e = { ...entry };
+      e.offsetMinutes = offset;
+      e.message = msgRaw;
+      e.messageJSON = messageJSON;
+      e.deleteAfterMs = deleteAfterMs;
+      if (cleanedChan) e.channelId = cleanedChan; else delete e.channelId;
+      return e;
+    });
+    updatedEv = updateEvent(ev.id, { autoMessages: newList });
+    console.log(`[Events] Updated all auto messages for event ${ev.id} (${ev.name}).`);
+    await interaction.reply({ content:`✅ Auto messages updated for this event.`, flags:1<<6 }).catch(()=>{});
+// Refresh previously tracked auto messages for the event (non-clock-in)
+  } else if (kind==='deleteafter') {
+    // Modal id pattern: notif_deleteafter_modal_<eventId>_<notifId>_<managerMessageId>
+    const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
+    const idx = list.findIndex(n=>String(n.id)===String(notifId));
+    if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
+    const raw = interaction.fields.getTextInputValue('deleteafter');
+    const msVal = parseDeleteAfterMs(raw);
+    list[idx].deleteAfterMs = msVal;
+    const updated = updateEvent(ev.id, { autoMessages: list });
+    await interaction.reply({ content:`✅ Delete-after ${msVal>0? 'set to '+humanizeMs(msVal):'disabled'}.`, flags:1<<6 }).catch(()=>{});
+    // Try to refresh the manager message if present
+    if (managerMessageId) {
+      try {
+        const mgrMsg = await interaction.channel.messages.fetch(managerMessageId).catch(()=>null);
+        if (mgrMsg) await mgrMsg.edit({ embeds:[buildNotifDetailEmbed(interaction.guild, updated, list[idx])], components: notifDetailRows(updated, list[idx]) }).catch(()=>{});
+      } catch {}
+    }
   }
   if (managerMessageId && updatedEv) {
     try {

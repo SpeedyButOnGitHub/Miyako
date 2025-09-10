@@ -38,7 +38,11 @@ const defaultConfig = {
   },
   maxPurgeLimit: 100,
   blacklistedChannels: [],
-  moderatorLogChannelId: null
+  moderatorLogChannelId: null,
+  // Auto-messages: default delete-after (ms); 0 disables auto-deletion
+  autoMessages: {
+    defaultDeleteMs: 0
+  }
 };
 
 // Setting metadata (timestamps, etc.) persisted separately
@@ -90,6 +94,10 @@ function validateConfig(cfg) {
   if (typeof cfg.commandLogging.testingCompare !== 'boolean') cfg.commandLogging.testingCompare = true;
   if (!cfg.commandLogging.logChannelId) cfg.commandLogging.logChannelId = null;
   if (!Number.isFinite(cfg.commandLogging.sendIntervalMs)) cfg.commandLogging.sendIntervalMs = 5000;
+
+  // Auto-messages defaults
+  if (typeof cfg.autoMessages !== 'object' || cfg.autoMessages === null) cfg.autoMessages = { ...defaultConfig.autoMessages };
+  if (!Number.isFinite(cfg.autoMessages.defaultDeleteMs) || cfg.autoMessages.defaultDeleteMs < 0) cfg.autoMessages.defaultDeleteMs = 0;
 
   // Sanitize levelRewards to { "level": [roleIds] }
   const cleanedRewards = {};

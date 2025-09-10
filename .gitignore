@@ -30,6 +30,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+logs/
 
 # OS
 .DS_Store
@@ -41,4 +42,5 @@ config/changelogSnapshot.json
 config/buttonSessions.json
 config/botStatus.json
 
-# Allow JSON by default; do not ignore all JSON globally
+# Runtime singleton lock (changes every run)
+.miyako.lock

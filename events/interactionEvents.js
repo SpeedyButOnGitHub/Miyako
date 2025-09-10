@@ -45,6 +45,8 @@ function attachInteractionEvents(client) {
   if (client.__interactionListenerAttached) return;
   client.__interactionListenerAttached = true;
   client.on("interactionCreate", async (interaction) => {
+  // Attach command logging wrappers to interaction reply/edit methods
+  try { require('../utils/commandLogger').instrumentInteractionLogging(interaction); } catch {}
     try {
       // Route persistent session UIs first
   if (interaction.isButton() || interaction.isStringSelectMenu()) {
@@ -853,8 +855,11 @@ function attachInteractionEvents(client) {
         const parts = interaction.customId.split(':'); // clockin:eventId:notifId
         const evId = parts[1];
         const notifId = parts[2]; // not used yet for constraints
-        const ev = getEvent(evId);
-  if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
+        let ev = getEvent(evId);
+        if (!ev) {
+          try { const { getEvent: ge } = require('../utils/eventsStorage'); ev = ge(evId); } catch {}
+        }
+        if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
         const member = interaction.member;
   if (!member) { await interaction.reply({ content:'Member not found.', flags:1<<6 }).catch(()=>{}); return; }
         const choice = interaction.values[0];

@@ -402,12 +402,52 @@ function startScheduler(client, opts = {}) {
                         if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
                         payload = applyPlaceholdersToJsonPayload(payload, ev);
                         if (!payload.content && !payload.embeds) payload.content = m.message || `Auto message (${ev.name})`;
-                        await channel.send(payload).catch(()=>{});
+                        const sent = await channel.send(payload).catch(()=>null);
+                        // Optional auto-delete (skip for testing)
+                        try {
+                          const delMs = Number(m.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
+                          if (!config.testingMode && sent && delMs > 0) {
+                            setTimeout(() => { try { sent.delete().catch(()=>{}); } catch {} }, delMs);
+                          }
+                        } catch {}
+                        // Track message for later refresh
+                        try {
+                          if (sent && sent.id) {
+                            const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? { ...ev.__notifMsgs } : {};
+                            const rec = map[m.id] && typeof map[m.id]==='object' ? { ...map[m.id] } : { channelId: channel.id, ids: [] };
+                            rec.channelId = channel.id;
+                            rec.ids = Array.isArray(rec.ids) ? rec.ids : [];
+                            rec.ids.push(sent.id);
+                            if (rec.ids.length > 20) rec.ids = rec.ids.slice(-20);
+                            map[m.id] = rec;
+                            updateEvent(ev.id, { __notifMsgs: map });
+                          }
+                        } catch {}
                       } else {
                         const raw = m.message || `Auto message (${ev.name})`;
                         let content = applyTimestampPlaceholders(raw, ev);
                         if (config.testingMode) content = content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
-                        await channel.send({ content }).catch(()=>{});
+                        const sent = await channel.send({ content }).catch(()=>null);
+                        // Optional auto-delete (skip for testing)
+                        try {
+                          const delMs = Number(m.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
+                          if (!config.testingMode && sent && delMs > 0) {
+                            setTimeout(() => { try { sent.delete().catch(()=>{}); } catch {} }, delMs);
+                          }
+                        } catch {}
+                        // Track message for later refresh
+                        try {
+                          if (sent && sent.id) {
+                            const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? { ...ev.__notifMsgs } : {};
+                            const rec = map[m.id] && typeof map[m.id]==='object' ? { ...map[m.id] } : { channelId: channel.id, ids: [] };
+                            rec.channelId = channel.id;
+                            rec.ids = Array.isArray(rec.ids) ? rec.ids : [];
+                            rec.ids.push(sent.id);
+                            if (rec.ids.length > 20) rec.ids = rec.ids.slice(-20);
+                            map[m.id] = rec;
+                            updateEvent(ev.id, { __notifMsgs: map });
+                          }
+                        } catch {}
                       }
                     }
                   } catch (e) {

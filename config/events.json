@@ -51,48 +51,52 @@
           "id": "2",
           "offsetMinutes": 1200,
           "enabled": true,
-          "message": "{\n  \"content\": \"\",\n  \"embeds\": [\n    {\n      \"title\": \"🕒 Staff Clock-In — {{EVENT_NAME}}\",\n      \"description\": \"🕒 Staff Clock-In — {{EVENT_NAME}}\\n\\nSelect a position from the menu below. One slot per staff (auto-updates).\",\n      \"color\": 5793266,\n      \"fields\": [\n        { \"name\": \"🗝️ Instance Manager (0/1)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"🛠️ Manager (0/5)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"🛡️ Bouncer (0/10)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"🍸 Bartender (0/15)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"🎯 Backup (0/20)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"⏳ Maybe/Late (0/50)\", \"value\": \"—\", \"inline\": true }\n      ],\n      \"footer\": { \"text\": \"\" }\n    }\n  ],\n  \"components\": [\n    {\n      \"type\": 1,\n      \"components\": [\n        {\n          \"type\": 3,\n            \"custom_id\": \"clockin:{{EVENT_ID}}:{{AUTO_MESSAGE_ID}}\",\n            \"placeholder\": \"📋 Select a position\",\n            \"options\": [\n              { \"label\": \"Instance Manager\", \"value\": \"instance_manager\", \"description\": \"IM slots 1\" },\n              { \"label\": \"Manager\", \"value\": \"manager\", \"description\": \"M slots 5\" },\n              { \"label\": \"Bouncer\", \"value\": \"bouncer\", \"description\": \"B slots 10\" },\n              { \"label\": \"Bartender\", \"value\": \"bartender\", \"description\": \"BT slots 15\" },\n              { \"label\": \"Backup\", \"value\": \"backup\", \"description\": \"BK slots 20\" },\n              { \"label\": \"Maybe/Late\", \"value\": \"maybe\", \"description\": \"? slots 50\" }\n            ]\n        }\n      ]\n    }\n  ]\n}",
+          "message": "{\n  \"content\": \"\",\n  \"embeds\": [\n    {\n      \"title\": \"🕒 Staff Clock In — Midnight Bar\",\n      \"description\": \"Staff clock-in for: https://discord.com/channels/1232701768316620840/1232701768832516098/1414992903914258454\\nPlease select your role below to clock in.\\n\\n**Instance Manager** is responsible for opening, managing, and closing an instance.\",\n      \"color\": 3447003,\n      \"fields\": [\n        {\n          \"name\": \"📝 Instance Manager (1 slot)\",\n          \"value\": \"0 / 1\\n\",\n          \"inline\": false\n        },\n        {\n          \"name\": \"🛠️ Manager\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"🛡️ Bouncer\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"🍸 Bartender\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"🎯 Backup\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"⏳ Maybe / Late\",\n          \"value\": \"*None*\",\n          \"inline\": false\n        },\n        {\n          \"name\": \"Eligable roles\",\n          \"value\": \"<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>\"\n        }\n      ],\n      \"footer\": {\n        \"text\": \"Late Night Hours | Staff clock in for the Midnight Bar\"\n      }\n    }\n  ],\n  \"components\": [\n    {\n      \"type\": 1,\n      \"components\": [\n        {\n          \"type\": 3,\n          \"custom_id\": \"clockin:{{EVENT_ID}}:{{AUTO_MESSAGE_ID}}\",\n          \"placeholder\": \"📋 Select your position\",\n          \"options\": [\n            {\n              \"label\": \"Instance Manager\",\n              \"value\": \"instance_manager\",\n              \"description\": \"1 slot available\",\n              \"emoji\": {\n                \"name\": \"📝\"\n              }\n            },\n            {\n              \"label\": \"Manager\",\n              \"value\": \"manager\",\n              \"emoji\": {\n                \"name\": \"🛠️\"\n              }\n            },\n            {\n              \"label\": \"Bouncer\",\n              \"value\": \"bouncer\",\n              \"emoji\": {\n                \"name\": \"🛡️\"\n              }\n            },\n            {\n              \"label\": \"Bartender\",\n              \"value\": \"bartender\",\n              \"emoji\": {\n                \"name\": \"🍸\"\n              }\n            },\n            {\n              \"label\": \"Backup\",\n              \"value\": \"backup\",\n              \"emoji\": {\n                \"name\": \"🎯\"\n              }\n            },\n            {\n              \"label\": \"Maybe / Late\",\n              \"value\": \"maybe\",\n              \"emoji\": {\n                \"name\": \"⏳\"\n              }\n            }\n          ],\n          \"flows\": {\n            \"maybe\": {\n              \"actions\": [\n                {\n                  \"type\": 0\n                }\n              ]\n            }\n          }\n        }\n      ]\n    }\n  ]\n}",
           "messageJSON": {
             "content": "",
             "embeds": [
               {
-                "title": "🕒 Staff Clock-In — {{EVENT_NAME}}",
-                "description": "🕒 Staff Clock-In — {{EVENT_NAME}}\n\nSelect a position from the menu below. One slot per staff (auto-updates).",
-                "color": 5793266,
+                "title": "🕒 Staff Clock In — Midnight Bar",
+                "description": "Staff clock-in for: https://discord.com/channels/1232701768316620840/1232701768832516098/1414992903914258454\nPlease select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.",
+                "color": 3447003,
                 "fields": [
                   {
-                    "name": "🗝️ Instance Manager (0/1)",
-                    "value": "—",
+                    "name": "📝 Instance Manager (1 slot)",
+                    "value": "0 / 1\n",
+                    "inline": false
+                  },
+                  {
+                    "name": "🛠️ Manager",
+                    "value": "*None*",
                     "inline": true
                   },
                   {
-                    "name": "🛠️ Manager (0/5)",
-                    "value": "—",
+                    "name": "🛡️ Bouncer",
+                    "value": "*None*",
                     "inline": true
                   },
                   {
-                    "name": "🛡️ Bouncer (0/10)",
-                    "value": "—",
+                    "name": "🍸 Bartender",
+                    "value": "*None*",
                     "inline": true
                   },
                   {
-                    "name": "🍸 Bartender (0/15)",
-                    "value": "—",
+                    "name": "🎯 Backup",
+                    "value": "*None*",
                     "inline": true
                   },
                   {
-                    "name": "🎯 Backup (0/20)",
-                    "value": "—",
-                    "inline": true
+                    "name": "⏳ Maybe / Late",
+                    "value": "*None*",
+                    "inline": false
                   },
                   {
-                    "name": "⏳ Maybe/Late (0/50)",
-                    "value": "—",
-                    "inline": true
+                    "name": "Eligable roles",
+                    "value": "<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>"
                   }
                 ],
                 "footer": {
-                  "text": ""
+                  "text": "Late Night Hours | Staff clock in for the Midnight Bar"
                 }
               }
             ],
@@ -103,39 +107,61 @@
                   {
                     "type": 3,
                     "custom_id": "clockin:{{EVENT_ID}}:{{AUTO_MESSAGE_ID}}",
-                    "placeholder": "📋 Select a position",
+                    "placeholder": "📋 Select your position",
                     "options": [
                       {
                         "label": "Instance Manager",
                         "value": "instance_manager",
-                        "description": "IM slots 1"
+                        "description": "1 slot available",
+                        "emoji": {
+                          "name": "📝"
+                        }
                       },
                       {
                         "label": "Manager",
                         "value": "manager",
-                        "description": "M slots 5"
+                        "emoji": {
+                          "name": "🛠️"
+                        }
                       },
                       {
                         "label": "Bouncer",
                         "value": "bouncer",
-                        "description": "B slots 10"
+                        "emoji": {
+                          "name": "🛡️"
+                        }
                       },
                       {
                         "label": "Bartender",
                         "value": "bartender",
-                        "description": "BT slots 15"
+                        "emoji": {
+                          "name": "🍸"
+                        }
                       },
                       {
                         "label": "Backup",
                         "value": "backup",
-                        "description": "BK slots 20"
+                        "emoji": {
+                          "name": "🎯"
+                        }
                       },
                       {
-                        "label": "Maybe/Late",
+                        "label": "Maybe / Late",
                         "value": "maybe",
-                        "description": "? slots 50"
+                        "emoji": {
+                          "name": "⏳"
+                        }
                       }
-                    ]
+                    ],
+                    "flows": {
+                      "maybe": {
+                        "actions": [
+                          {
+                            "type": 0
+                          }
+                        ]
+                      }
+                    }
                   }
                 ]
               }
@@ -143,13 +169,22 @@
           },
           "channelId": "1376497592871030865",
           "isClockIn": false,
-          "__skipUntil": 1757505762468,
-          "lastManualTrigger": 1757502162468
+          "__skipUntil": 1757508587804,
+          "lastManualTrigger": 1757504987804
         }
       ],
       "nextAutoId": 3,
       "__auto_2_6:00-10:00": 1757455214645,
-      "__auto_1_6:00-10:00": 1757476809648
+      "__auto_1_6:00-10:00": 1757476809648,
+      "__notifMsgs": {
+        "2": {
+          "channelId": "1376497592871030865",
+          "ids": [
+            "1415303188491538564",
+            "1415303239468843131"
+          ]
+        }
+      }
     }
   ]
 }

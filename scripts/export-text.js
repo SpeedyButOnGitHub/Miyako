@@ -9,7 +9,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const outFile = path.join(root, 'FULL_CONTEXT.txt');
 
-const excludeDirs = new Set(['node_modules', '.git', '.vscode']);
+const excludeDirs = new Set(['node_modules', '.git', '.vscode', 'logs']);
 const excludeFiles = new Set([
   '.env', '.bot.pid', '.miyako.lock', 'logs_runner.txt', 'FULL_CONTEXT.txt',
   'PROJECT_SUMMARY.txt', 'schedule_summary.txt',

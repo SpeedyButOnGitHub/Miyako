@@ -10,7 +10,7 @@ const root = path.join(__dirname, '..');
 const OUT_SUMMARY = path.join(root, 'PROJECT_SUMMARY.txt');
 const OUT_FULL = path.join(root, 'FULL_CONTEXT.txt');
 
-const excludeDirs = new Set(['node_modules', '.git', '.vscode']);
+const excludeDirs = new Set(['node_modules', '.git', '.vscode', 'logs']);
 const excludeFiles = new Set([
   '.env', '.bot.pid', '.miyako.lock', 'logs_runner.txt',
   'PROJECT_SUMMARY.txt', 'FULL_CONTEXT.txt', 'schedule_summary.txt'

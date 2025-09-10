@@ -90,6 +90,9 @@
   "maxPurgeLimit": 100,
   "blacklistedChannels": [],
   "moderatorLogChannelId": null,
+  "autoMessages": {
+    "defaultDeleteMs": 0
+  },
   "testingWarnings": {
     "349282473085239298": [
       {
