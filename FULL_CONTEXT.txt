@@ -1,5 +1,5 @@
 ===== BEGIN REPO CONTEXT =====
-Repo: Miyako  (generated: 2025-09-10T08:55:29.470Z)
+Repo: Miyako  (generated: 2025-09-10T11:05:15.327Z)
 Notes:
 - Sensitive runtime files are excluded (e.g., .env, pid/lock).
 - Sections are delimited by FILE markers and fenced code blocks.
@@ -177,6 +177,60 @@ chmod +x .git/hooks/pre-commit
 ```
 
 The hook aborts the commit if any `ephemeral:true` remains.
+
+```
+
+===== FILE: REFCHANGE-2025-09-10.md =====
+```markdown
+# REFCHANGE — 2025-09-10
+
+Scope: idempotent attach, TTL-based send guards, scheduler/manual trigger dedup, small unit test.
+
+Changes
+- events/interactionEvents.js
+  - Add client.__interactionListenerAttached sentinel to avoid double registration of interactionCreate.
+- utils/sendOnce.js (new)
+  - Small in-memory TTL guard: seenRecently(key, ttlMs) used to prevent rapid duplicate sends.
+- utils/scheduler.js
+  - runScheduleOnce(): uses TTL guard keyed by schedule + channel to avoid rare double fires due to drift.
+  - autoMessages loop: add TTL guard per (eventId, notifId, time, channel) before sending. Keep existing 60s per-fireKey protection.
+  - Preserve existing clock-in dedup (lastSentTs + message age) and pruning.
+- commands/schedule.js
+  - manualTriggerAutoMessage(): add TTL send guard for rapid double-clicks; no behavior change otherwise.
+- __tests__/sendOnce.test.js (new)
+  - Unit test validating TTL guard behavior.
+
+Notes
+- Guards are in-memory and per-process; if you run multiple instances, consider a shared store (Redis) for cross-process dedup.
+- TTLs used: 7–8 seconds for manual/scheduled sends; clock-in keeps 5-minute window via existing state.
+- No user-visible changes except fewer accidental duplicates under race conditions.
+
+Quality gates
+- Build: N/A (Node runtime)
+- Lint/Typecheck: N/A (no TS)
+- Tests: jest run expected to pass for new test.
+
+
+```
+
+===== FILE: __tests__/sendOnce.test.js =====
+```javascript
+const { seenRecently } = require('../utils/sendOnce');
+
+describe('sendOnce TTL guard', () => {
+  test('returns false on first sight, true if seen within TTL, then false after TTL', async () => {
+    const key = 'unit:abc';
+    const ttl = 100; // 100ms TTL
+    const first = seenRecently(key, ttl);
+    expect(first).toBe(false);
+    const second = seenRecently(key, ttl);
+    expect(second).toBe(true);
+    // wait past TTL
+    await new Promise(r => setTimeout(r, ttl + 30));
+    const third = seenRecently(key, ttl);
+    expect(third).toBe(false);
+  });
+});
 
 ```
 
@@ -3759,10 +3813,15 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   const channel = await interaction.client.channels.fetch(targetChannelId).catch(()=>null);
   if (!channel) throw new Error('Channel not found');
   const { applyTimestampPlaceholders } = require('../utils/timestampPlaceholders');
+  // TTL guard for rapid double-trigger from UI
+  try {
+    const { seenRecently } = require('../utils/sendOnce');
+    const key = `manual:${ev.id}:${notif.id}:${targetChannelId}`;
+    if (seenRecently(key, 7000)) return true; // treat as success, skip duplicate
+  } catch {}
   if (notif.isClockIn) {
     // Build staff clock-in message to match the expected template
-    const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-    const theme = require('../utils/theme');
+  const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
     // Capacities per template and standardized labels
     const POSITIONS = [
       { key:'instance_manager', emoji:'🗝️', label:'Instance Manager', cap:1, short:'IM' },
@@ -3785,26 +3844,51 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
         return true; // treat as success without duplication
       }
     } catch {}
-    // Build embed matching clockInEmbedTemplate.json expectations
-    const title = `🕒 Staff Clock-In — ${ev.name}`;
-    let description = `🕒 Staff Clock-In — ${ev.name}\n\nSelect a position from the menu below. One slot per staff (auto-updates).`;
-    description = applyTimestampPlaceholders(description, ev);
-    if (config.testingMode) description = sanitizeMentionsForTesting(description);
-    const embed = createEmbed({ title, description, color: theme.colors?.primary || 0x5865F2 });
-    for (const p of POSITIONS) {
-      const arr = ev.__clockIn.positions[p.key];
-      const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-      const name = `${p.emoji} ${p.label} (${arr.length}/${p.cap})`;
-      embed.addFields({ name, value: value.substring(0,1024), inline: true });
-    }
+    // Helper: mention list (sanitized in testing)
+    const fmtMentions = (arr=[]) => {
+      if (!Array.isArray(arr) || arr.length === 0) return '*None*';
+      const s = arr.map(id=>`<@${id}>`).join(', ');
+      return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
+    };
+    const nameSafe = ev.name || 'Event';
+    // Build embed JSON per template
+    const embedJson = {
+      title: `🕒 Staff Clock In — ${nameSafe}`,
+      description: "Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.",
+      color: 3447003,
+      fields: [
+        {
+          name: '📝 Instance Manager (1 slot)',
+          value: `${(ev.__clockIn.positions.instance_manager||[]).length} / 1\n${fmtMentions(ev.__clockIn.positions.instance_manager)}`,
+          inline: false
+        },
+        { name: '🛠️ Manager',   value: fmtMentions(ev.__clockIn.positions.manager),   inline: true },
+        { name: '🛡️ Bouncer',   value: fmtMentions(ev.__clockIn.positions.bouncer),   inline: true },
+        { name: '🍸 Bartender', value: fmtMentions(ev.__clockIn.positions.bartender), inline: true },
+        { name: '🎯 Backup',    value: fmtMentions(ev.__clockIn.positions.backup),    inline: true },
+        { name: '⏳ Maybe / Late', value: fmtMentions(ev.__clockIn.positions.maybe), inline: false },
+        {
+          name: 'Eligible roles',
+          value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>'
+        }
+      ],
+      footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
+    };
     // Build select menu with option descriptions like "IM slots 1"
     const menu = new StringSelectMenuBuilder()
       .setCustomId(`clockin:${ev.id}:${notif.id}`)
-      .setPlaceholder('📋 Select a position')
-      .addOptions(POSITIONS.map(p => ({ label: p.label, value: p.key, description: `${p.short} slots ${p.cap}` })));
-    const row = new ActionRowBuilder().addComponents(menu);
-    // Content is intentionally empty to match template
-    const sent = await channel.send({ content: '', embeds:[embed], components:[row] }).catch(()=>null);
+      .setPlaceholder('📋 Select your position')
+      .addOptions([
+        { label: 'Instance Manager', value: 'instance_manager', description: '1 slot available', emoji: { name: '📝' } },
+        { label: 'Manager',          value: 'manager',                              emoji: { name: '🛠️' } },
+        { label: 'Bouncer',          value: 'bouncer',                              emoji: { name: '🛡️' } },
+        { label: 'Bartender',        value: 'bartender',                            emoji: { name: '🍸' } },
+        { label: 'Backup',           value: 'backup',                               emoji: { name: '🎯' } },
+        { label: 'Maybe / Late',     value: 'maybe',                                emoji: { name: '⏳' } }
+      ]);
+  const row = new ActionRowBuilder().addComponents(menu);
+  // Content intentionally empty; embed contains header/description
+  const sent = await channel.send({ content: '', embeds:[embedJson], components:[row] }).catch(()=>null);
     if (sent && !config.testingMode) {
       notif.__skipUntil = Date.now() + 60*60*1000; // skip for an hour
       notif.lastManualTrigger = Date.now();
@@ -4765,7 +4849,7 @@ module.exports = { handleTestCommand };
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
-  "testingMode": true,
+  "testingMode": false,
   "roleLogBlacklist": [
     "1232701768329199666",
     "1232701768341655617",
@@ -4869,46 +4953,57 @@ module.exports = { handleTestCommand };
 ===== FILE: config/botStatus.json =====
 ```json
 {
-  "lastOnline": 1757494248353
+  "lastOnline": 1757502128075
 }
 ```
 
 ===== FILE: config/buttonSessions.json =====
 ```json
 {
-  "1415258201993121802": {
+  "1415291250285744189": {
     "type": "status",
     "userId": null,
     "guildId": "1232701768316620840",
     "channelId": "1413966369296220233",
-    "expiresAt": 1757494549705,
+    "expiresAt": 1757502429294,
     "data": {
-      "summary": "Files changed: 1 (➕ 0, ✖️ 0, 🔧 1)",
+      "summary": "Files changed: 2 (➕ 0, ✖️ 0, 🔧 2)",
       "detailLines": [
-        "🔧 commands/schedule.js (+1 lines)"
+        "🔧 events/interactionEvents.js (+12 lines)",
+        "🔧 utils/scheduler.js (+20 lines)"
       ],
       "expanded": false
     }
   },
-  "1415258209756647505": {
+  "1415291254148829235": {
     "type": "testmenu",
     "userId": "349282473085239298",
     "guildId": "1232701768316620840",
     "channelId": "1413966369296220233",
-    "expiresAt": 1757494552408,
+    "expiresAt": 1757502431568,
     "data": {
       "view": "root"
     }
   },
-  "1415258287359660074": {
+  "1415291275267281026": {
     "type": "events",
     "userId": "349282473085239298",
     "guildId": "1232701768316620840",
     "channelId": "1413966369296220233",
-    "expiresAt": 1757494582794,
+    "expiresAt": 1757502462224,
     "data": {
       "mode": "detail",
       "currentId": "3"
+    }
+  },
+  "1415291373925564449": {
+    "type": "testmenu",
+    "userId": "349282473085239298",
+    "guildId": "1232701768316620840",
+    "channelId": "1413966369296220233",
+    "expiresAt": 1757502460882,
+    "data": {
+      "view": "root"
     }
   }
 }
@@ -4921,7 +5016,7 @@ module.exports = { handleTestCommand };
     "amount": 1284
   },
   "608049611549966355": {
-    "amount": 121
+    "amount": 223
   },
   "442007276182568961": {
     "amount": 122
@@ -5000,7 +5095,7 @@ module.exports = {
 ===== FILE: config/changelogSnapshot.json =====
 ```json
 {
-  "createdAt": 1757494248371,
+  "createdAt": 1757502128086,
   "files": {
     "commands/balance.js": {
       "hash": "f4ac3ec3f46d6fdff253e133df87daf118dde670",
@@ -5108,9 +5203,9 @@ module.exports = {
       "lines": 352
     },
     "commands/schedule.js": {
-      "hash": "b5d7a420aa2589d1a11d9db291353bec8d06ba52",
-      "bytes": 56475,
-      "lines": 915
+      "hash": "62621172c87a40f4788963faab0f89a7a0ec26d9",
+      "bytes": 58187,
+      "lines": 945
     },
     "commands/scripts.js": {
       "hash": "f60cc3fee8c2c6fb856c984d68ee9056b8b320bd",
@@ -5143,9 +5238,9 @@ module.exports = {
       "lines": 52
     },
     "events/interactionEvents.js": {
-      "hash": "5bdccd00bc040d634623e37b6df8dfb80250f695",
-      "bytes": 54145,
-      "lines": 926
+      "hash": "1bf0b214886883fc49de9c871f00fe81b6d9319f",
+      "bytes": 54915,
+      "lines": 933
     },
     "events/messages.js": {
       "hash": "74b4c6285585079b43c4a305ebc46e2ccb3b820d",
@@ -5251,6 +5346,11 @@ module.exports = {
       "hash": "3a09f1b5390a091bb6899673c966b883bbc3ded5",
       "bytes": 5425,
       "lines": 166
+    },
+    "utils/clockinEmbed.js": {
+      "hash": "0468393a5abd77898459492d4f073a98e6ad4dae",
+      "bytes": 3405,
+      "lines": 75
     },
     "utils/commandLogger.js": {
       "hash": "2b823eb6ad362f9598fbb6a3320629a4b4742b21",
@@ -5363,14 +5463,19 @@ module.exports = {
       "lines": 6
     },
     "utils/scheduler.js": {
-      "hash": "e8490ffe0bc91fd58b6e8149e0634e1c7c139e72",
-      "bytes": 25387,
-      "lines": 496
+      "hash": "5a2d7ec58a9d0c8b7ef995b893775f77f1e49a0d",
+      "bytes": 27215,
+      "lines": 517
     },
     "utils/scheduleStorage.js": {
       "hash": "d4871e2697340651009544c86eea4ff779e36de7",
       "bytes": 1932,
       "lines": 56
+    },
+    "utils/sendOnce.js": {
+      "hash": "6d85ce2c9f92b1739835491f92807376504c98b6",
+      "bytes": 737,
+      "lines": 23
     },
     "utils/shutdownState.js": {
       "hash": "240e66f6d66c6f72fda2431678da774805df7716",
@@ -5436,6 +5541,11 @@ module.exports = {
       "hash": "25880a7bdfb90dbdc4f7bc6e2282da07ecb3d5df",
       "bytes": 2077,
       "lines": 64
+    },
+    "__tests__/sendOnce.test.js": {
+      "hash": "94d23c92e21d4e563fe1c95f738a6ee3ec8c940a",
+      "bytes": 577,
+      "lines": 17
     }
   }
 }
@@ -5488,7 +5598,7 @@ module.exports = {
 ===== FILE: config/crash-latest.json =====
 ```json
 {
-  "ts": 1757494524085,
+  "ts": 1757495869509,
   "scope": "fatal",
   "reason": "abnormal-exit",
   "code": 1
@@ -5688,54 +5798,24 @@ module.exports = {
     "message": "process exiting with code 0"
   },
   {
-    "ts": 1757494248391,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
+    "ts": 1757496251618,
+    "scope": "exit",
+    "message": "process exiting with code 0"
   },
   {
-    "ts": 1757494279031,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
+    "ts": 1757498719510,
+    "scope": "exit",
+    "message": "process exiting with code 0"
   },
   {
-    "ts": 1757494309634,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
+    "ts": 1757502018365,
+    "scope": "exit",
+    "message": "process exiting with code 0"
   },
   {
-    "ts": 1757494340233,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
-  },
-  {
-    "ts": 1757494370956,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
-  },
-  {
-    "ts": 1757494401555,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
-  },
-  {
-    "ts": 1757494432237,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
-  },
-  {
-    "ts": 1757494462841,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
-  },
-  {
-    "ts": 1757494493476,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
-  },
-  {
-    "ts": 1757494524085,
-    "scope": "fatal:exit",
-    "message": "abnormal exit code 1"
+    "ts": 1757502126503,
+    "scope": "exit",
+    "message": "process exiting with code 0"
   }
 ]
 ```
@@ -5887,8 +5967,8 @@ module.exports = {
           },
           "channelId": "1376497592871030865",
           "isClockIn": false,
-          "__skipUntil": 1757460572490,
-          "lastManualTrigger": 1757456972490
+          "__skipUntil": 1757505762468,
+          "lastManualTrigger": 1757502162468
         }
       ],
       "nextAutoId": 3,
@@ -5903,7 +5983,7 @@ module.exports = {
 ```json
 {
   "349282473085239298": {
-    "xp": 22548,
+    "xp": 22664,
     "level": 33
   },
   "931601222857809920": {
@@ -5951,7 +6031,7 @@ module.exports = {
     "level": 1
   },
   "608049611549966355": {
-    "xp": 1282,
+    "xp": 1321,
     "level": 4
   },
   "696080705871937557": {
@@ -6523,7 +6603,7 @@ module.exports = {
     "level": 0
   },
   "791684202890002452": {
-    "xp": 35,
+    "xp": 47,
     "level": 0
   }
 }
@@ -6532,7 +6612,7 @@ module.exports = {
 ===== FILE: config/process-heartbeat.json =====
 ```json
 {
-  "ts": 1757494486801
+  "ts": 1757502306599
 }
 ```
 
@@ -6715,6 +6795,9 @@ const { semanticButton, buildNavRow } = require("../utils/ui");
 const pendingPunishments = new Map();
 
 function attachInteractionEvents(client) {
+  // Idempotent attach guard to prevent duplicate listener registration
+  if (client.__interactionListenerAttached) return;
+  client.__interactionListenerAttached = true;
   client.on("interactionCreate", async (interaction) => {
     try {
       // Route persistent session UIs first
@@ -7558,29 +7641,33 @@ function attachInteractionEvents(client) {
         updateEvent(ev.id, { [clockKey]: state });
         // Re-render all clock-in messages for this event
         try {
-          const { EmbedBuilder } = require('discord.js');
-          const theme = require('../utils/theme');
-          const { createEmbed, safeAddField } = require('../utils/embeds');
-          const POSITIONS = ['instance_manager','manager','bouncer','bartender','backup','maybe'];
-          // Standardized header; ignore stored message for uniformity
-          const base = `🕒 Staff Clock-In — ${ev.name}`;
-          const embed = createEmbed({
-            title: `🕒 Staff Clock-In — ${ev.name}`,
-            description: `${base}\n\nSelect a position below. One slot per staff; re-select to move.`,
-            color: theme.colors?.primary || 0x5865F2
-          });
-          for (const k of POSITIONS) {
-            const arr = state.positions[k] || [];
-            const label = POS_META[k].label;
-            const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-            const cap = POS_META[k].max === Infinity ? '' : `/${POS_META[k].max}`;
-            safeAddField(embed, `${label} (${arr.length}${cap})`, value.substring(0,1024), true);
-          }
+          // Build embed JSON per the required template (keeps IM limited, others unlimited)
+          const fmtMentions = (arr=[]) => {
+            if (!Array.isArray(arr) || arr.length === 0) return '*None*';
+            const s = arr.map(id=>`<@${id}>`).join(', ');
+            return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
+          };
+          const nameSafe = ev.name || 'Event';
+          const embed = {
+            title: `🕒 Staff Clock In — ${nameSafe}`,
+            description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.',
+            color: 3447003,
+            fields: [
+              { name: '📝 Instance Manager (1 slot)', value: `${(state.positions.instance_manager||[]).length} / 1\n${fmtMentions(state.positions.instance_manager)}`, inline: false },
+              { name: '🛠️ Manager',   value: fmtMentions(state.positions.manager),   inline: true },
+              { name: '🛡️ Bouncer',   value: fmtMentions(state.positions.bouncer),   inline: true },
+              { name: '🍸 Bartender', value: fmtMentions(state.positions.bartender), inline: true },
+              { name: '🎯 Backup',    value: fmtMentions(state.positions.backup),    inline: true },
+              { name: '⏳ Maybe / Late', value: fmtMentions(state.positions.maybe), inline: false },
+              { name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
+            ],
+            footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
+          };
           for (const mid of state.messageIds || []) {
             try {
               const channel = await interaction.channel?.guild?.channels?.fetch(ev.channelId).catch(()=>null) || await interaction.client.channels.fetch(ev.channelId).catch(()=>null);
               const msg = channel && channel.messages ? await channel.messages.fetch(mid).catch(()=>null) : null;
-              if (msg) await msg.edit({ embeds:[embed] }).catch(()=>{});
+              if (msg) await msg.edit({ content: '', embeds:[embed] }).catch(()=>{});
             } catch {}
           }
         } catch {}
@@ -12231,6 +12318,8 @@ client.login(process.env.DISCORD_TOKEN);
     "stop": "node ./scripts/stopBot.js",
     "import-levels": "node ./scripts/import-levels.js",
   "export:text": "node ./scripts/export-text.js",
+  "export:summary": "node ./scripts/export-summary.js",
+  "export:watch": "node ./scripts/export-watch.js",
     "test": "jest --runInBand",
     "migrate:clockin": "node ./scripts/migrate-clockin.js"
   },
@@ -12276,6 +12365,175 @@ if (bad.length) {
   process.exit(1);
 }
 console.log('Ephemeral usage check passed.');
+```
+
+===== FILE: scripts/export-summary.js =====
+```javascript
+// Generate a compact, paste-friendly project summary with folder tree and important snippets
+// Output: PROJECT_SUMMARY.txt at repo root
+
+const fs = require('fs');
+const path = require('path');
+
+const root = path.join(__dirname, '..');
+const outFile = path.join(root, 'PROJECT_SUMMARY.txt');
+
+const excludeDirs = new Set(['node_modules', '.git', '.vscode']);
+const excludeFiles = new Set(['.env', '.bot.pid', '.miyako.lock', 'logs_runner.txt', 'FULL_CONTEXT.txt', 'PROJECT_SUMMARY.txt']);
+const allowedExt = new Set(['.js', '.json', '.md']);
+
+function listAll(relDir = '.') {
+  const abs = path.join(root, relDir);
+  const entries = fs.readdirSync(abs, { withFileTypes: true });
+  const result = [];
+  for (const e of entries) {
+    if (e.isDirectory()) {
+      if (excludeDirs.has(e.name)) continue;
+      result.push({ type: 'dir', rel: path.join(relDir, e.name) });
+      result.push(...listAll(path.join(relDir, e.name)));
+    } else if (e.isFile()) {
+      if (excludeFiles.has(e.name)) continue;
+      const ext = path.extname(e.name).toLowerCase();
+      if (!allowedExt.has(ext)) continue;
+      result.push({ type: 'file', rel: path.join(relDir, e.name) });
+    }
+  }
+  return result;
+}
+
+function makeTree(lines) {
+  // Build nested tree text using indentation and sorted paths
+  const sorted = [...lines].sort((a, b) => a.rel.localeCompare(b.rel));
+  const out = [];
+  out.push('// Project Structure');
+  const prefix = '';
+  out.push(prefix + path.basename(root) + '/');
+  for (const { rel, type } of sorted) {
+    const parts = rel.split(path.sep);
+    let indent = '  ';
+    for (let i = 0; i < parts.length - 1; i++) indent += '  ';
+    out.push(`${'  '.repeat(parts.length)}${type === 'dir' ? parts[parts.length - 1] + '/' : parts[parts.length - 1]}`);
+  }
+  return out.join('\n');
+}
+
+function extractObjectKeysFromBlock(src, startIdx) {
+  // Naive brace scanner to get shallow keys from an object literal starting at or after startIdx
+  let i = startIdx;
+  const n = src.length;
+  let depth = 0;
+  let started = false;
+  const keys = new Set();
+  while (i < n) {
+    const ch = src[i];
+    if (ch === '{') { depth++; started = true; i++; continue; }
+    if (ch === '}') { depth--; i++; if (started && depth === 0) break; continue; }
+    if (started && depth === 1) {
+      // capture key before colon (simple case)
+      const m = src.slice(i).match(/\s*([A-Za-z0-9_\-"']+)\s*:/);
+      if (m) {
+        let key = m[1];
+        key = key.replace(/^['"]|['"]$/g, '');
+        if (key) keys.add(key);
+        i += m.index + m[0].length;
+        continue;
+      }
+    }
+    i++;
+  }
+  return Array.from(keys);
+}
+
+function summarizeJS(filePath) {
+  const src = fs.readFileSync(filePath, 'utf8');
+  const lines = src.split(/\r?\n/);
+  const out = [];
+  const push = (s) => out.push(s);
+  push('// ...');
+  // Scan line-by-line for key constructs
+  lines.forEach((line, idx) => {
+    const l = line.trim();
+    if (/^class\s+\w+/.test(l)) push(l);
+    else if (/^async\s+function\s+\w+\(/.test(l)) push(l.replace(/\s+\{\s*$/, '')); 
+    else if (/^function\s+\w+\(/.test(l)) push(l.replace(/\s+\{\s*$/, ''));
+    else if (/^const\s+\w+\s*=\s*async\s*\(/.test(l)) push(l.replace(/\{\s*$/, '')); 
+    else if (/^const\s+\w+\s*=\s*\(/.test(l) && l.includes('=>')) push(l.replace(/\{\s*$/, ''));
+    else if (/\.on\(\s*['"][^'"]+['"]/.test(l)) push(l);
+    else if (/ActiveMenus\.registerHandler\(/.test(l)) push(l);
+    else if (/module\.exports\s*=\s*\{/.test(l)) {
+      // collect export keys
+      const start = lines.slice(0, idx + 1).join('\n').length;
+      const keys = extractObjectKeysFromBlock(src, start);
+      push('module.exports = { ' + keys.join(', ') + ' }');
+    } else if (/module\.exports\./.test(l) || /^exports\./.test(l)) {
+      push(l);
+    } else if (/^const\s+defaultConfig\s*=\s*\{/.test(l)) {
+      const start = lines.slice(0, idx + 1).join('\n').length;
+      const keys = extractObjectKeysFromBlock(src, start);
+      push('const defaultConfig = { ' + keys.join(', ') + ' }');
+    }
+  });
+  push('// ...');
+  return out.join('\n');
+}
+
+function summarizeJSON(filePath) {
+  try {
+    const txt = fs.readFileSync(filePath, 'utf8');
+    const json = JSON.parse(txt);
+    if (Array.isArray(json)) {
+      return `// JSON Array (length=${json.length})`;
+    }
+    const keys = Object.keys(json || {});
+    return '/* JSON keys: ' + keys.join(', ') + ' */';
+  } catch {
+    // Fallback to first ~20 lines
+    const first = fs.readFileSync(filePath, 'utf8').split(/\r?\n/).slice(0, 20).join('\n');
+    return first + '\n// ...';
+  }
+}
+
+function summarizeMD(filePath) {
+  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+  const heads = lines.filter(l => /^#\s/.test(l)).slice(0, 10);
+  return (heads.join('\n') || '// markdown');
+}
+
+function main() {
+  const items = listAll();
+  const treeText = makeTree(items);
+  const parts = [];
+  parts.push('===== COMPACT PROJECT SUMMARY =====');
+  parts.push(`Project: ${path.basename(root)}  (generated: ${new Date().toISOString()})`);
+  parts.push('');
+  parts.push(treeText);
+  parts.push('');
+  parts.push('// Important Snippets (condensed)');
+
+  for (const it of items) {
+    if (it.type !== 'file') continue;
+    const rel = it.rel.replace(/\\/g, '/');
+    const ext = path.extname(rel).toLowerCase();
+    parts.push('');
+    parts.push(`// FILE: ${rel}`);
+    try {
+      if (ext === '.js') parts.push(summarizeJS(path.join(root, rel)));
+      else if (ext === '.json') parts.push(summarizeJSON(path.join(root, rel)));
+      else if (ext === '.md') parts.push(summarizeMD(path.join(root, rel)));
+    } catch (e) {
+      parts.push(`// (failed to summarize: ${e.message})`);
+    }
+  }
+
+  parts.push('');
+  parts.push('===== END SUMMARY =====');
+
+  fs.writeFileSync(outFile, parts.join('\n'), 'utf8');
+  console.log(`[export-summary] Wrote ${outFile}`);
+}
+
+if (require.main === module) main();
+
 ```
 
 ===== FILE: scripts/export-text.js =====
@@ -12365,6 +12623,100 @@ function main() {
 }
 
 if (require.main === module) main();
+
+```
+
+===== FILE: scripts/export-watch.js =====
+```javascript
+// Watch the repo and auto-regenerate paste-friendly summaries for ChatGPT
+// - Regenerates: PROJECT_SUMMARY.txt and FULL_CONTEXT.txt
+// - Debounced to avoid thrashing; ignores its own output files
+
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
+
+const root = path.join(__dirname, '..');
+const OUT_SUMMARY = path.join(root, 'PROJECT_SUMMARY.txt');
+const OUT_FULL = path.join(root, 'FULL_CONTEXT.txt');
+
+const excludeDirs = new Set(['node_modules', '.git', '.vscode']);
+const excludeFiles = new Set([
+  '.env', '.bot.pid', '.miyako.lock', 'logs_runner.txt',
+  'PROJECT_SUMMARY.txt', 'FULL_CONTEXT.txt', 'schedule_summary.txt'
+]);
+const allowedExt = new Set(['.js', '.json', '.md']);
+
+function isExcluded(file) {
+  const base = path.basename(file);
+  if (excludeFiles.has(base)) return true;
+  // inside excluded dirs?
+  const rel = path.relative(root, file).replace(/\\/g, '/');
+  const parts = rel.split('/');
+  if (parts.some(p => excludeDirs.has(p))) return true;
+  const ext = path.extname(file).toLowerCase();
+  return !allowedExt.has(ext);
+}
+
+let pending = false;
+let timer = null;
+let running = false;
+
+function run(cmd, args) {
+  return new Promise((resolve) => {
+    const p = spawn(process.execPath, [path.join(root, ...args)], { cwd: root, stdio: 'ignore' });
+    p.on('exit', () => resolve());
+  });
+}
+
+async function regenerate() {
+  if (running) return; // coalesce
+  running = true;
+  try {
+    await run('node', ['scripts', 'export-summary.js']);
+    await run('node', ['scripts', 'export-text.js']);
+    // Optional: if a schedule summary exporter exists, run it here
+    const schedExporter = path.join(root, 'scripts', 'export-schedule-summary.js');
+    try { if (fs.existsSync(schedExporter)) await run('node', ['scripts', 'export-schedule-summary.js']); } catch {}
+    console.log(`[export-watch] Updated summaries at ${new Date().toISOString()}`);
+  } catch (e) {
+    console.error('[export-watch] regenerate error', e);
+  } finally {
+    running = false;
+  }
+}
+
+function scheduleRegen(reason) {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(() => { timer = null; regenerate(); }, 600);
+}
+
+function startWatch() {
+  // Initial build
+  regenerate();
+  // fs.watch recursive works on Windows/macOS; good for this project context
+  try {
+    const watcher = fs.watch(root, { recursive: true }, (event, filename) => {
+      if (!filename) return;
+      const full = path.join(root, filename);
+      if (isExcluded(full)) return;
+      scheduleRegen(`${event}:${filename}`);
+    });
+    watcher.on('error', () => {});
+    console.log('[export-watch] Watching for changes...');
+  } catch (e) {
+    console.error('[export-watch] fs.watch failed; falling back to interval scan');
+    let lastTick = 0;
+    setInterval(() => {
+      const now = Date.now();
+      if (now - lastTick < 2000) return;
+      lastTick = now;
+      scheduleRegen('interval');
+    }, 2500).unref?.();
+  }
+}
+
+if (require.main === module) startWatch();
 
 ```
 
@@ -14268,6 +14620,85 @@ module.exports = {
 
 ```
 
+===== FILE: utils/clockinEmbed.js =====
+```javascript
+// Unified "Staff Clock-In" embed renderer to keep styling consistent and compact
+// across scheduler auto-messages, manual triggers, and interaction updates.
+// Preserves existing logic and IDs; only presentation is improved.
+
+const { createEmbed, safeAddField } = require('./embeds');
+const theme = require('./theme');
+const { computeNextRange } = require('./timestampPlaceholders');
+
+// Standard role meta used for consistent labeling/emojis
+const ROLE_META = {
+  instance_manager: { label: 'Instance Manager', emoji: '📝' },
+  manager:          { label: 'Manager',          emoji: '🛠️' },
+  bouncer:          { label: 'Bouncer',          emoji: '🛡️' },
+  bartender:        { label: 'Bartender',        emoji: '🍸' },
+  backup:           { label: 'Backup',           emoji: '🎯' },
+  maybe:            { label: 'Maybe/Late',       emoji: '⏳' }
+};
+
+// Build a tiny capacity bar using simple squares for broad device support
+// length=5 cells, using ■ (filled) and □ (empty)
+function capacityBar(count, cap, cells = 5) {
+  if (!cap || cap <= 0) return null;
+  const pct = Math.max(0, Math.min(1, count / cap));
+  const filled = Math.max(0, Math.min(cells, Math.round(pct * cells)));
+  return '■'.repeat(filled) + '□'.repeat(cells - filled);
+}
+
+// Build the embed. arguments:
+// - ev: event object (name, times/ranges for footer)
+// - positions: { [roleKey]: string[] userIds }
+// - capacities: { [roleKey]: number|undefined } optional caps per role
+// - options: { compact?: boolean }
+function buildClockInEmbed(ev, positions = {}, capacities = {}, options = {}) {
+  const name = ev?.name || 'Event';
+  const color = theme.colors?.primary || 0x5865F2;
+  const title = `🕒 Staff Clock-In — ${name}`;
+  const description = 'Select your role from the menu. One slot per staff. Updates apply instantly.';
+
+  const embed = createEmbed({ title, description, color, timestamp: true });
+
+  const order = ['instance_manager','manager','bouncer','bartender','backup','maybe'];
+  for (const key of order) {
+    const meta = ROLE_META[key] || { label: key, emoji: '' };
+    const arr = Array.isArray(positions[key]) ? positions[key] : [];
+    const cap = Number.isFinite(capacities[key]) ? Number(capacities[key]) : null;
+    const count = arr.length;
+    const countText = cap ? `${count}/${cap}` : `${count}`;
+    const fieldName = `${meta.emoji ? meta.emoji+ ' ' : ''}${meta.label} (${countText})`;
+    const mentions = count ? arr.map(id => `<@${id}>`).join(', ').slice(0, 1024) : '—';
+    const bar = cap ? capacityBar(count, cap) : null;
+    const fieldValue = bar ? `${bar}\n${mentions}` : mentions;
+    safeAddField(embed, fieldName, fieldValue, true);
+  }
+
+  // Footer with dynamic timing info (starts/ends) if known
+  try {
+    const r = computeNextRange(ev);
+    const now = Date.now() / 1000;
+    if (r && r.startSec && r.endSec) {
+      let footer = `Event: ${name}`;
+      if (now < r.startSec) footer = `${footer} • Starts <t:${r.startSec}:R>`;
+      else if (now >= r.startSec && now < r.endSec) footer = `${footer} • Ends <t:${r.endSec}:t>`;
+      embed.setFooter({ text: footer });
+    } else {
+      embed.setFooter({ text: `Event: ${name}` });
+    }
+  } catch {
+    embed.setFooter({ text: `Event: ${name}` });
+  }
+
+  return embed;
+}
+
+module.exports = { buildClockInEmbed, ROLE_META };
+
+```
+
 ===== FILE: utils/commandLogger.js =====
 ```javascript
 // In-memory command logger with optional channel reporting and expected vs actual diffing
@@ -15698,6 +16129,7 @@ const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const theme = require('./theme');
 const { createEmbed } = require('./embeds');
 const { CONFIG_LOG_CHANNEL } = require('./logChannels');
+const { buildClockInEmbed } = require('./clockinEmbed');
 
 function applyPlaceholdersToJsonPayload(payload, ev) {
   if (!payload || typeof payload !== 'object') return payload;
@@ -15839,6 +16271,12 @@ async function runScheduleOnce(client, schedule) {
   const chId = config.testingMode ? (schedule.logChannelId || CONFIG_LOG_CHANNEL || schedule.channelId) : schedule.channelId;
   const channel = await client.channels.fetch(chId).catch(() => null);
     if (!channel || !channel.send) throw new Error("Invalid channel");
+    // Best-effort dedup if loop jitter causes double fire
+    try {
+      const { seenRecently } = require('./sendOnce');
+      const key = `sched:${schedule.id}:${chId}`;
+      if (seenRecently(key, 8000)) return; // skip duplicate within 8s
+    } catch {}
     // Support simple content or JSON payloads + timestamp placeholders
     // If messageJSON exists, prefer its content (even if empty) and do not fallback to the raw string in schedule.message.
     let content = '';
@@ -15992,6 +16430,12 @@ function startScheduler(client, opts = {}) {
                     const targetChannelId = config.testingMode ? CONFIG_LOG_CHANNEL : (m.channelId || ev.channelId);
                     const channel = await client.channels.fetch(targetChannelId).catch(()=>null);
                     if (channel && channel.send) {
+                      // TTL send guard to prevent duplicate racing across intervals
+                      try {
+                        const { seenRecently } = require('./sendOnce');
+                        const k = `auto:${ev.id}:${m.id}:${t}:${targetChannelId}`;
+                        if (seenRecently(k, 8000)) { throw new Error('dup_guard_skip'); }
+                      } catch {}
                       // Clock-In special behavior
                       if (m.isClockIn) {
                         // Maintain per-event clockIn data structure: { positions: {key: [userId]}, messageIds:[], lastEventStart: timestamp }
@@ -16032,39 +16476,41 @@ function startScheduler(client, opts = {}) {
                             continue; // skip creating a new clock-in embed
                           }
                         } catch {}
-                        // Build base text (header) and embed fields
-                        // Standardized base text (ignore any custom saved clock-in message to ensure uniformity)
-                        let baseText = `🕒 Staff Clock-In — ${ev.name}`;
-                        baseText = baseText.replace(/{{EVENT_NAME}}/g, ev.name || 'Event');
-                        baseText = applyTimestampPlaceholders(baseText, ev).replace(/\n{3,}/g,'\n\n');
-                        if (config.testingMode) {
-                          // Light sanitization of role/user mentions in testing
-                          baseText = baseText.replace(/<@&?\d+>/g, match => `\`${match}\``);
-                        }
-                        const embed = createEmbed({
-                          title: `🕒 Staff Clock-In — ${ev.name}`,
-                          color: theme.colors?.primary || 0x5865F2,
-                          description: `${baseText}\n\nSelect a position from the menu below. One slot per staff (auto-updates).`,
-                          timestamp: false
-                        });
-                        for (const p of POSITIONS) {
-                          const arr = state.positions[p.key];
-                          const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-                          const name = p.key === 'instance_manager' ? `${p.label} (${arr.length}/1)` : `${p.label} (${arr.length})`;
-                          embed.addFields({ name, value: value.substring(0,1024), inline: true });
-                        }
+                        // Build embed JSON per the required template
+                        const fmtMentions = (arr=[]) => {
+                          if (!Array.isArray(arr) || arr.length === 0) return '*None*';
+                          const s = arr.map(id=>`<@${id}>`).join(', ');
+                          return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
+                        };
+                        const nameSafe = ev.name || 'Event';
+                        const embed = {
+                          title: `🕒 Staff Clock In — ${nameSafe}`,
+                          description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.',
+                          color: 3447003,
+                          fields: [
+                            { name: '📝 Instance Manager (1 slot)', value: `${(state.positions.instance_manager||[]).length} / 1\n${fmtMentions(state.positions.instance_manager)}`, inline: false },
+                            { name: '🛠️ Manager',   value: fmtMentions(state.positions.manager),   inline: true },
+                            { name: '🛡️ Bouncer',   value: fmtMentions(state.positions.bouncer),   inline: true },
+                            { name: '🍸 Bartender', value: fmtMentions(state.positions.bartender), inline: true },
+                            { name: '🎯 Backup',    value: fmtMentions(state.positions.backup),    inline: true },
+                            { name: '⏳ Maybe / Late', value: fmtMentions(state.positions.maybe), inline: false },
+                            { name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
+                          ],
+                          footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
+                        };
                         const menu = new StringSelectMenuBuilder()
                           .setCustomId(`clockin:${ev.id}:${m.id}`)
-                          .setPlaceholder('📋 Select a position')
-                          .addOptions(
-                            POSITIONS.map(p => ({
-                              label: `${p.label.replace(/^[^ ]+ /,'')}`.slice(0,100),
-                              value: p.key,
-                              description: p.max ? `${p.short} slots ${p.max}` : `${p.short}`
-                            }))
-                          );
+                          .setPlaceholder('📋 Select your position')
+                          .addOptions([
+                            { label: 'Instance Manager', value: 'instance_manager', description: '1 slot available', emoji: { name: '📝' } },
+                            { label: 'Manager',          value: 'manager',                              emoji: { name: '🛠️' } },
+                            { label: 'Bouncer',          value: 'bouncer',                              emoji: { name: '🛡️' } },
+                            { label: 'Bartender',        value: 'bartender',                            emoji: { name: '🍸' } },
+                            { label: 'Backup',           value: 'backup',                               emoji: { name: '🎯' } },
+                            { label: 'Maybe / Late',     value: 'maybe',                                emoji: { name: '⏳' } }
+                          ]);
                         const row = new ActionRowBuilder().addComponents(menu);
-                        const sent = await channel.send({ embeds: [embed], components: [row] }).catch(()=>null);
+                        const sent = await channel.send({ content: '', embeds: [embed], components: [row] }).catch(()=>null);
                         if (sent) {
                           state.messageIds.push(sent.id);
                           // Cleanup orphaned / non-existent ids beyond cap
@@ -16086,7 +16532,13 @@ function startScheduler(client, opts = {}) {
                         await channel.send({ content }).catch(()=>{});
                       }
                     }
-                  } catch (e) { console.error('Auto message dispatch failed', ev.id, m.id, e); }
+                  } catch (e) {
+                    if ((e && String(e.message||e).includes('dup_guard_skip'))) {
+                      // skip silently
+                    } else {
+                      console.error('Auto message dispatch failed', ev.id, m.id, e);
+                    }
+                  }
                   ev[fireKey] = now; updateEvent(ev.id, { [fireKey]: now });
                 }
               }
@@ -16184,6 +16636,33 @@ module.exports = {
   computeNextRun,
   computeAfterRun
 };
+
+```
+
+===== FILE: utils/sendOnce.js =====
+```javascript
+// Simple in-memory TTL-based send guard to avoid duplicate sends in race conditions
+// Keyed by a caller-provided key, e.g., `${scope}:${channelId}:${eventId}:${notifId}`
+// Expires entries after ttlMs. Safe in single-process use; if you shard/process separately,
+// consider replacing with a shared store.
+
+const _seen = new Map(); // key -> timestamp
+
+function seenRecently(key, ttlMs = 30000) {
+  const now = Date.now();
+  // prune sometimes
+  if (_seen.size > 2000) {
+    for (const [k, ts] of _seen) {
+      if (now - ts > ttlMs) _seen.delete(k);
+    }
+  }
+  const last = _seen.get(key) || 0;
+  if (now - last < ttlMs) return true;
+  _seen.set(key, now);
+  return false;
+}
+
+module.exports = { seenRecently };
 
 ```
 

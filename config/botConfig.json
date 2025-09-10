@@ -27,7 +27,7 @@
   },
   "defaultMuteDuration": 3600000,
   "modLogChannelId": "1232701768383729791",
-  "testingMode": true,
+  "testingMode": false,
   "roleLogBlacklist": [
     "1232701768329199666",
     "1232701768341655617",

@@ -7,6 +7,7 @@
     "import-levels": "node ./scripts/import-levels.js",
   "export:text": "node ./scripts/export-text.js",
   "export:summary": "node ./scripts/export-summary.js",
+  "export:watch": "node ./scripts/export-watch.js",
     "test": "jest --runInBand",
     "migrate:clockin": "node ./scripts/migrate-clockin.js"
   },

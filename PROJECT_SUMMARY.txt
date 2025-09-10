@@ -1,8 +1,10 @@
 ===== COMPACT PROJECT SUMMARY =====
-Project: Miyako  (generated: 2025-09-10T09:04:37.525Z)
+Project: Miyako  (generated: 2025-09-10T11:05:15.268Z)
 
 // Project Structure
 Miyako/
+  __tests__/
+    sendOnce.test.js
   ARCHITECTURE.md
   commands/
     balance.js
@@ -62,10 +64,12 @@ Miyako/
   package-lock.json
   package.json
   README.md
+  REFCHANGE-2025-09-10.md
   scripts/
     check-ephemeral.js
     export-summary.js
     export-text.js
+    export-watch.js
     import-levels.js
     migrate-clockin.js
     migrateClockInCore.js
@@ -96,6 +100,7 @@ Miyako/
     cash.js
     cashDrops.js
     changelog.js
+    clockinEmbed.js
     commandLogger.js
     configLogs.js
     configValidate.js
@@ -120,6 +125,7 @@ Miyako/
     sanitize.js
     scheduler.js
     scheduleStorage.js
+    sendOnce.js
     shutdownState.js
     singleton.js
     staffTeam.js
@@ -375,6 +381,7 @@ const clamp = (s,max=1900)=> (s && s.length>max? s.slice(0,max-3)+'...':s);
 async function handleScheduleModal(interaction)
 function sanitizeMentionsForTesting(content)
 async function manualTriggerAutoMessage(interaction, ev, notif)
+const fmtMentions = (arr=[]) => 
 ActiveMenus.registerHandler('events', async (interaction, session) => {
 const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
 const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
@@ -436,7 +443,7 @@ module.exports = { embeds, components }
 /* JSON keys: lastOnline */
 
 // FILE: config/buttonSessions.json
-/* JSON keys:  */
+/* JSON keys: 1415291250285744189, 1415291254148829235, 1415291275267281026, 1415291373925564449 */
 
 // FILE: config/cash.json
 /* JSON keys: 349282473085239298, 608049611549966355, 442007276182568961, 439459732336410627, 653331598951055391, 800410857758261318, 743113043776503839 */
@@ -459,7 +466,7 @@ module.exports = {  }
 /* JSON keys: users, day, resetAt */
 
 // FILE: config/errorLog.json
-// JSON Array (length=64)
+// JSON Array (length=40)
 
 // FILE: config/events.json
 /* JSON keys: nextId, events */
@@ -513,7 +520,8 @@ const saveStore = () => { try { saveConfig(); } catch {} };
 const buildTopRow = () => new ActionRowBuilder().addComponents(
 const swapRows = async (rows) => 
 const buildTopRow = () => new ActionRowBuilder().addComponents(
-module.exports = { embeds, content, flags }
+const fmtMentions = (arr=[]) => 
+module.exports = { content, embeds, flags }
 // ...
 
 // FILE: events/messages.js
@@ -546,6 +554,9 @@ const fields = (embed.data.fields||[]).filter(f => !f.name.startsWith('Details')
 // FILE: README.md
 # Miyako
 
+// FILE: REFCHANGE-2025-09-10.md
+# REFCHANGE — 2025-09-10
+
 // FILE: scripts/check-ephemeral.js
 // ...
 function listTracked()
@@ -571,6 +582,17 @@ function langForExt(ext)
 function listFiles(dir)
 function main()
 ws.on('close', () => {
+// ...
+
+// FILE: scripts/export-watch.js
+// ...
+function isExcluded(file)
+function run(cmd, args)
+p.on('exit', () => resolve());
+async function regenerate()
+function scheduleRegen(reason)
+function startWatch()
+watcher.on('error', () => {});
 // ...
 
 // FILE: scripts/import-levels.js
@@ -796,6 +818,13 @@ async function postStartupChangelog(client, channelId, rootDir = path.resolve(__
 module.exports = { embeds }
 // ...
 
+// FILE: utils/clockinEmbed.js
+// ...
+function capacityBar(count, cap, cells = 5)
+function buildClockInEmbed(ev, positions = {}, capacities = {}, options = {})
+module.exports = {  }
+// ...
+
 // FILE: utils/commandLogger.js
 // ...
 function getLimit()
@@ -1001,6 +1030,7 @@ const timeMsOfDay = (() =>
 async function runScheduleOnce(client, schedule)
 function computeAfterRun(schedule)
 function startScheduler(client, opts = {})
+const fmtMentions = (arr=[]) => 
 module.exports = { __clockIn }
 // ...
 
@@ -1014,6 +1044,12 @@ function getSchedule(id) { id = String(id); return loadObj().schedules.find(s =>
 function addSchedule(schedule) { const obj = loadObj(); const id = String(obj.nextId++); const withId = { id, ...schedule }; obj.schedules.push(withId); saveObj(obj); return withId; }
 function updateSchedule(id, patch)
 function removeSchedule(id)
+module.exports = {  }
+// ...
+
+// FILE: utils/sendOnce.js
+// ...
+function seenRecently(key, ttlMs = 30000)
 module.exports = {  }
 // ...
 
@@ -1140,6 +1176,10 @@ function flushAll()
 function enqueueWrite(filePath, getContentFn, { delay = 150 } = {})
 function getWriteQueueMetrics() { return { ...metrics, pending: pending.size }; }
 module.exports = {  }
+// ...
+
+// FILE: __tests__/sendOnce.test.js
+// ...
 // ...
 
 ===== END SUMMARY =====

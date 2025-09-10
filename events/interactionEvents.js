@@ -887,21 +887,33 @@ function attachInteractionEvents(client) {
         updateEvent(ev.id, { [clockKey]: state });
         // Re-render all clock-in messages for this event
         try {
-          const { buildClockInEmbed } = require('../utils/clockinEmbed');
-          const capacities = {
-            instance_manager: 1,
-            manager: Infinity,
-            bouncer: Infinity,
-            bartender: Infinity,
-            backup: Infinity,
-            maybe: Infinity
+          // Build embed JSON per the required template (keeps IM limited, others unlimited)
+          const fmtMentions = (arr=[]) => {
+            if (!Array.isArray(arr) || arr.length === 0) return '*None*';
+            const s = arr.map(id=>`<@${id}>`).join(', ');
+            return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
           };
-          const embed = buildClockInEmbed(ev, state.positions, capacities, { compact: true });
+          const nameSafe = ev.name || 'Event';
+          const embed = {
+            title: `🕒 Staff Clock In — ${nameSafe}`,
+            description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.',
+            color: 3447003,
+            fields: [
+              { name: '📝 Instance Manager (1 slot)', value: `${(state.positions.instance_manager||[]).length} / 1\n${fmtMentions(state.positions.instance_manager)}`, inline: false },
+              { name: '🛠️ Manager',   value: fmtMentions(state.positions.manager),   inline: true },
+              { name: '🛡️ Bouncer',   value: fmtMentions(state.positions.bouncer),   inline: true },
+              { name: '🍸 Bartender', value: fmtMentions(state.positions.bartender), inline: true },
+              { name: '🎯 Backup',    value: fmtMentions(state.positions.backup),    inline: true },
+              { name: '⏳ Maybe / Late', value: fmtMentions(state.positions.maybe), inline: false },
+              { name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
+            ],
+            footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
+          };
           for (const mid of state.messageIds || []) {
             try {
               const channel = await interaction.channel?.guild?.channels?.fetch(ev.channelId).catch(()=>null) || await interaction.client.channels.fetch(ev.channelId).catch(()=>null);
               const msg = channel && channel.messages ? await channel.messages.fetch(mid).catch(()=>null) : null;
-              if (msg) await msg.edit({ embeds:[embed] }).catch(()=>{});
+              if (msg) await msg.edit({ content: '', embeds:[embed] }).catch(()=>{});
             } catch {}
           }
         } catch {}

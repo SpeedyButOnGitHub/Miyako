@@ -420,7 +420,6 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   if (notif.isClockIn) {
     // Build staff clock-in message to match the expected template
   const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-  const { buildClockInEmbed } = require('../utils/clockinEmbed');
     // Capacities per template and standardized labels
     const POSITIONS = [
       { key:'instance_manager', emoji:'🗝️', label:'Instance Manager', cap:1, short:'IM' },
@@ -443,17 +442,51 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
         return true; // treat as success without duplication
       }
     } catch {}
-  // Build embed with unified, modern renderer
-  const capacities = POSITIONS.reduce((acc,p)=>{ acc[p.key] = p.cap; return acc; }, {});
-  const embed = buildClockInEmbed(ev, ev.__clockIn.positions, capacities, { compact: true });
+    // Helper: mention list (sanitized in testing)
+    const fmtMentions = (arr=[]) => {
+      if (!Array.isArray(arr) || arr.length === 0) return '*None*';
+      const s = arr.map(id=>`<@${id}>`).join(', ');
+      return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
+    };
+    const nameSafe = ev.name || 'Event';
+    // Build embed JSON per template
+    const embedJson = {
+      title: `🕒 Staff Clock In — ${nameSafe}`,
+      description: "Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.",
+      color: 3447003,
+      fields: [
+        {
+          name: '📝 Instance Manager (1 slot)',
+          value: `${(ev.__clockIn.positions.instance_manager||[]).length} / 1\n${fmtMentions(ev.__clockIn.positions.instance_manager)}`,
+          inline: false
+        },
+        { name: '🛠️ Manager',   value: fmtMentions(ev.__clockIn.positions.manager),   inline: true },
+        { name: '🛡️ Bouncer',   value: fmtMentions(ev.__clockIn.positions.bouncer),   inline: true },
+        { name: '🍸 Bartender', value: fmtMentions(ev.__clockIn.positions.bartender), inline: true },
+        { name: '🎯 Backup',    value: fmtMentions(ev.__clockIn.positions.backup),    inline: true },
+        { name: '⏳ Maybe / Late', value: fmtMentions(ev.__clockIn.positions.maybe), inline: false },
+        {
+          name: 'Eligible roles',
+          value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>'
+        }
+      ],
+      footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
+    };
     // Build select menu with option descriptions like "IM slots 1"
     const menu = new StringSelectMenuBuilder()
       .setCustomId(`clockin:${ev.id}:${notif.id}`)
-      .setPlaceholder('📋 Select a position')
-      .addOptions(POSITIONS.map(p => ({ label: p.label, value: p.key, description: `${p.short} slots ${p.cap}` })));
+      .setPlaceholder('📋 Select your position')
+      .addOptions([
+        { label: 'Instance Manager', value: 'instance_manager', description: '1 slot available', emoji: { name: '📝' } },
+        { label: 'Manager',          value: 'manager',                              emoji: { name: '🛠️' } },
+        { label: 'Bouncer',          value: 'bouncer',                              emoji: { name: '🛡️' } },
+        { label: 'Bartender',        value: 'bartender',                            emoji: { name: '🍸' } },
+        { label: 'Backup',           value: 'backup',                               emoji: { name: '🎯' } },
+        { label: 'Maybe / Late',     value: 'maybe',                                emoji: { name: '⏳' } }
+      ]);
   const row = new ActionRowBuilder().addComponents(menu);
   // Content intentionally empty; embed contains header/description
-  const sent = await channel.send({ content: '', embeds:[embed], components:[row] }).catch(()=>null);
+  const sent = await channel.send({ content: '', embeds:[embedJson], components:[row] }).catch(()=>null);
     if (sent && !config.testingMode) {
       notif.__skipUntil = Date.now() + 60*60*1000; // skip for an hour
       notif.lastManualTrigger = Date.now();
