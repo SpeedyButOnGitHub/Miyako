@@ -1,7 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 
-const SCHEDULES_FILE = path.resolve(__dirname, "../config/schedules.json");
+const SCHEDULES_FILE = cfgPath('schedules.json');
 
 function ensureFile() {
   const dir = path.dirname(SCHEDULES_FILE);

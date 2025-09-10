@@ -1,7 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 
-const EVENTS_FILE = path.resolve(__dirname, "../config/events.json");
+const EVENTS_FILE = cfgPath('events.json');
 
 function ensureFile() {
   const dir = path.dirname(EVENTS_FILE);

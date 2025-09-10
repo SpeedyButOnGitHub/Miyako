@@ -1,15 +1,16 @@
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 const { getCash, addCash, getTestingCash, addTestingCash } = require("./cash");
 const { config } = require("./storage");
 
-const BANK_FILE = path.resolve(__dirname, "../config/bank.json");
+const BANK_FILE = cfgPath('bank.json');
 const { enqueueWrite } = require('./writeQueue');
 
 // Persistent bank balances
 let bank = {};
 // Testing overlay (persisted separately) mirrors shape { userId: { amount } }
-const TEST_BANK_FILE = path.resolve(__dirname, "../config/testingBank.json");
+const TEST_BANK_FILE = cfgPath('testingBank.json');
 let testingBank = {};
 try {
   if (fs.existsSync(TEST_BANK_FILE)) {

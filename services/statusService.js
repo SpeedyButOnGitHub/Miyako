@@ -5,8 +5,9 @@ const path = require('path');
 const { createEmbed } = require('../utils/embeds');
 const { getRecentErrors, clearErrorLog } = require('../utils/errorUtil');
 const { CONFIG_LOG_CHANNEL } = require('../utils/logChannels');
+const { cfgPath } = require('../utils/paths');
 
-const BOT_STATUS_FILE = path.resolve(__dirname, '../config/botStatus.json');
+const BOT_STATUS_FILE = cfgPath('botStatus.json');
 
 function readLastOnline() {
   try {

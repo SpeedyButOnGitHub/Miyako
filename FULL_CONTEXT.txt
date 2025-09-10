@@ -1,5 +1,5 @@
 ===== BEGIN REPO CONTEXT =====
-Repo: Miyako  (generated: 2025-09-10T11:07:43.196Z)
+Repo: Miyako  (generated: 2025-09-10T13:06:49.904Z)
 Notes:
 - Sensitive runtime files are excluded (e.g., .env, pid/lock).
 - Sections are delimited by FILE markers and fenced code blocks.
@@ -3463,6 +3463,37 @@ function humanizeMinutes(mins) {
   return `${m} minute${m===1?'':'s'} before`;
 }
 
+// Parse delete-after input to milliseconds. Accepts:
+//  - '0', 'off', 'disable', 'none' => 0
+//  - plain number => minutes
+//  - composite durations like 1h30m, 45m, 20s
+function parseDeleteAfterMs(input) {
+  if (!input) return 0;
+  const raw = String(input).trim().toLowerCase();
+  if (["0","off","disable","disabled","none"].includes(raw)) return 0;
+  if (/^-?\d+$/.test(raw)) { const mins = Math.max(0, parseInt(raw,10)); return mins * 60000; }
+  const norm = raw.replace(/minutes?/g,'m').replace(/hours?/g,'h').replace(/hrs?/g,'h').replace(/mins?/g,'m').replace(/seconds?/g,'s').replace(/secs?/g,'s').replace(/ /g,'');
+  let durMs = null;
+  try { durMs = ms(norm); } catch { durMs = null; }
+  if (typeof durMs === 'number' && isFinite(durMs) && durMs >= 0) return Math.floor(durMs);
+  // manual composite fallback
+  const regex = /(\d+)(h|m|s)/g; let match; let total = 0; let any=false;
+  while ((match = regex.exec(norm))) { any=true; const v=parseInt(match[1],10); const u=match[2]; if (u==='h') total+=v*3600000; else if (u==='m') total+=v*60000; else total+=v*1000; }
+  if (any) return total;
+  return 0;
+}
+
+function humanizeMs(msVal) {
+  const n = Number(msVal)||0; if (n<=0) return 'Disabled';
+  const sec = Math.round(n/1000);
+  const h = Math.floor(sec/3600); const m = Math.floor((sec%3600)/60); const s = sec%60;
+  const parts = [];
+  if (h) parts.push(`${h}h`);
+  if (m) parts.push(`${m}m`);
+  if (!h && !m && s) parts.push(`${s}s`);
+  return parts.join(' ');
+}
+
 // --- Event Manager (ActiveMenus) ---
 
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -3575,7 +3606,15 @@ function buildNotifsEmbed(guild, ev) {
       }
       const chanNote = m.channelId && m.channelId !== ev.channelId ? ` <#${m.channelId}>` : '';
       const clock = m.isClockIn ? ' ⏱️' : '';
-      return `${status} [${off}]${clock}${chanNote} ${preview}`;
+      // TTL label: per-notif deleteAfterMs, else global default, clock-in always off
+      const hasOwn = Number.isFinite(m.deleteAfterMs);
+      let ttlDisp = 'off';
+      if (!m.isClockIn) {
+        if (hasOwn) ttlDisp = m.deleteAfterMs > 0 ? humanizeMs(m.deleteAfterMs) : 'off';
+        else if (config.autoMessages?.defaultDeleteMs > 0) ttlDisp = humanizeMs(config.autoMessages.defaultDeleteMs) + '*';
+      }
+      const ttlLabel = ` [TTL ${ttlDisp}]`;
+      return `${status} [${off}]${clock}${chanNote} ${preview}${ttlLabel}`;
     }).join('\n');
     safeAddField(embed, 'Messages', lines);
   } else {
@@ -3601,15 +3640,12 @@ function notifSelectRows(ev) {
 
 // Newly added: detailed auto message control rows
 function notifDetailRows(ev, notif) {
-  // Row 1: Toggle / Edit (all) / Channel / Offset / Message
+  // Row 1: Toggle / Edit (consolidated)
   const row1 = buildNavRow([
     semanticButton(notif.enabled ? 'danger' : 'success', { id: `event_notif_toggle_${ev.id}_${notif.id}`, label: notif.enabled ? 'Disable' : 'Enable', emoji: notif.enabled ? theme.emojis.disable : theme.emojis.enable }),
-    semanticButton('primary', { id: `event_notif_edit_${ev.id}_${notif.id}`, label: 'Edit', emoji: theme.emojis.edit || theme.emojis.message || '✏️' }),
-    semanticButton('nav', { id: `event_notif_edit_channel_${ev.id}_${notif.id}`, label: 'Channel', emoji: theme.emojis.channel || '🧵' }),
-    semanticButton('nav', { id: `event_notif_edit_offset_${ev.id}_${notif.id}`, label: 'Offset', emoji: '⏱️' }),
-    semanticButton('nav', { id: `event_notif_edit_msg_${ev.id}_${notif.id}`, label: 'Msg', emoji: theme.emojis.message || '💬' })
+    semanticButton('primary', { id: `event_notif_edit_${ev.id}_${notif.id}`, label: 'Edit', emoji: theme.emojis.edit || theme.emojis.message || '✏️' })
   ]);
-  // Row 2: Trigger / Delete / Back
+  // Row 2: Trigger / Delete
   const row2 = buildNavRow([
     semanticButton('success', { id: `event_notif_trigger_${ev.id}_${notif.id}`, label: 'Trigger', emoji: theme.emojis.enable || '✅' }),
     semanticButton('danger', { id: `event_notif_delete_${ev.id}_${notif.id}`, label: 'Delete', emoji: theme.emojis.delete || '🗑️' })
@@ -3627,6 +3663,8 @@ function buildNotifDetailEmbed(guild, ev, notif) {
   safeAddField(embed, 'Enabled', notif.enabled? 'Yes':'No', true);
   safeAddField(embed, 'Channel', notif.channelId ? `<#${notif.channelId}>` + (notif.channelId===ev.channelId ? ' (event)' : '') : `<#${ev.channelId}> (event)`, true);
   safeAddField(embed, 'Clock-In', notif.isClockIn ? 'Yes' : 'No', true);
+  const ttlInfo = Number.isFinite(notif.deleteAfterMs) ? humanizeMs(notif.deleteAfterMs) : (config.autoMessages?.defaultDeleteMs ? `${humanizeMs(config.autoMessages.defaultDeleteMs)} (default)` : 'Disabled');
+  safeAddField(embed, 'Delete after', ttlInfo, true);
   const previewVal = (()=>{ if (notif.messageJSON){ if (notif.messageJSON.content) return notif.messageJSON.content.slice(0,200)||'(empty)'; if (Array.isArray(notif.messageJSON.embeds)&&notif.messageJSON.embeds.length) return (notif.messageJSON.embeds[0].title||notif.messageJSON.embeds[0].description||'(embed)').toString().slice(0,200); return 'JSON'; } return (notif.message||'').slice(0,200)||'(empty)';})();
   safeAddField(embed, 'Preview', previewVal);
   applyFooterWithPagination(embed, guild, { page:1, totalPages:1, extra:'Auto Msg Detail' });
@@ -3806,6 +3844,36 @@ function sanitizeMentionsForTesting(content) {
   return content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
 }
 
+// Apply timestamp placeholders to JSON payload fields similarly to scheduler
+function applyPlaceholdersToJsonPayload(payload, ev) {
+  if (!payload || typeof payload !== 'object') return payload;
+  const { applyTimestampPlaceholders } = require('../utils/timestampPlaceholders');
+  const repl = (s) => applyTimestampPlaceholders(String(s), ev);
+  const sanitize = (s) => (config.testingMode ? String(s).replace(/<@&?\d+>/g, m=>`\`${m}\``) : s);
+  const fixStr = (s) => sanitize(repl(s));
+  const copy = { ...payload };
+  if (typeof copy.content === 'string') copy.content = fixStr(copy.content).slice(0, 2000);
+  if (Array.isArray(copy.embeds)) {
+    copy.embeds = copy.embeds.map(e => {
+      if (!e || typeof e !== 'object') return e;
+      const ee = { ...e };
+      if (typeof ee.title === 'string') ee.title = fixStr(ee.title);
+      if (typeof ee.description === 'string') ee.description = fixStr(ee.description);
+      if (ee.footer && typeof ee.footer.text === 'string') ee.footer = { ...ee.footer, text: fixStr(ee.footer.text) };
+      if (ee.author && typeof ee.author.name === 'string') ee.author = { ...ee.author, name: fixStr(ee.author.name) };
+      if (Array.isArray(ee.fields)) ee.fields = ee.fields.map(f => {
+        if (!f || typeof f !== 'object') return f;
+        const ff = { ...f };
+        if (typeof ff.name === 'string') ff.name = fixStr(ff.name).slice(0, 256);
+        if (typeof ff.value === 'string') ff.value = fixStr(ff.value).slice(0, 1024);
+        return ff;
+      });
+      return ee;
+    });
+  }
+  return copy;
+}
+
 async function manualTriggerAutoMessage(interaction, ev, notif) {
   const { CONFIG_LOG_CHANNEL } = require('../utils/logChannels');
   const targetChannelId = config.testingMode ? CONFIG_LOG_CHANNEL : (notif.channelId || ev.channelId);
@@ -3854,7 +3922,7 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     // Build embed JSON per template
     const embedJson = {
       title: `🕒 Staff Clock In — ${nameSafe}`,
-      description: "Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.",
+      description: "Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.",
       color: 3447003,
       fields: [
         {
@@ -3893,6 +3961,7 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
       notif.__skipUntil = Date.now() + 60*60*1000; // skip for an hour
       notif.lastManualTrigger = Date.now();
       ev.__clockIn.lastSentTs = Date.now();
+      ev.__clockIn.channelId = channel.id;
       updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn });
     }
     return !!sent;
@@ -3900,18 +3969,42 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   // If a JSON payload exists, prefer its content exclusively (even if empty),
   // and do NOT fall back to the raw JSON string saved in notif.message — otherwise
   // the JSON body gets echoed as plain text alongside the embed/components.
-  let content = '';
+  let payload;
   if (notif.messageJSON && typeof notif.messageJSON === 'object') {
-    content = notif.messageJSON.content || '';
+    const base = { ...notif.messageJSON };
+    if (base.embeds && !Array.isArray(base.embeds)) base.embeds = [base.embeds];
+    // Ensure there's some content fallback for empty JSON
+    if (!base.content && !base.embeds) base.content = notif.message || `Auto message (${ev.name})`;
+    payload = applyPlaceholdersToJsonPayload(base, ev);
   } else {
-    content = notif.message || '';
+    let content = notif.message || '';
+    content = applyTimestampPlaceholders(content, ev);
+    if (config.testingMode) content = sanitizeMentionsForTesting(content);
+    if (!content) content = `Auto message (${ev.name})`;
+    payload = { content };
   }
-  content = applyTimestampPlaceholders(content, ev);
-  if (config.testingMode) content = sanitizeMentionsForTesting(content);
-  if (!content) content = `Auto message (${ev.name})`;
-  const payload = notif.messageJSON ? { ...notif.messageJSON, content } : { content };
   if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
   const sent = await channel.send(payload).catch(()=>null);
+  // Optional auto-delete (non-testing, non-clock-in)
+  try {
+    const delMs = Number(notif.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
+    if (!config.testingMode && sent && delMs > 0) {
+      setTimeout(() => { try { sent.delete().catch(()=>{}); } catch {} }, delMs);
+    }
+  } catch {}
+  // Track for later refresh
+  try {
+    if (sent && sent.id) {
+      const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? { ...ev.__notifMsgs } : {};
+      const rec = map[notif.id] && typeof map[notif.id]==='object' ? { ...map[notif.id] } : { channelId: channel.id, ids: [] };
+      rec.channelId = channel.id;
+      rec.ids = Array.isArray(rec.ids) ? rec.ids : [];
+      rec.ids.push(sent.id);
+      if (rec.ids.length > 20) rec.ids = rec.ids.slice(-20);
+      map[notif.id] = rec;
+      updateEvent(ev.id, { __notifMsgs: map });
+    }
+  } catch {}
   if (sent && !config.testingMode) {
     notif.__skipUntil = Date.now() + 60*60*1000;
     notif.lastManualTrigger = Date.now();
@@ -4014,10 +4107,14 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
   if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
+  // Compute a suggested TTL string based on current value (per-notif or default)
+  const currentTTL = Number.isFinite(notif.deleteAfterMs) ? notif.deleteAfterMs : (config.autoMessages?.defaultDeleteMs || 0);
+  const suggestTTL = currentTTL<=0 ? '0' : (currentTTL%3600000===0 ? `${Math.floor(currentTTL/3600000)}h` : (currentTTL%60000===0 ? `${Math.floor(currentTTL/60000)}m` : `${Math.max(1,Math.floor(currentTTL/1000))}s`));
     const modal = new ModalBuilder().setCustomId(`notif_edit_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Auto Message')
       .addComponents(
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setValue(notif.channelId||'')),
-  new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('offset').setLabel('When before start? (e.g. 10m, 2h)').setStyle(TextInputStyle.Short).setRequired(true).setValue(notif.offsetMinutes? `${notif.offsetMinutes}m` : 'start')),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('offset').setLabel('When before start? (e.g. 10m, 2h)').setStyle(TextInputStyle.Short).setRequired(true).setValue(notif.offsetMinutes? `${notif.offsetMinutes}m` : 'start')),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deleteafter').setLabel('Delete after (e.g. 10m, 2h, 0=disable)').setStyle(TextInputStyle.Short).setRequired(true).setValue(suggestTTL)),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message / JSON').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(notif.message || (notif.messageJSON? JSON.stringify(notif.messageJSON,null,2):'')))
       );
     await interaction.showModal(modal); return;
@@ -4096,6 +4193,18 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
     const modal = new ModalBuilder().setCustomId(`notif_msg_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Auto Message')
       .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message / JSON').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(notif.message || (notif.messageJSON? JSON.stringify(notif.messageJSON,null,2):''))));
+    await interaction.showModal(modal); return;
+  }
+  if (customId.startsWith('event_notif_edit_ttl_')) {
+    const parts = customId.split('_');
+    const evId = parts[4]; const notifId = parts[5];
+    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
+    const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
+    if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
+    const current = Number.isFinite(notif.deleteAfterMs) ? notif.deleteAfterMs : (config.autoMessages?.defaultDeleteMs || 0);
+    const suggest = current<=0 ? '0' : (current%3600000===0 ? `${Math.floor(current/3600000)}h` : (current%60000===0 ? `${Math.floor(current/60000)}m` : `${Math.max(1,Math.floor(current/1000))}s`));
+    const modal = new ModalBuilder().setCustomId(`notif_deleteafter_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Delete After')
+      .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deleteafter').setLabel('Delete after (e.g. 10m, 2h, 0=disable)').setStyle(TextInputStyle.Short).setRequired(true).setValue(suggest)));
     await interaction.showModal(modal); return;
   }
   if (customId.startsWith('event_notif_delete_')) {
@@ -4247,6 +4356,7 @@ async function handleEventEditModal(interaction) {
 async function handleEventNotificationModal(interaction) {
   if (!interaction.isModalSubmit()) return;
   if (!/^(notif_(add|offset|msg|channel|edit)_modal_)/.test(interaction.customId)) return;
+  if (!/^(notif_(add|offset|msg|channel|edit|deleteafter)_modal_)/.test(interaction.customId)) return;
   const parts = interaction.customId.split('_');
   // Patterns:
   // notif_add_modal_<eventId>_<managerMessageId>
@@ -4316,15 +4426,42 @@ async function handleEventNotificationModal(interaction) {
   if (cleanedChan && !/^\d{1,32}$/.test(cleanedChan)) return interaction.reply({ content:'❌ Invalid channel id.', flags:1<<6 });
     const offsetRaw = interaction.fields.getTextInputValue('offset');
     let offset = parseOffsetInput(offsetRaw);
+  const deleteAfterRaw = interaction.fields.getTextInputValue('deleteafter');
+  const deleteAfterMs = parseDeleteAfterMs(deleteAfterRaw);
     const msgRaw = interaction.fields.getTextInputValue('message');
     let messageJSON = null; const healed = healJSON(msgRaw); if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
     const entry = list[idx];
-    entry.offsetMinutes = offset;
-    entry.message = msgRaw;
-    entry.messageJSON = messageJSON;
-    if (cleanedChan) entry.channelId = cleanedChan; else delete entry.channelId;
-    updatedEv = updateEvent(ev.id, { autoMessages: list });
-  await interaction.reply({ content:`✅ Auto message updated.`, flags:1<<6 }).catch(()=>{});
+    const newList = list.map(entry => {
+      const e = { ...entry };
+      e.offsetMinutes = offset;
+      e.message = msgRaw;
+      e.messageJSON = messageJSON;
+      e.deleteAfterMs = deleteAfterMs;
+      if (cleanedChan) e.channelId = cleanedChan; else delete e.channelId;
+      return e;
+    });
+    updatedEv = updateEvent(ev.id, { autoMessages: newList });
+    console.log(`[Events] Updated all auto messages for event ${ev.id} (${ev.name}).`);
+    await interaction.reply({ content:`✅ Auto messages updated for this event.`, flags:1<<6 }).catch(()=>{});
+  // Refresh previously tracked auto messages for the event (and clock-in embeds)
+  try { await refreshTrackedAutoMessages(interaction.client, updatedEv); } catch {}
+  } else if (kind==='deleteafter') {
+    // Modal id pattern: notif_deleteafter_modal_<eventId>_<notifId>_<managerMessageId>
+    const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
+    const idx = list.findIndex(n=>String(n.id)===String(notifId));
+    if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
+    const raw = interaction.fields.getTextInputValue('deleteafter');
+    const msVal = parseDeleteAfterMs(raw);
+    list[idx].deleteAfterMs = msVal;
+    const updated = updateEvent(ev.id, { autoMessages: list });
+    await interaction.reply({ content:`✅ Delete-after ${msVal>0? 'set to '+humanizeMs(msVal):'disabled'}.`, flags:1<<6 }).catch(()=>{});
+    // Try to refresh the manager message if present
+    if (managerMessageId) {
+      try {
+        const mgrMsg = await interaction.channel.messages.fetch(managerMessageId).catch(()=>null);
+        if (mgrMsg) await mgrMsg.edit({ embeds:[buildNotifDetailEmbed(interaction.guild, updated, list[idx])], components: notifDetailRows(updated, list[idx]) }).catch(()=>{});
+      } catch {}
+    }
   }
   if (managerMessageId && updatedEv) {
     try {
@@ -4343,7 +4480,72 @@ async function handleEventNotificationModal(interaction) {
   }
 }
 
-module.exports = { handleScheduleCommand, handleScheduleModal, handleEventCreateModal, handleEventEditModal, handleEventNotificationModal, ensureAnchor, manualTriggerAutoMessage };
+// Refresh helper: edits recently-tracked messages to match the latest event/notif definitions
+async function refreshTrackedAutoMessages(client, ev) {
+  try {
+    // Regular auto messages
+    const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? ev.__notifMsgs : null;
+    if (map && Array.isArray(ev.autoMessages)) {
+      for (const notif of ev.autoMessages) {
+        const rec = map[notif.id];
+        if (!rec || !rec.channelId || !Array.isArray(rec.ids) || rec.ids.length===0) continue;
+        const channel = await client.channels.fetch(rec.channelId).catch(()=>null);
+        if (!channel || !channel.messages) continue;
+        // Build fresh payload
+        let payload;
+        if (notif.messageJSON && typeof notif.messageJSON==='object') {
+          const base = { ...notif.messageJSON };
+          if (base.embeds && !Array.isArray(base.embeds)) base.embeds = [base.embeds];
+          if (!base.content && !base.embeds) base.content = notif.message || `Auto message (${ev.name})`;
+          payload = applyPlaceholdersToJsonPayload(base, ev);
+        } else {
+          const { applyTimestampPlaceholders } = require('../utils/timestampPlaceholders');
+          let content = notif.message || `Auto message (${ev.name})`;
+          content = applyTimestampPlaceholders(content, ev);
+          if (config.testingMode) content = sanitizeMentionsForTesting(content);
+          payload = { content };
+        }
+        // Edit last few tracked messages
+        for (const mid of rec.ids.slice(-3)) {
+          try { const msg = await channel.messages.fetch(mid).catch(()=>null); if (msg) await msg.edit(payload).catch(()=>{}); } catch {}
+        }
+      }
+    }
+    // Staff clock-in messages
+    if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length) {
+      const chId = ev.__clockIn.channelId || ev.channelId;
+      const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
+      if (channel && channel.messages) {
+        const fmtMentions = (arr=[]) => {
+          if (!Array.isArray(arr) || arr.length === 0) return '*None*';
+          const s = arr.map(id=>`<@${id}>`).join(', ');
+          return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
+        };
+        const nameSafe = ev.name || 'Event';
+        const embed = {
+          title: `🕒 Staff Clock In — ${nameSafe}`,
+          description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
+          color: 3447003,
+          fields: [
+            { name: '📝 Instance Manager (1 slot)', value: `${(ev.__clockIn.positions?.instance_manager||[]).length} / 1\n${fmtMentions(ev.__clockIn.positions?.instance_manager)}`, inline: false },
+            { name: '🛠️ Manager',   value: fmtMentions(ev.__clockIn.positions?.manager),   inline: true },
+            { name: '🛡️ Bouncer',   value: fmtMentions(ev.__clockIn.positions?.bouncer),   inline: true },
+            { name: '🍸 Bartender', value: fmtMentions(ev.__clockIn.positions?.bartender), inline: true },
+            { name: '🎯 Backup',    value: fmtMentions(ev.__clockIn.positions?.backup),    inline: true },
+            { name: '⏳ Maybe / Late', value: fmtMentions(ev.__clockIn.positions?.maybe), inline: false },
+            { name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
+          ],
+          footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
+        };
+        for (const mid of ev.__clockIn.messageIds.slice(-3)) {
+          try { const msg = await channel.messages.fetch(mid).catch(()=>null); if (msg) await msg.edit({ content:'', embeds:[embed] }).catch(()=>{}); } catch {}
+        }
+      }
+    }
+  } catch {}
+}
+
+module.exports = { handleScheduleCommand, handleScheduleModal, handleEventCreateModal, handleEventEditModal, handleEventNotificationModal, ensureAnchor, manualTriggerAutoMessage, refreshTrackedAutoMessages };
 
 ```
 
@@ -4900,6 +5102,9 @@ module.exports = { handleTestCommand };
   "maxPurgeLimit": 100,
   "blacklistedChannels": [],
   "moderatorLogChannelId": null,
+  "autoMessages": {
+    "defaultDeleteMs": 0
+  },
   "testingWarnings": {
     "349282473085239298": [
       {
@@ -5093,48 +5298,52 @@ module.exports = {
           "id": "2",
           "offsetMinutes": 1200,
           "enabled": true,
-          "message": "{\n  \"content\": \"\",\n  \"embeds\": [\n    {\n      \"title\": \"🕒 Staff Clock-In — {{EVENT_NAME}}\",\n      \"description\": \"🕒 Staff Clock-In — {{EVENT_NAME}}\\n\\nSelect a position from the menu below. One slot per staff (auto-updates).\",\n      \"color\": 5793266,\n      \"fields\": [\n        { \"name\": \"🗝️ Instance Manager (0/1)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"🛠️ Manager (0/5)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"🛡️ Bouncer (0/10)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"🍸 Bartender (0/15)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"🎯 Backup (0/20)\", \"value\": \"—\", \"inline\": true },\n        { \"name\": \"⏳ Maybe/Late (0/50)\", \"value\": \"—\", \"inline\": true }\n      ],\n      \"footer\": { \"text\": \"\" }\n    }\n  ],\n  \"components\": [\n    {\n      \"type\": 1,\n      \"components\": [\n        {\n          \"type\": 3,\n            \"custom_id\": \"clockin:{{EVENT_ID}}:{{AUTO_MESSAGE_ID}}\",\n            \"placeholder\": \"📋 Select a position\",\n            \"options\": [\n              { \"label\": \"Instance Manager\", \"value\": \"instance_manager\", \"description\": \"IM slots 1\" },\n              { \"label\": \"Manager\", \"value\": \"manager\", \"description\": \"M slots 5\" },\n              { \"label\": \"Bouncer\", \"value\": \"bouncer\", \"description\": \"B slots 10\" },\n              { \"label\": \"Bartender\", \"value\": \"bartender\", \"description\": \"BT slots 15\" },\n              { \"label\": \"Backup\", \"value\": \"backup\", \"description\": \"BK slots 20\" },\n              { \"label\": \"Maybe/Late\", \"value\": \"maybe\", \"description\": \"? slots 50\" }\n            ]\n        }\n      ]\n    }\n  ]\n}",
+          "message": "{\n  \"content\": \"\",\n  \"embeds\": [\n    {\n      \"title\": \"🕒 Staff Clock In — Midnight Bar\",\n      \"description\": \"Staff clock-in for: https://discord.com/channels/1232701768316620840/1232701768832516098/1414992903914258454\\nPlease select your role below to clock in.\\n\\n**Instance Manager** is responsible for opening, managing, and closing an instance.\",\n      \"color\": 3447003,\n      \"fields\": [\n        {\n          \"name\": \"📝 Instance Manager (1 slot)\",\n          \"value\": \"0 / 1\\n\",\n          \"inline\": false\n        },\n        {\n          \"name\": \"🛠️ Manager\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"🛡️ Bouncer\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"🍸 Bartender\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"🎯 Backup\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"⏳ Maybe / Late\",\n          \"value\": \"*None*\",\n          \"inline\": false\n        },\n        {\n          \"name\": \"Eligable roles\",\n          \"value\": \"<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>\"\n        }\n      ],\n      \"footer\": {\n        \"text\": \"Late Night Hours | Staff clock in for the Midnight Bar\"\n      }\n    }\n  ],\n  \"components\": [\n    {\n      \"type\": 1,\n      \"components\": [\n        {\n          \"type\": 3,\n          \"custom_id\": \"clockin:{{EVENT_ID}}:{{AUTO_MESSAGE_ID}}\",\n          \"placeholder\": \"📋 Select your position\",\n          \"options\": [\n            {\n              \"label\": \"Instance Manager\",\n              \"value\": \"instance_manager\",\n              \"description\": \"1 slot available\",\n              \"emoji\": {\n                \"name\": \"📝\"\n              }\n            },\n            {\n              \"label\": \"Manager\",\n              \"value\": \"manager\",\n              \"emoji\": {\n                \"name\": \"🛠️\"\n              }\n            },\n            {\n              \"label\": \"Bouncer\",\n              \"value\": \"bouncer\",\n              \"emoji\": {\n                \"name\": \"🛡️\"\n              }\n            },\n            {\n              \"label\": \"Bartender\",\n              \"value\": \"bartender\",\n              \"emoji\": {\n                \"name\": \"🍸\"\n              }\n            },\n            {\n              \"label\": \"Backup\",\n              \"value\": \"backup\",\n              \"emoji\": {\n                \"name\": \"🎯\"\n              }\n            },\n            {\n              \"label\": \"Maybe / Late\",\n              \"value\": \"maybe\",\n              \"emoji\": {\n                \"name\": \"⏳\"\n              }\n            }\n          ],\n          \"flows\": {\n            \"maybe\": {\n              \"actions\": [\n                {\n                  \"type\": 0\n                }\n              ]\n            }\n          }\n        }\n      ]\n    }\n  ]\n}",
           "messageJSON": {
             "content": "",
             "embeds": [
               {
-                "title": "🕒 Staff Clock-In — {{EVENT_NAME}}",
-                "description": "🕒 Staff Clock-In — {{EVENT_NAME}}\n\nSelect a position from the menu below. One slot per staff (auto-updates).",
-                "color": 5793266,
+                "title": "🕒 Staff Clock In — Midnight Bar",
+                "description": "Staff clock-in for: https://discord.com/channels/1232701768316620840/1232701768832516098/1414992903914258454\nPlease select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.",
+                "color": 3447003,
                 "fields": [
                   {
-                    "name": "🗝️ Instance Manager (0/1)",
-                    "value": "—",
+                    "name": "📝 Instance Manager (1 slot)",
+                    "value": "0 / 1\n",
+                    "inline": false
+                  },
+                  {
+                    "name": "🛠️ Manager",
+                    "value": "*None*",
                     "inline": true
                   },
                   {
-                    "name": "🛠️ Manager (0/5)",
-                    "value": "—",
+                    "name": "🛡️ Bouncer",
+                    "value": "*None*",
                     "inline": true
                   },
                   {
-                    "name": "🛡️ Bouncer (0/10)",
-                    "value": "—",
+                    "name": "🍸 Bartender",
+                    "value": "*None*",
                     "inline": true
                   },
                   {
-                    "name": "🍸 Bartender (0/15)",
-                    "value": "—",
+                    "name": "🎯 Backup",
+                    "value": "*None*",
                     "inline": true
                   },
                   {
-                    "name": "🎯 Backup (0/20)",
-                    "value": "—",
-                    "inline": true
+                    "name": "⏳ Maybe / Late",
+                    "value": "*None*",
+                    "inline": false
                   },
                   {
-                    "name": "⏳ Maybe/Late (0/50)",
-                    "value": "—",
-                    "inline": true
+                    "name": "Eligable roles",
+                    "value": "<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>"
                   }
                 ],
                 "footer": {
-                  "text": ""
+                  "text": "Late Night Hours | Staff clock in for the Midnight Bar"
                 }
               }
             ],
@@ -5145,39 +5354,61 @@ module.exports = {
                   {
                     "type": 3,
                     "custom_id": "clockin:{{EVENT_ID}}:{{AUTO_MESSAGE_ID}}",
-                    "placeholder": "📋 Select a position",
+                    "placeholder": "📋 Select your position",
                     "options": [
                       {
                         "label": "Instance Manager",
                         "value": "instance_manager",
-                        "description": "IM slots 1"
+                        "description": "1 slot available",
+                        "emoji": {
+                          "name": "📝"
+                        }
                       },
                       {
                         "label": "Manager",
                         "value": "manager",
-                        "description": "M slots 5"
+                        "emoji": {
+                          "name": "🛠️"
+                        }
                       },
                       {
                         "label": "Bouncer",
                         "value": "bouncer",
-                        "description": "B slots 10"
+                        "emoji": {
+                          "name": "🛡️"
+                        }
                       },
                       {
                         "label": "Bartender",
                         "value": "bartender",
-                        "description": "BT slots 15"
+                        "emoji": {
+                          "name": "🍸"
+                        }
                       },
                       {
                         "label": "Backup",
                         "value": "backup",
-                        "description": "BK slots 20"
+                        "emoji": {
+                          "name": "🎯"
+                        }
                       },
                       {
-                        "label": "Maybe/Late",
+                        "label": "Maybe / Late",
                         "value": "maybe",
-                        "description": "? slots 50"
+                        "emoji": {
+                          "name": "⏳"
+                        }
                       }
-                    ]
+                    ],
+                    "flows": {
+                      "maybe": {
+                        "actions": [
+                          {
+                            "type": 0
+                          }
+                        ]
+                      }
+                    }
                   }
                 ]
               }
@@ -5185,13 +5416,22 @@ module.exports = {
           },
           "channelId": "1376497592871030865",
           "isClockIn": false,
-          "__skipUntil": 1757505762468,
-          "lastManualTrigger": 1757502162468
+          "__skipUntil": 1757508587804,
+          "lastManualTrigger": 1757504987804
         }
       ],
       "nextAutoId": 3,
       "__auto_2_6:00-10:00": 1757455214645,
-      "__auto_1_6:00-10:00": 1757476809648
+      "__auto_1_6:00-10:00": 1757476809648,
+      "__notifMsgs": {
+        "2": {
+          "channelId": "1376497592871030865",
+          "ids": [
+            "1415303188491538564",
+            "1415303239468843131"
+          ]
+        }
+      }
     }
   ]
 }
@@ -5336,6 +5576,8 @@ function attachInteractionEvents(client) {
   if (client.__interactionListenerAttached) return;
   client.__interactionListenerAttached = true;
   client.on("interactionCreate", async (interaction) => {
+  // Attach command logging wrappers to interaction reply/edit methods
+  try { require('../utils/commandLogger').instrumentInteractionLogging(interaction); } catch {}
     try {
       // Route persistent session UIs first
   if (interaction.isButton() || interaction.isStringSelectMenu()) {
@@ -6144,14 +6386,25 @@ function attachInteractionEvents(client) {
         const parts = interaction.customId.split(':'); // clockin:eventId:notifId
         const evId = parts[1];
         const notifId = parts[2]; // not used yet for constraints
-        const ev = getEvent(evId);
-  if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
+        let ev = getEvent(evId);
+        if (!ev) {
+          try { const { getEvent: ge } = require('../utils/eventsStorage'); ev = ge(evId); } catch {}
+        }
+        // Fallback: try to resolve by message id if the event id was not found (e.g., after restart)
+        if (!ev && interaction.message?.id) {
+          try {
+            const { getEvents } = require('../utils/eventsStorage');
+            const all = getEvents();
+            ev = all.find(e => Array.isArray(e.__clockIn?.messageIds) && e.__clockIn.messageIds.includes(interaction.message.id)) || null;
+          } catch {}
+        }
+        if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
         const member = interaction.member;
   if (!member) { await interaction.reply({ content:'Member not found.', flags:1<<6 }).catch(()=>{}); return; }
         const choice = interaction.values[0];
         const ROLE_REQUIRED = '1375958480380493844';
         const POS_META = {
-          'instance_manager': { label: 'Instance Master', max:1, role: ROLE_REQUIRED },
+          'instance_manager': { label: 'Instance Manager', max:1, role: ROLE_REQUIRED },
           'manager': { label: 'Manager', max:Infinity, role: ROLE_REQUIRED },
           'bouncer': { label: 'Bouncer', max:Infinity },
           'bartender': { label: 'Bartender', max:Infinity },
@@ -6187,7 +6440,7 @@ function attachInteractionEvents(client) {
           const nameSafe = ev.name || 'Event';
           const embed = {
             title: `🕒 Staff Clock In — ${nameSafe}`,
-            description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.',
+            description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
             color: 3447003,
             fields: [
               { name: '📝 Instance Manager (1 slot)', value: `${(state.positions.instance_manager||[]).length} / 1\n${fmtMentions(state.positions.instance_manager)}`, inline: false },
@@ -6200,9 +6453,11 @@ function attachInteractionEvents(client) {
             ],
             footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
           };
+          // Choose a channel: prefer stored clock-in channel, then event channel, finally current interaction channel
+          const chId = (ev.__clockIn && ev.__clockIn.channelId) || ev.channelId || interaction.channelId;
+          const channel = chId ? (await interaction.client.channels.fetch(chId).catch(()=>null)) : null;
           for (const mid of state.messageIds || []) {
             try {
-              const channel = await interaction.channel?.guild?.channels?.fetch(ev.channelId).catch(()=>null) || await interaction.client.channels.fetch(ev.channelId).catch(()=>null);
               const msg = channel && channel.messages ? await channel.messages.fetch(mid).catch(()=>null) : null;
               if (msg) await msg.edit({ content: '', embeds:[embed] }).catch(()=>{});
             } catch {}
@@ -6337,40 +6592,40 @@ function attachMessageEvents(client) {
   let _logCtx = null; let _sentMsg = null; let _expected = null;
   try {
       if (command === "help") {
-    _logCtx = logStart({ name: 'help', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'help', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleHelpCommand(client, message); markCommand();
       } else if (["mute", "unmute", "timeout", "untimeout", "ban", "kick", "warn", "removewarn"].includes(command)) {
         if (!checkPolicy(command, message)) return;
         if (!cdOk(message.author.id, command, 2500)) return;
-    _logCtx = logStart({ name: command, userId: message.author.id, channelId: message.channelId, params: { args } });
+    _logCtx = logStart({ name: command, userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
     _sentMsg = await handleModerationCommands(client, message, command, args); markCommand();
       } else if (command === 'purge' || command === 'clean') {
         if (!checkPolicy('purge', message)) return;
         if (!cdOk(message.author.id, 'purge', 5000)) return;
-    _logCtx = logStart({ name: 'purge', userId: message.author.id, channelId: message.channelId, params: { args } });
+    _logCtx = logStart({ name: 'purge', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
     _sentMsg = await handlePurgeCommand(client, message, args); markCommand();
       } else if (["snipe", "s", "ds"].includes(command)) {
-    _logCtx = logStart({ name: 'snipe', userId: message.author.id, channelId: message.channelId, params: { alias: command, args } });
+    _logCtx = logStart({ name: 'snipe', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, alias: command, args } });
     _sentMsg = await handleSnipeCommands(client, message, command, args); markCommand();
       } else if (command === "warnings" || command === "warns") {
-    _logCtx = logStart({ name: 'warnings', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'warnings', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleWarningsCommand(client, message); markCommand();
       } else if (command === "config") {
         if (!checkPolicy('config', message)) return;
-    _logCtx = logStart({ name: 'config', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'config', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleMessageCreate(client, message); markCommand();
       } else if (command === "level" || command === "rank") {
-    _logCtx = logStart({ name: 'rank', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'rank', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleRankCommand(client, message); markCommand();
       } else if (command === "profile" || command === "p") {
-    _logCtx = logStart({ name: 'profile', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'profile', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleProfileCommand(client, message); markCommand();
       } else if (command === "test") {
         if (!checkPolicy('test', message)) return;
-    _logCtx = logStart({ name: 'test', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'test', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleTestCommand(client, message); markCommand();
       } else if (command === "leaderboard" || command === "lb") {
-    _logCtx = logStart({ name: 'leaderboard', userId: message.author.id, channelId: message.channelId, params: {} });
+    _logCtx = logStart({ name: 'leaderboard', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
     _sentMsg = await handleLeaderboardCommand(client, message); markCommand();
       } else if (command === "restart") {
         if (message.author.id !== process.env.OWNER_ID) return;
@@ -6402,29 +6657,30 @@ function attachMessageEvents(client) {
         if (message.author.id !== process.env.OWNER_ID) return;
         await message.reply("🛑 Stopping bot...");
         process.exit(0);
-      } else if (command === "schedule") {
-  _logCtx = logStart({ name: 'schedule', userId: message.author.id, channelId: message.channelId, params: {} });
+    } else if (command === "schedule") {
+  _logCtx = logStart({ name: 'schedule', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleScheduleCommand(client, message);
       } else if (command === "scripts") {
-  _logCtx = logStart({ name: 'scripts', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'scripts', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleScriptsCommand(client, message); markCommand();
       } else if (command === "cash") {
-  _logCtx = logStart({ name: 'cash', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'cash', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleCashCommand(client, message); markCommand();
       } else if (command === "balance" || command === "bal") {
-  _logCtx = logStart({ name: 'balance', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'balance', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleBalanceCommand(client, message); markCommand();
       } else if (command === "diag" || command === "diagnostics") {
-  _logCtx = logStart({ name: 'diagnostics', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'diagnostics', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleDiagnosticsCommand(client, message); markCommand();
       } else if (command === 'metrics') {
-  _logCtx = logStart({ name: 'metrics', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'metrics', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleMetricsCommand(client, message); markCommand();
   } else if (command === 'clockinstate') {
-  _logCtx = logStart({ name: 'clockinstate', userId: message.author.id, channelId: message.channelId, params: {} });
+  _logCtx = logStart({ name: 'clockinstate', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
   _sentMsg = await handleClockInStateCommand(client, message); markCommand();
   } else if (command === 'errors' || command === 'err') {
         if (message.author.id !== process.env.OWNER_ID) return;
+  _logCtx = logStart({ name: 'errors', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
         // Accept patterns: .errors, .errors 25, .errors embed 25, .errors 25 embed
         const embedMode = args.some(a => a.toLowerCase() === 'embed');
         const numArg = args.find(a => /^(\d+)$/.test(a));
@@ -6440,7 +6696,8 @@ function attachMessageEvents(client) {
         if (!embedMode) {
           const lines = rows.map(r => `#${r.idx} ${r.ts.split(' ')[1]} [${r.scope}] ${r.first}`);
           const content = '🧾 Recent Errors (newest last)\n' + lines.join('\n');
-          return void message.reply({ content: content.slice(0, 1900), allowedMentions: { repliedUser: false } });
+          _sentMsg = await message.reply({ content: content.slice(0, 1900), allowedMentions: { repliedUser: false } });
+          return;
         }
         // Embed mode
         const { createEmbed, safeAddField } = require('../utils/embeds');
@@ -6461,23 +6718,25 @@ function attachMessageEvents(client) {
           semanticButton('nav', { id: 'err_next', label: 'Next', enabled: page < totalPages-1 }),
           semanticButton('primary', { id: 'err_refresh', label: 'Refresh' })
         ]);
-        const sent = await message.reply({ embeds: [buildPage(0)], components: [row(0)], allowedMentions: { repliedUser: false } });
-        ActiveMenus.registerMessage(sent, { type: 'errors', userId: message.author.id, data: { page: 0, limit } });
+  _sentMsg = await message.reply({ embeds: [buildPage(0)], components: [row(0)], allowedMentions: { repliedUser: false } });
+  ActiveMenus.registerMessage(_sentMsg, { type: 'errors', userId: message.author.id, data: { page: 0, limit } });
       } else if (command === 'clearerrors' || command === 'cerr') {
         if (message.author.id !== process.env.OWNER_ID) return;
         clearErrorLog();
-        await message.reply({ content: '🧹 Error log cleared.', allowedMentions: { repliedUser: false } });
+  _logCtx = logStart({ name: 'clearerrors', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
+  _sentMsg = await message.reply({ content: '🧹 Error log cleared.', allowedMentions: { repliedUser: false } });
       } else if (command === 'errdetail') {
         if (message.author.id !== process.env.OWNER_ID) return;
         const idx = Number(args[0]);
-        if (!Number.isInteger(idx)) return message.reply({ content: 'Provide an index from .errors list.', allowedMentions:{repliedUser:false}});
+  _logCtx = logStart({ name: 'errdetail', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
+  if (!Number.isInteger(idx)) { _sentMsg = await message.reply({ content: 'Provide an index from .errors list.', allowedMentions:{repliedUser:false}}); return; }
         const full = getRecentErrors(100);
-        if (idx < 0 || idx >= full.length) return message.reply({ content: 'Index out of range.', allowedMentions:{repliedUser:false}});
+  if (idx < 0 || idx >= full.length) { _sentMsg = await message.reply({ content: 'Index out of range.', allowedMentions:{repliedUser:false}}); return; }
         const entry = full[idx];
         const { createEmbed, addChunkedField } = require('../utils/embeds');
         const embed = createEmbed({ title: `Error #${idx} [${entry.scope}]`, description: new Date(entry.ts).toISOString(), color: 'danger' });
         addChunkedField(embed, 'Stack / Message', entry.message, 950);
-        await message.reply({ embeds:[embed], allowedMentions:{repliedUser:false}});
+  _sentMsg = await message.reply({ embeds:[embed], allowedMentions:{repliedUser:false}});
       }
     } catch (err) {
       console.error(`[Message Command Error]:`, err);
@@ -6573,341 +6832,8 @@ try {
 
 ===== FILE: index.js =====
 ```javascript
-// Early crash reporter (must be first)
-require('./utils/crashReporter').initEarly();
-// Prevent multiple concurrent bot instances (esp. if accidentally started twice)
-try { require('./utils/singleton').ensureSingleton(); } catch {}
-try { process.title = 'MiyakoBot'; } catch {}
-require("dotenv/config");
-// (ephemeralShim removed; all interactions now use flags:1<<6 directly)
-const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { semanticButton, buildNavRow } = require('./utils/ui');
-const fs = require("fs");
-const path = require("path");
-const { config, saveConfig } = require("./utils/storage");
-const { postStartupChangelog } = require("./utils/changelog");
-const { registerErrorListener } = require('./utils/errorUtil');
-let lastOfflineDurationMs = null;
-try {
-  if (fs.existsSync("./config/lastShutdown.json")) {
-    const raw = JSON.parse(fs.readFileSync("./config/lastShutdown.json", "utf8"));
-    if (raw && raw.ts) {
-      lastOfflineDurationMs = Date.now() - raw.ts;
-      // remove file after reading
-      try { fs.unlinkSync("./config/lastShutdown.json"); } catch {}
-    }
-  }
-} catch {}
-const { attachMessageEvents } = require("./events/messages");
-const { attachGuildEvents } = require("./events/guildEvents");
-const { attachInteractionEvents } = require("./events/interactionEvents");
-// Legacy command handler in events/messageEvents.js caused duplicate replies; ensure not required/attached elsewhere.
-try { delete require.cache[require.resolve('./events/messageEvents')]; } catch {}
-let CRASH_LOG_CHANNEL_ID = null; // resolved post-config load
-const { startScheduler } = require("./utils/scheduler");
-const ActiveMenus = require("./utils/activeMenus");
-const { startVoiceLeveling } = require("./utils/voiceLeveling");
-const { validateConfig } = require("./utils/configValidate");
-const { startCashDrops } = require("./utils/cashDrops");
-// Load daily deposit progress tracker
-try { require("./utils/depositProgress").load(); } catch {}
-// debug: ensure functions are imported correctly
-// console.log('attachMessageEvents typeof =', typeof attachMessageEvents);
-// console.log('attachGuildEvents typeof =', typeof attachGuildEvents);
-
-const BOT_STATUS_FILE = path.resolve(__dirname, "./config/botStatus.json");
-
-// Real-time error forwarding (compact). Fires after client ready.
-registerErrorListener(async (entry) => {
-  try {
-    if (!client.isReady || !client.isReady()) return; // wait for ready
-    if (!CRASH_LOG_CHANNEL_ID) CRASH_LOG_CHANNEL_ID = config.crashLogChannelId || CONFIG_LOG_CHANNEL;
-    if (!CRASH_LOG_CHANNEL_ID) return; // nowhere to send
-    const channel = await client.channels.fetch(CRASH_LOG_CHANNEL_ID).catch(()=>null);
-    if (!channel) return;
-    // De-duplicate high volume warnings; throttle identical scope+message pairs within 30s
-    global.__ERR_CACHE = global.__ERR_CACHE || new Map();
-    const key = entry.scope + ':' + entry.message.slice(0,120);
-    const now = Date.now();
-    const prev = global.__ERR_CACHE.get(key);
-    if (prev && (now - prev) < 30000) return; // skip spam
-    global.__ERR_CACHE.set(key, now);
-    // Build compact embed
-    const em = createEmbed({
-      title: `⚠️ ${entry.scope}`,
-      description: `\u200B\n\`${(entry.message||'').slice(0, 350).replace(/`/g,'\u200b')}\`\n\u200B`,
-      color: entry.scope.startsWith('fatal') ? 0xE74C3C : 0xFFA500
-    });
-    em.setFooter({ text: `At <t:${Math.floor(entry.ts/1000)}:T>` });
-    await channel.send({ embeds:[em] }).catch(()=>{});
-  } catch { /* ignore */ }
-});
-// After client ready, start voice leveling service
-// This file's ready handler likely exists below; if not, attach minimal
-if (require.main === module) {
-  // Lazy attach to client when created in this module
-}
-const STATUS_CHANNEL_ID = "1413966369296220233";
-const ACTIVE_MENUS_FILE = path.resolve(__dirname, "./config/activeMenus.json");
-
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-  GatewayIntentBits.MessageContent,
-  GatewayIntentBits.GuildVoiceStates
-  ],
-  partials: [Partials.Message, Partials.Channel, Partials.Reaction]
-});
-
-// --- Global error capture layer (non-recursive) ---
-try {
-  const { recordExternalError, setOriginalConsoleError } = require('./utils/errorUtil');
-  const origConsoleError = console.error;
-  setOriginalConsoleError(origConsoleError);
-  console.error = function(...args) {
-    try { recordExternalError('console', args.length === 1 ? args[0] : args.map(a=> (a && a.stack) ? a.stack : String(a)).join(' ')); } catch { /* ignore */ }
-    return origConsoleError.apply(this, args);
-  };
-  process.on('warning', (w) => recordExternalError('warning', w));
-} catch { /* ignore capture setup errors */ }
-
-// Attach client to crashReporter for graceful shutdown details
-try { require('./utils/crashReporter').attachClient(client); } catch {}
-
-const { runHealthChecks, formatHealthLines } = require('./utils/health');
-const { CONFIG_LOG_CHANNEL } = require('./utils/logChannels');
-const { createEmbed, safeAddField } = require('./utils/embeds');
-
-async function sendBotStatusMessage() {
-  let lastOnline = 0;
-  if (fs.existsSync(BOT_STATUS_FILE)) {
-    try { lastOnline = JSON.parse(fs.readFileSync(BOT_STATUS_FILE)).lastOnline || 0; } catch {}
-  }
-  const now = Date.now();
-  const diff = now - lastOnline;
-  const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
-  if (channel) {
-    // Build a single, modern embed with inline smart changelog
-    const isColdStart = diff >= 5 * 60 * 1000;
-  const title = isColdStart ? "🟢 Miyako is Online" : "🔄 Miyako Restarted";
-    const color = isColdStart ? 0x5865F2 : 0xFFD700;
-
-  const embed = createEmbed({
-    title,
-    description: isColdStart
-      ? "All systems are up. Here's what changed since last run:"
-      : `Restart complete. ${lastOfflineDurationMs!=null ? `Offline for ${Math.max(0, Math.round(lastOfflineDurationMs/1000))}s.` : ""} Here's what changed since last run:`,
-    color
-  });
-
-    // Build changelog overview + store details for button expansion
-    let changelogSession = null;
-    try {
-      const { createSnapshot, compareSnapshots } = require("./utils/changelog");
-      const snapshotFile = path.resolve(__dirname, "./config/changelogSnapshot.json");
-      let prev = null;
-      try { if (fs.existsSync(snapshotFile)) prev = JSON.parse(fs.readFileSync(snapshotFile, "utf8")); } catch {}
-      const curr = createSnapshot(path.resolve(__dirname));
-      const result = compareSnapshots(prev, curr);
-      try { fs.writeFileSync(snapshotFile, JSON.stringify({ createdAt: Date.now(), files: curr }, null, 2)); } catch {}
-      const total = result.added.length + result.removed.length + result.modified.length;
-      if (total === 0) {
-  safeAddField(embed, "Changelog Overview", "No changes have been made since last restart.");
-      } else {
-        const summary = `Files changed: ${total} (➕ ${result.added.length}, ✖️ ${result.removed.length}, 🔧 ${result.modified.length})`;
-  safeAddField(embed, "Changelog Overview", summary);
-        // Prepare detailed lines (full lists capped)
-        const detailLines = [];
-        for (const it of result.added) detailLines.push(`➕ ${it.path}`);
-        for (const it of result.removed) detailLines.push(`✖️ ${it.path}`);
-        for (const it of result.modified) {
-          const ld = it.linesDelta === 0 ? "±0" : (it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`);
-          detailLines.push(`🔧 ${it.path} (${ld} lines)`);
-        }
-        changelogSession = { summary, detailLines };
-      }
-    } catch (e) {
-  safeAddField(embed, "Changelog Overview", "No changes have been made since last restart.");
-    }
-
-    // Run health checks (events + staff team) and append compact status block at top of embed
-    try {
-      const health = await runHealthChecks(client);
-      if (health && health.length) {
-        const lines = formatHealthLines(health).slice(0, 1024);
-        embed.spliceFields(0, 0, { name: 'Health', value: lines });
-      }
-    } catch (e) {
-      safeAddField(embed, 'Health', '✖️ Health checks failed: ' + e.message.slice(0, 200));
-    }
-
-    // Components: Details button only if we have detail lines
-    let components = [];
-    if (changelogSession && changelogSession.detailLines && changelogSession.detailLines.length) {
-      components = [ buildNavRow([
-        semanticButton('primary', { id: 'status_show', label: 'Details' })
-      ]) ];
-    }
-    const sent = await channel.send({ embeds: [embed], components }).catch(() => null);
-    if (sent && changelogSession) {
-      try {
-        ActiveMenus.registerMessage(sent, { type: 'status', data: { ...changelogSession, expanded: false } });
-      } catch {}
-    }
-  }
-  fs.writeFileSync(BOT_STATUS_FILE, JSON.stringify({ lastOnline: now }, null, 2));
-}
-
-async function setStatusChannelName(online) {
-  const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
-  if (!channel || !channel.setName) return;
-  const name = online
-    ? "🟢︎𝙼𝚒𝚢𝚊𝚔𝚘-𝚜𝚝𝚊𝚝𝚞𝚜"
-    : "🔴︎𝙼𝚒𝚢𝚊𝚔𝚘-𝚜𝚝𝚊𝚝𝚞𝚜";
-  await channel.setName(name).catch(() => {});
-}
-
-// (SIGINT/SIGTERM now handled gracefully by crashReporter; no duplicate handlers here)
-
-// Use 'clientReady' instead of deprecated 'ready' (v15 will remove 'ready')
-client.once("clientReady", async () => {
-  config.testingMode = false; saveConfig();
-  console.log(`✅ Logged in as ${client.user.tag}`);
-  await sendBotStatusMessage();
-  await setStatusChannelName(true);
-
-    // Config validation report (deduplicated per boot)
-    try {
-      const guild = client.guilds.cache.first();
-      const issues = validateConfig(guild);
-      if (issues.length) {
-        console.warn(`[config] ${issues.length} issue(s):`);
-        for (const i of issues) console.warn(' -', i);
-        if (CONFIG_LOG_CHANNEL) {
-          const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(()=>null);
-          if (channel) {
-            const hash = require('crypto').createHash('sha1').update(issues.join('|')).digest('hex');
-            const stampFile = path.resolve(__dirname, './config/.lastConfigIssuesHash');
-            let prev = null; try { if (fs.existsSync(stampFile)) prev = fs.readFileSync(stampFile,'utf8').trim(); } catch {}
-            if (prev !== hash) {
-              channel.send({ content: `⚠️ Config validation found ${issues.length} issue(s):\n` + issues.map(i=>`• ${i}`).join('\n') }).catch(()=>{});
-              try { fs.writeFileSync(stampFile, hash); } catch {}
-            } else {
-              console.log('[config] issues unchanged since last boot; not re-sent');
-            }
-          }
-        }
-      } else {
-        console.log('[config] validation passed');
-      }
-    } catch (err) {
-      console.error('[config] validation error', err);
-    }
-  // Changelog now included inside the status embed above
-
-  // Initialize global button/session manager (restores timers and disables expired UIs)
-  try { await ActiveMenus.init(client); } catch (e) { console.error("[ActiveMenus init]", e); }
-  // Sweep orphaned (stale) interactive menus (older than 1h) for cleanliness
-  try { if (ActiveMenus.sweepOrphans) await ActiveMenus.sweepOrphans(client); } catch {}
-
-  // Start the scheduler loop
-  try { startScheduler(client); } catch (e) { console.error("[Scheduler] start error:", e); }
-
-  // Start voice leveling loop
-  try { startVoiceLeveling(client); } catch (e) { console.error("[VoiceLeveling] start error:", e); }
-
-  // Start cash drops cleanup loop
-  try { startCashDrops(); } catch (e) { console.error("[CashDrops] start error:", e); }
-
-  // Basic permission health check for critical channels
-  try {
-    const important = [STATUS_CHANNEL_ID, config.modLogChannelId].filter(Boolean);
-    for (const id of important) {
-      const ch = await client.channels.fetch(id).catch(()=>null);
-      if (ch && ch.permissionsFor && !ch.permissionsFor(client.user.id)?.has('SendMessages')) {
-        console.warn('[perm] Missing SendMessages in channel', id);
-      }
-    }
-  } catch {}
-
-  // Cleanup lingering menus on restart
-  if (fs.existsSync(ACTIVE_MENUS_FILE)) {
-    try {
-      const menus = JSON.parse(fs.readFileSync(ACTIVE_MENUS_FILE));
-      for (const { channelId, messageId, commandId } of menus) {
-        const channel = await client.channels.fetch(channelId).catch(() => null);
-        if (channel) {
-          await channel.messages.delete(messageId).catch(() => {});
-          await channel.messages.delete(commandId).catch(() => {});
-        }
-      }
-      fs.writeFileSync(ACTIVE_MENUS_FILE, "[]");
-    } catch (err) { console.error("[Startup Menu Cleanup Error]:", err); }
-  }
-});
-
-// Status (startup) details handler
-try {
-  ActiveMenus.registerHandler('status', async (interaction, session) => {
-    if (!interaction.isButton()) return;
-    const data = session.data || {}; // { summary, detailLines, expanded }
-    if (interaction.customId === 'status_show') {
-      data.expanded = true;
-      // Rebuild embed from original message but replace/add Details field
-      const embed = EmbedBuilder.from(interaction.message.embeds[0] || {});
-      // Remove existing Details field if any
-      const fields = embed.data.fields || [];
-      const filtered = fields.filter(f => f.name !== 'Details');
-      if (data.detailLines && data.detailLines.length) {
-        const chunked = [];
-        let current = [];
-        let totalLen = 0;
-        for (const line of data.detailLines) {
-          if ((totalLen + line.length + 1) > 1000 && current.length) {
-            chunked.push(current.join('\n'));
-            current = [];
-            totalLen = 0;
-          }
-          current.push(line);
-          totalLen += line.length + 1;
-        }
-        if (current.length) chunked.push(current.join('\n'));
-        // Discord limit: keep at most 2 detail fields for brevity
-        filtered.push({ name: 'Details', value: chunked[0].slice(0,1024) });
-        if (chunked[1]) filtered.push({ name: 'Details (cont.)', value: chunked[1].slice(0,1024) });
-      }
-      embed.setFields(filtered);
-      const rows = [ buildNavRow([
-        semanticButton('nav', { id: 'status_hide', label: 'Hide' })
-      ]) ];
-      await interaction.update({ embeds: [embed], components: rows });
-      session.data = data;
-      return;
-    }
-    if (interaction.customId === 'status_hide') {
-      data.expanded = false;
-      const embed = EmbedBuilder.from(interaction.message.embeds[0] || {});
-      const fields = (embed.data.fields||[]).filter(f => !f.name.startsWith('Details'));
-      // Ensure overview field name is 'Changelog Overview'
-      embed.setFields(fields.map(f => f.name === 'Changelog' ? { ...f, name: 'Changelog Overview' } : f));
-      const rows = [ buildNavRow([
-        semanticButton('primary', { id: 'status_show', label: 'Details' })
-      ]) ];
-      await interaction.update({ embeds: [embed], components: rows });
-      session.data = data;
-      return;
-    }
-  });
-} catch (e) { /* ignore registration errors */ }
-
-// attach modular handlers
-attachMessageEvents(client);
-attachGuildEvents(client);
-attachInteractionEvents(client);
-
-client.login(process.env.DISCORD_TOKEN);
+// Thin bootstrapper to new src/ entrypoint to enable project reorganization without breaking scripts
+module.exports = require('./src/index');
 
 ```
 
@@ -10857,6 +10783,7 @@ client.login(process.env.DISCORD_TOKEN);
   "export:text": "node ./scripts/export-text.js",
   "export:summary": "node ./scripts/export-summary.js",
   "export:watch": "node ./scripts/export-watch.js",
+  "export:schedule": "node ./scripts/export-schedule-summary.js",
     "test": "jest --runInBand",
     "migrate:clockin": "node ./scripts/migrate-clockin.js"
   },
@@ -10904,6 +10831,61 @@ if (bad.length) {
 console.log('Ephemeral usage check passed.');
 ```
 
+===== FILE: scripts/export-schedule-summary.js =====
+```javascript
+// Emit a quick schedule summary (counts and next runs) into schedule_summary.txt
+const fs = require('fs');
+const path = require('path');
+const { cfgPath } = require('../utils/paths');
+
+function formatTs(ms) {
+  if (!ms || !Number.isFinite(ms)) return 'n/a';
+  const s = Math.floor(ms / 1000);
+  return `<t:${s}:F> (<t:${s}:R>)`;
+}
+
+function main() {
+  const eventsFile = cfgPath('events.json');
+  const schedulesFile = cfgPath('schedules.json');
+  let events = [];
+  let schedules = [];
+  try {
+    const ej = JSON.parse(fs.readFileSync(eventsFile, 'utf8'));
+    events = Array.isArray(ej) ? ej : (Array.isArray(ej?.events) ? ej.events : []);
+  } catch {}
+  try {
+    const sj = JSON.parse(fs.readFileSync(schedulesFile, 'utf8'));
+    schedules = Array.isArray(sj) ? sj : (Array.isArray(sj?.schedules) ? sj.schedules : []);
+  } catch {}
+
+  const lines = [];
+  lines.push('===== AUTO MESSAGES (events.json) =====');
+  lines.push(`Total events: ${events.length}`);
+  for (const ev of events) {
+    const next = ev.__nextRunAt || ev.nextRunAt || null;
+    const ch = ev.channelId || 'unknown';
+    lines.push(`- ${ev.name || ev.id || '(unnamed)'} -> #${ch} next: ${formatTs(next)}`);
+  }
+  lines.push('');
+
+  lines.push('===== SCHEDULES (schedules.json) =====');
+  lines.push(`Total schedules: ${schedules.length}`);
+  for (const sc of schedules) {
+    const next = sc.__nextRunAt || sc.nextRunAt || null;
+    const ch = sc.channelId || 'unknown';
+    lines.push(`- ${sc.name || sc.id || '(unnamed)'} -> #${ch} next: ${formatTs(next)}`);
+  }
+  lines.push('');
+
+  const out = path.join(path.dirname(eventsFile), '..', 'schedule_summary.txt');
+  fs.writeFileSync(out, lines.join('\n'), 'utf8');
+  console.log(`[export-schedule-summary] wrote ${out}`);
+}
+
+if (require.main === module) main();
+
+```
+
 ===== FILE: scripts/export-summary.js =====
 ```javascript
 // Generate a compact, paste-friendly project summary with folder tree and important snippets
@@ -10915,7 +10897,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const outFile = path.join(root, 'PROJECT_SUMMARY.txt');
 
-const excludeDirs = new Set(['node_modules', '.git', '.vscode']);
+const excludeDirs = new Set(['node_modules', '.git', '.vscode', 'logs']);
 const excludeFiles = new Set([
   '.env', '.bot.pid', '.miyako.lock', 'logs_runner.txt',
   'FULL_CONTEXT.txt', 'PROJECT_SUMMARY.txt', 'schedule_summary.txt',
@@ -11094,7 +11076,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const outFile = path.join(root, 'FULL_CONTEXT.txt');
 
-const excludeDirs = new Set(['node_modules', '.git', '.vscode']);
+const excludeDirs = new Set(['node_modules', '.git', '.vscode', 'logs']);
 const excludeFiles = new Set([
   '.env', '.bot.pid', '.miyako.lock', 'logs_runner.txt', 'FULL_CONTEXT.txt',
   'PROJECT_SUMMARY.txt', 'schedule_summary.txt',
@@ -11193,7 +11175,7 @@ const root = path.join(__dirname, '..');
 const OUT_SUMMARY = path.join(root, 'PROJECT_SUMMARY.txt');
 const OUT_FULL = path.join(root, 'FULL_CONTEXT.txt');
 
-const excludeDirs = new Set(['node_modules', '.git', '.vscode']);
+const excludeDirs = new Set(['node_modules', '.git', '.vscode', 'logs']);
 const excludeFiles = new Set([
   '.env', '.bot.pid', '.miyako.lock', 'logs_runner.txt',
   'PROJECT_SUMMARY.txt', 'FULL_CONTEXT.txt', 'schedule_summary.txt'
@@ -11279,9 +11261,10 @@ require('dotenv/config');
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { cfgPath } = require('../utils/paths');
 
 const CHANNEL_ID = '1232701768832516100';
-const LEVELS_FILE = path.resolve(__dirname, '../config/levels.json');
+const LEVELS_FILE = cfgPath('levels.json');
 
 function xpForLevel(level) {
   const BASE_XP = 150;
@@ -12053,8 +12036,9 @@ const path = require('path');
 const { createEmbed } = require('../utils/embeds');
 const { getRecentErrors, clearErrorLog } = require('../utils/errorUtil');
 const { CONFIG_LOG_CHANNEL } = require('../utils/logChannels');
+const { cfgPath } = require('../utils/paths');
 
-const BOT_STATUS_FILE = path.resolve(__dirname, '../config/botStatus.json');
+const BOT_STATUS_FILE = cfgPath('botStatus.json');
 
 function readLastOnline() {
   try {
@@ -12122,6 +12106,863 @@ module.exports = {
   readLastOnline,
   writeLastOnline
 };
+
+```
+
+===== FILE: src/commands/balance.js =====
+```javascript
+module.exports = require('../../commands/balance');
+
+```
+
+===== FILE: src/commands/cash.js =====
+```javascript
+module.exports = require('../../commands/cash');
+
+```
+
+===== FILE: src/commands/clockin.js =====
+```javascript
+module.exports = require('../../commands/clockin');
+
+```
+
+===== FILE: src/commands/configMenu.js =====
+```javascript
+module.exports = require('../../commands/configMenu');
+
+```
+
+===== FILE: src/commands/configMenu/constants.js =====
+```javascript
+module.exports = require('../../../commands/configMenu/constants');
+
+```
+
+===== FILE: src/commands/configMenu/handlers.js =====
+```javascript
+module.exports = require('../../../commands/configMenu/handlers');
+
+```
+
+===== FILE: src/commands/configMenu/index.js =====
+```javascript
+module.exports = require('../../../commands/configMenu');
+
+```
+
+===== FILE: src/commands/configMenu/render.js =====
+```javascript
+module.exports = require('../../../commands/configMenu/render');
+
+```
+
+===== FILE: src/commands/diagnostics.js =====
+```javascript
+module.exports = require('../../commands/diagnostics');
+
+```
+
+===== FILE: src/commands/help.js =====
+```javascript
+module.exports = require('../../commands/help');
+
+```
+
+===== FILE: src/commands/leaderboard.js =====
+```javascript
+module.exports = require('../../commands/leaderboard');
+
+```
+
+===== FILE: src/commands/level.js =====
+```javascript
+module.exports = require('../../commands/level');
+
+```
+
+===== FILE: src/commands/metrics.js =====
+```javascript
+module.exports = require('../../commands/metrics');
+
+```
+
+===== FILE: src/commands/moderation/dm.js =====
+```javascript
+module.exports = require('../../../commands/moderation/dm');
+
+```
+
+===== FILE: src/commands/moderation/index.js =====
+```javascript
+module.exports = require('../../../commands/moderation');
+
+```
+
+===== FILE: src/commands/moderation/moderationCommands.js =====
+```javascript
+module.exports = require('../../../commands/moderation/moderationCommands');
+
+```
+
+===== FILE: src/commands/moderation/permissions.js =====
+```javascript
+module.exports = require('../../../commands/moderation/permissions');
+
+```
+
+===== FILE: src/commands/moderation/purge.js =====
+```javascript
+module.exports = require('../../../commands/moderation/purge');
+
+```
+
+===== FILE: src/commands/moderation/replies.js =====
+```javascript
+module.exports = require('../../../commands/moderation/replies');
+
+```
+
+===== FILE: src/commands/moderation/warnings.js =====
+```javascript
+module.exports = require('../../../commands/moderation/warnings');
+
+```
+
+===== FILE: src/commands/profile.js =====
+```javascript
+module.exports = require('../../commands/profile');
+
+```
+
+===== FILE: src/commands/schedule.js =====
+```javascript
+module.exports = require('../../commands/schedule');
+
+```
+
+===== FILE: src/commands/scripts.js =====
+```javascript
+module.exports = require('../../commands/scripts');
+
+```
+
+===== FILE: src/commands/snipes.js =====
+```javascript
+module.exports = require('../../commands/snipes');
+
+```
+
+===== FILE: src/commands/test.js =====
+```javascript
+module.exports = require('../../commands/test');
+
+```
+
+===== FILE: src/events/guildEvents.js =====
+```javascript
+module.exports = require('../../events/guildEvents');
+
+```
+
+===== FILE: src/events/interactionEvents.js =====
+```javascript
+module.exports = require('../../events/interactionEvents');
+
+```
+
+===== FILE: src/events/messages.js =====
+```javascript
+module.exports = require('../../events/messages');
+
+```
+
+===== FILE: src/index.js =====
+```javascript
+// Early crash reporter (must be first)
+require('./utils/crashReporter').initEarly();
+// Prevent multiple concurrent bot instances (esp. if accidentally started twice)
+try { require('./utils/singleton').ensureSingleton(); } catch {}
+try { process.title = 'MiyakoBot'; } catch {}
+require('dotenv/config');
+// (ephemeralShim removed; all interactions now use flags:1<<6 directly)
+const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { semanticButton, buildNavRow } = require('./utils/ui');
+const fs = require('fs');
+const path = require('path');
+const projectRoot = path.resolve(process.cwd());
+const { config, saveConfig } = require('./utils/storage');
+const { postStartupChangelog } = require('./utils/changelog');
+const { registerErrorListener } = require('./utils/errorUtil');
+let lastOfflineDurationMs = null;
+try {
+  const lastShutdownPath = path.join(projectRoot, 'config', 'lastShutdown.json');
+  if (fs.existsSync(lastShutdownPath)) {
+    const raw = JSON.parse(fs.readFileSync(lastShutdownPath, 'utf8'));
+    if (raw && raw.ts) {
+      lastOfflineDurationMs = Date.now() - raw.ts;
+      // remove file after reading
+      try { fs.unlinkSync(lastShutdownPath); } catch {}
+    }
+  }
+} catch {}
+const { attachMessageEvents } = require('./events/messages');
+const { attachGuildEvents } = require('./events/guildEvents');
+const { attachInteractionEvents } = require('./events/interactionEvents');
+// Legacy command handler in events/messageEvents.js caused duplicate replies; ensure not required/attached elsewhere.
+try { delete require.cache[require.resolve('../events/messageEvents')]; } catch {}
+let CRASH_LOG_CHANNEL_ID = null; // resolved post-config load
+const { startScheduler } = require('./utils/scheduler');
+const ActiveMenus = require('./utils/activeMenus');
+const { startVoiceLeveling } = require('./utils/voiceLeveling');
+const { validateConfig } = require('./utils/configValidate');
+const { startCashDrops } = require('./utils/cashDrops');
+// Load daily deposit progress tracker
+try { require('./utils/depositProgress').load(); } catch {}
+
+const BOT_STATUS_FILE = path.join(projectRoot, 'config', 'botStatus.json');
+
+// Real-time error forwarding (compact). Fires after client ready.
+registerErrorListener(async (entry) => {
+  try {
+    if (!client.isReady || !client.isReady()) return; // wait for ready
+    if (!CRASH_LOG_CHANNEL_ID) CRASH_LOG_CHANNEL_ID = config.crashLogChannelId || CONFIG_LOG_CHANNEL;
+    if (!CRASH_LOG_CHANNEL_ID) return; // nowhere to send
+    const channel = await client.channels.fetch(CRASH_LOG_CHANNEL_ID).catch(() => null);
+    if (!channel) return;
+    // De-duplicate high volume warnings; throttle identical scope+message pairs within 30s
+    global.__ERR_CACHE = global.__ERR_CACHE || new Map();
+    const key = entry.scope + ':' + entry.message.slice(0, 120);
+    const now = Date.now();
+    const prev = global.__ERR_CACHE.get(key);
+    if (prev && (now - prev) < 30000) return; // skip spam
+    global.__ERR_CACHE.set(key, now);
+    // Build compact embed
+    const em = createEmbed({
+      title: `⚠️ ${entry.scope}`,
+      description: `\u200B\n\`${(entry.message || '').slice(0, 350).replace(/`/g, '\u200b')}\`\n\u200B`,
+      color: entry.scope.startsWith('fatal') ? 0xE74C3C : 0xFFA500,
+    });
+    em.setFooter({ text: `At <t:${Math.floor(entry.ts / 1000)}:T>` });
+    await channel.send({ embeds: [em] }).catch(() => {});
+  } catch { /* ignore */ }
+});
+// After client ready, start voice leveling service
+// This file's ready handler likely exists below; if not, attach minimal
+if (require.main === module) {
+  // Lazy attach to client when created in this module
+}
+const STATUS_CHANNEL_ID = '1413966369296220233';
+const ACTIVE_MENUS_FILE = path.join(projectRoot, 'config', 'activeMenus.json');
+
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates,
+  ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction],
+});
+
+// --- Global error capture layer (non-recursive) ---
+try {
+  const { recordExternalError, setOriginalConsoleError } = require('./utils/errorUtil');
+  const origConsoleError = console.error;
+  setOriginalConsoleError(origConsoleError);
+  console.error = function (...args) {
+    try {
+      recordExternalError('console', args.length === 1 ? args[0] : args.map((a) => (a && a.stack) ? a.stack : String(a)).join(' '));
+    } catch { /* ignore */ }
+    return origConsoleError.apply(this, args);
+  };
+  process.on('warning', (w) => recordExternalError('warning', w));
+} catch { /* ignore capture setup errors */ }
+
+// Attach client to crashReporter for graceful shutdown details
+try { require('./utils/crashReporter').attachClient(client); } catch {}
+
+const { runHealthChecks, formatHealthLines } = require('./utils/health');
+const { CONFIG_LOG_CHANNEL } = require('./utils/logChannels');
+const { createEmbed, safeAddField } = require('./utils/embeds');
+
+async function sendBotStatusMessage() {
+  let lastOnline = 0;
+  if (fs.existsSync(BOT_STATUS_FILE)) {
+    try { lastOnline = JSON.parse(fs.readFileSync(BOT_STATUS_FILE)).lastOnline || 0; } catch {}
+  }
+  const now = Date.now();
+  const diff = now - lastOnline;
+  const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
+  if (channel) {
+    // Build a single, modern embed with inline smart changelog
+    const isColdStart = diff >= 5 * 60 * 1000;
+    const title = isColdStart ? '🟢 Miyako is Online' : '🔄 Miyako Restarted';
+    const color = isColdStart ? 0x5865F2 : 0xFFD700;
+
+    const embed = createEmbed({
+      title,
+      description: isColdStart
+        ? "All systems are up. Here's what changed since last run:"
+        : `Restart complete. ${lastOfflineDurationMs != null ? `Offline for ${Math.max(0, Math.round(lastOfflineDurationMs / 1000))}s.` : ''} Here's what changed since last run:`,
+      color,
+    });
+
+    // Build changelog overview + store details for button expansion
+    let changelogSession = null;
+    try {
+      const { createSnapshot, compareSnapshots } = require('./utils/changelog');
+      const snapshotFile = path.join(projectRoot, 'config', 'changelogSnapshot.json');
+      let prev = null;
+      try { if (fs.existsSync(snapshotFile)) prev = JSON.parse(fs.readFileSync(snapshotFile, 'utf8')); } catch {}
+      const curr = createSnapshot(projectRoot);
+      const result = compareSnapshots(prev, curr);
+      try { fs.writeFileSync(snapshotFile, JSON.stringify({ createdAt: Date.now(), files: curr }, null, 2)); } catch {}
+      const total = result.added.length + result.removed.length + result.modified.length;
+      if (total === 0) {
+        safeAddField(embed, 'Changelog Overview', 'No changes have been made since last restart.');
+      } else {
+        const summary = `Files changed: ${total} (➕ ${result.added.length}, ✖️ ${result.removed.length}, 🔧 ${result.modified.length})`;
+        safeAddField(embed, 'Changelog Overview', summary);
+        // Prepare detailed lines (full lists capped)
+        const detailLines = [];
+        for (const it of result.added) detailLines.push(`➕ ${it.path}`);
+        for (const it of result.removed) detailLines.push(`✖️ ${it.path}`);
+        for (const it of result.modified) {
+          const ld = it.linesDelta === 0 ? '±0' : (it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`);
+          detailLines.push(`🔧 ${it.path} (${ld} lines)`);
+        }
+        changelogSession = { summary, detailLines };
+      }
+    } catch (e) {
+      safeAddField(embed, 'Changelog Overview', 'No changes have been made since last restart.');
+    }
+
+    // Run health checks (events + staff team) and append compact status block at top of embed
+    try {
+      const health = await runHealthChecks(client);
+      if (health && health.length) {
+        const lines = formatHealthLines(health).slice(0, 1024);
+        embed.spliceFields(0, 0, { name: 'Health', value: lines });
+      }
+    } catch (e) {
+      safeAddField(embed, 'Health', '✖️ Health checks failed: ' + e.message.slice(0, 200));
+    }
+
+    // Components: Details button only if we have detail lines
+    let components = [];
+    if (changelogSession && changelogSession.detailLines && changelogSession.detailLines.length) {
+      components = [
+        buildNavRow([
+          semanticButton('primary', { id: 'status_show', label: 'Details' }),
+        ]),
+      ];
+    }
+    const sent = await channel.send({ embeds: [embed], components }).catch(() => null);
+    if (sent && changelogSession) {
+      try {
+        ActiveMenus.registerMessage(sent, { type: 'status', data: { ...changelogSession, expanded: false } });
+      } catch {}
+    }
+  }
+  fs.writeFileSync(BOT_STATUS_FILE, JSON.stringify({ lastOnline: now }, null, 2));
+}
+
+async function setStatusChannelName(online) {
+  const channel = await client.channels.fetch(STATUS_CHANNEL_ID).catch(() => null);
+  if (!channel || !channel.setName) return;
+  const name = online
+    ? '🟢︎𝙼𝚒𝚢𝚊𝚔𝚘-𝚜𝚝𝚊𝚝𝚞𝚜'
+    : '🔴︎𝙼𝚒𝚢𝚊𝚔𝚘-𝚜𝚝𝚊𝚝𝚞𝚜';
+  await channel.setName(name).catch(() => {});
+}
+
+// (SIGINT/SIGTERM now handled gracefully by crashReporter; no duplicate handlers here)
+
+// Use 'clientReady' instead of deprecated 'ready' (v15 will remove 'ready')
+client.once('clientReady', async () => {
+  config.testingMode = false; saveConfig();
+  console.log(`✅ Logged in as ${client.user.tag}`);
+  await sendBotStatusMessage();
+  await setStatusChannelName(true);
+
+  // Config validation report (deduplicated per boot)
+  try {
+    const guild = client.guilds.cache.first();
+    const issues = validateConfig(guild);
+    if (issues.length) {
+      console.warn(`[config] ${issues.length} issue(s):`);
+      for (const i of issues) console.warn(' -', i);
+      if (CONFIG_LOG_CHANNEL) {
+        const channel = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
+        if (channel) {
+          const hash = require('crypto').createHash('sha1').update(issues.join('|')).digest('hex');
+          const stampFile = path.join(projectRoot, 'config', '.lastConfigIssuesHash');
+          let prev = null; try { if (fs.existsSync(stampFile)) prev = fs.readFileSync(stampFile, 'utf8').trim(); } catch {}
+          if (prev !== hash) {
+            channel.send({ content: `⚠️ Config validation found ${issues.length} issue(s):\n` + issues.map(i => `• ${i}`).join('\n') }).catch(() => {});
+            try { fs.writeFileSync(stampFile, hash); } catch {}
+          } else {
+            console.log('[config] issues unchanged since last boot; not re-sent');
+          }
+        }
+      }
+    } else {
+      console.log('[config] validation passed');
+    }
+  } catch (err) {
+    console.error('[config] validation error', err);
+  }
+  // Changelog now included inside the status embed above
+
+  // Initialize global button/session manager (restores timers and disables expired UIs)
+  try { await ActiveMenus.init(client); } catch (e) { console.error('[ActiveMenus init]', e); }
+  // Sweep orphaned (stale) interactive menus (older than 1h) for cleanliness
+  try { if (ActiveMenus.sweepOrphans) await ActiveMenus.sweepOrphans(client); } catch {}
+
+  // Start the scheduler loop
+  try { startScheduler(client); } catch (e) { console.error('[Scheduler] start error:', e); }
+
+  // Start voice leveling loop
+  try { startVoiceLeveling(client); } catch (e) { console.error('[VoiceLeveling] start error:', e); }
+
+  // Start cash drops cleanup loop
+  try { startCashDrops(); } catch (e) { console.error('[CashDrops] start error:', e); }
+
+  // Basic permission health check for critical channels
+  try {
+    const important = [STATUS_CHANNEL_ID, config.modLogChannelId].filter(Boolean);
+    for (const id of important) {
+      const ch = await client.channels.fetch(id).catch(() => null);
+      if (ch && ch.permissionsFor && !ch.permissionsFor(client.user.id)?.has('SendMessages')) {
+        console.warn('[perm] Missing SendMessages in channel', id);
+      }
+    }
+  } catch {}
+
+  // After boot, refresh recent auto/clock-in messages to apply latest patches
+  try {
+    const { getEvents } = require('./utils/eventsStorage');
+    const { refreshTrackedAutoMessages } = require('./commands/schedule');
+    const evs = getEvents();
+    for (const ev of evs) {
+      // Light throttle to avoid rate limits on large sets
+      try { await refreshTrackedAutoMessages(client, ev); } catch {}
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  } catch (e) { console.error('[Startup Refresh] error', e); }
+
+  // Cleanup lingering menus on restart
+  if (fs.existsSync(ACTIVE_MENUS_FILE)) {
+    try {
+      const menus = JSON.parse(fs.readFileSync(ACTIVE_MENUS_FILE));
+      for (const { channelId, messageId, commandId } of menus) {
+        const channel = await client.channels.fetch(channelId).catch(() => null);
+        if (channel) {
+          await channel.messages.delete(messageId).catch(() => {});
+          await channel.messages.delete(commandId).catch(() => {});
+        }
+      }
+      fs.writeFileSync(ACTIVE_MENUS_FILE, '[]');
+    } catch (err) { console.error('[Startup Menu Cleanup Error]:', err); }
+  }
+});
+
+// Status (startup) details handler
+try {
+  ActiveMenus.registerHandler('status', async (interaction, session) => {
+    if (!interaction.isButton()) return;
+    const data = session.data || {}; // { summary, detailLines, expanded }
+    if (interaction.customId === 'status_show') {
+      data.expanded = true;
+      // Rebuild embed from original message but replace/add Details field
+      const embed = EmbedBuilder.from(interaction.message.embeds[0] || {});
+      // Remove existing Details field if any
+      const fields = embed.data.fields || [];
+      const filtered = fields.filter((f) => f.name !== 'Details');
+      if (data.detailLines && data.detailLines.length) {
+        const chunked = [];
+        let current = [];
+        let totalLen = 0;
+        for (const line of data.detailLines) {
+          if ((totalLen + line.length + 1) > 1000 && current.length) {
+            chunked.push(current.join('\n'));
+            current = [];
+            totalLen = 0;
+          }
+          current.push(line);
+          totalLen += line.length + 1;
+        }
+        if (current.length) chunked.push(current.join('\n'));
+        // Discord limit: keep at most 2 detail fields for brevity
+        filtered.push({ name: 'Details', value: chunked[0].slice(0, 1024) });
+        if (chunked[1]) filtered.push({ name: 'Details (cont.)', value: chunked[1].slice(0, 1024) });
+      }
+      embed.setFields(filtered);
+      const rows = [
+        buildNavRow([
+          semanticButton('nav', { id: 'status_hide', label: 'Hide' }),
+        ]),
+      ];
+      await interaction.update({ embeds: [embed], components: rows });
+      session.data = data;
+      return;
+    }
+    if (interaction.customId === 'status_hide') {
+      data.expanded = false;
+      const embed = EmbedBuilder.from(interaction.message.embeds[0] || {});
+      const fields = (embed.data.fields || []).filter((f) => !f.name.startsWith('Details'));
+      // Ensure overview field name is 'Changelog Overview'
+      embed.setFields(fields.map((f) => (f.name === 'Changelog' ? { ...f, name: 'Changelog Overview' } : f)));
+      const rows = [
+        buildNavRow([
+          semanticButton('primary', { id: 'status_show', label: 'Details' }),
+        ]),
+      ];
+      await interaction.update({ embeds: [embed], components: rows });
+      session.data = data;
+      return;
+    }
+  });
+} catch (e) { /* ignore registration errors */ }
+
+// attach modular handlers
+attachMessageEvents(client);
+attachGuildEvents(client);
+attachInteractionEvents(client);
+
+client.login(process.env.DISCORD_TOKEN);
+
+```
+
+===== FILE: src/services/economyService.js =====
+```javascript
+module.exports = require('../../services/economyService');
+
+```
+
+===== FILE: src/services/leaderboardService.js =====
+```javascript
+module.exports = require('../../services/leaderboardService');
+
+```
+
+===== FILE: src/services/levelingService.js =====
+```javascript
+module.exports = require('../../services/levelingService');
+
+```
+
+===== FILE: src/services/metricsService.js =====
+```javascript
+module.exports = require('../../services/metricsService');
+
+```
+
+===== FILE: src/services/scheduleService.js =====
+```javascript
+module.exports = require('../../services/scheduleService');
+
+```
+
+===== FILE: src/services/statusService.js =====
+```javascript
+module.exports = require('../../services/statusService');
+
+```
+
+===== FILE: src/utils/activeMenus.js =====
+```javascript
+module.exports = require('../../utils/activeMenus');
+
+```
+
+===== FILE: src/utils/bank.js =====
+```javascript
+module.exports = require('../../utils/bank');
+
+```
+
+===== FILE: src/utils/botStatus.js =====
+```javascript
+module.exports = require('../../utils/botStatus');
+
+```
+
+===== FILE: src/utils/cash.js =====
+```javascript
+module.exports = require('../../utils/cash');
+
+```
+
+===== FILE: src/utils/cashDrops.js =====
+```javascript
+module.exports = require('../../utils/cashDrops');
+
+```
+
+===== FILE: src/utils/changelog.js =====
+```javascript
+module.exports = require('../../utils/changelog');
+module.exports = require('../../utils/changelog');
+
+```
+
+===== FILE: src/utils/clockinEmbed.js =====
+```javascript
+module.exports = require('../../utils/clockinEmbed');
+
+```
+
+===== FILE: src/utils/commandLogger.js =====
+```javascript
+module.exports = require('../../utils/commandLogger');
+
+```
+
+===== FILE: src/utils/configLogs.js =====
+```javascript
+module.exports = require('../../utils/configLogs');
+
+```
+
+===== FILE: src/utils/configValidate.js =====
+```javascript
+module.exports = require('../../utils/configValidate');
+
+```
+
+===== FILE: src/utils/crashReporter.js =====
+```javascript
+module.exports = require('../../utils/crashReporter');
+
+```
+
+===== FILE: src/utils/depositProgress.js =====
+```javascript
+module.exports = require('../../utils/depositProgress');
+
+```
+
+===== FILE: src/utils/embeds.js =====
+```javascript
+module.exports = require('../../utils/embeds');
+
+```
+
+===== FILE: src/utils/ephemeralShim.js =====
+```javascript
+module.exports = require('../../utils/ephemeralShim');
+
+```
+
+===== FILE: src/utils/errorUtil.js =====
+```javascript
+module.exports = require('../../utils/errorUtil');
+
+```
+
+===== FILE: src/utils/eventsStorage.js =====
+```javascript
+module.exports = require('../../utils/eventsStorage');
+
+```
+
+===== FILE: src/utils/health.js =====
+```javascript
+module.exports = require('../../utils/health');
+module.exports = require('../../utils/health');
+
+```
+
+===== FILE: src/utils/index.js =====
+```javascript
+// Re-export utils from project root for transitional compatibility
+module.exports = new Proxy({}, {
+  get(_, prop) {
+    // allow require('./utils/<name>') from src to map to root utils
+    try { return require(`../../utils/${prop}`); } catch {}
+    try { return require(`../../utils/${prop}.js`); } catch {}
+    // fallback to index
+    try { return require(`../../utils/index.js`)[prop]; } catch {}
+    throw new Error(`utils module not found: ${String(prop)}`);
+  }
+});
+
+```
+
+===== FILE: src/utils/leaderboards.js =====
+```javascript
+module.exports = require('../../utils/leaderboards');
+
+```
+
+===== FILE: src/utils/leveling.js =====
+```javascript
+module.exports = require('../../utils/leveling');
+
+```
+
+===== FILE: src/utils/levels.js =====
+```javascript
+module.exports = require('../../utils/levels');
+
+```
+
+===== FILE: src/utils/logChannels.js =====
+```javascript
+module.exports = require('../../utils/logChannels');
+
+```
+
+===== FILE: src/utils/memberLogs.js =====
+```javascript
+module.exports = require('../../utils/memberLogs');
+
+```
+
+===== FILE: src/utils/messageLogs.js =====
+```javascript
+module.exports = require('../../utils/messageLogs');
+
+```
+
+===== FILE: src/utils/modLogs.js =====
+```javascript
+module.exports = require('../../utils/modLogs');
+
+```
+
+===== FILE: src/utils/paths.js =====
+```javascript
+module.exports = require('../../utils/paths');
+
+```
+
+===== FILE: src/utils/permissionsCache.js =====
+```javascript
+module.exports = require('../../utils/permissionsCache');
+
+```
+
+===== FILE: src/utils/policy.js =====
+```javascript
+module.exports = require('../../utils/policy');
+
+```
+
+===== FILE: src/utils/processHandlers.js =====
+```javascript
+module.exports = require('../../utils/processHandlers');
+
+```
+
+===== FILE: src/utils/roleLogs.js =====
+```javascript
+module.exports = require('../../utils/roleLogs');
+
+```
+
+===== FILE: src/utils/sanitize.js =====
+```javascript
+module.exports = require('../../utils/sanitize');
+
+```
+
+===== FILE: src/utils/scheduleStorage.js =====
+```javascript
+module.exports = require('../../utils/scheduleStorage');
+
+```
+
+===== FILE: src/utils/scheduler.js =====
+```javascript
+module.exports = require('../../utils/scheduler');
+
+```
+
+===== FILE: src/utils/sendOnce.js =====
+```javascript
+module.exports = require('../../utils/sendOnce');
+
+```
+
+===== FILE: src/utils/shutdownState.js =====
+```javascript
+module.exports = require('../../utils/shutdownState');
+
+```
+
+===== FILE: src/utils/singleton.js =====
+```javascript
+module.exports = require('../../utils/singleton');
+
+```
+
+===== FILE: src/utils/staffTeam.js =====
+```javascript
+module.exports = require('../../utils/staffTeam');
+
+```
+
+===== FILE: src/utils/storage.js =====
+```javascript
+module.exports = require('../../utils/storage');
+
+```
+
+===== FILE: src/utils/testingBanner.js =====
+```javascript
+module.exports = require('../../utils/testingBanner');
+
+```
+
+===== FILE: src/utils/text.js =====
+```javascript
+module.exports = require('../../utils/text');
+
+```
+
+===== FILE: src/utils/theme.js =====
+```javascript
+module.exports = require('../../utils/theme');
+
+```
+
+===== FILE: src/utils/time.js =====
+```javascript
+module.exports = require('../../utils/time');
+
+```
+
+===== FILE: src/utils/timestampPlaceholders.js =====
+```javascript
+module.exports = require('../../utils/timestampPlaceholders');
+
+```
+
+===== FILE: src/utils/ui.js =====
+```javascript
+module.exports = require('../../utils/ui');
+
+```
+
+===== FILE: src/utils/vcLevels.js =====
+```javascript
+module.exports = require('../../utils/vcLevels');
+
+```
+
+===== FILE: src/utils/voiceLeveling.js =====
+```javascript
+module.exports = require('../../utils/voiceLeveling');
+
+```
+
+===== FILE: src/utils/writeQueue.js =====
+```javascript
+module.exports = require('../../utils/writeQueue');
 
 ```
 
@@ -12360,8 +13201,9 @@ describe('XP Modifier streak behavior', () => {
 ```javascript
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 
-const SESSIONS_FILE = path.resolve(__dirname, "../config/buttonSessions.json");
+const SESSIONS_FILE = cfgPath('buttonSessions.json');
 
 // Handlers by session.type
 const handlers = new Map();
@@ -12560,16 +13402,17 @@ module.exports = {
 ```javascript
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 const { getCash, addCash, getTestingCash, addTestingCash } = require("./cash");
 const { config } = require("./storage");
 
-const BANK_FILE = path.resolve(__dirname, "../config/bank.json");
+const BANK_FILE = cfgPath('bank.json');
 const { enqueueWrite } = require('./writeQueue');
 
 // Persistent bank balances
 let bank = {};
 // Testing overlay (persisted separately) mirrors shape { userId: { amount } }
-const TEST_BANK_FILE = path.resolve(__dirname, "../config/testingBank.json");
+const TEST_BANK_FILE = cfgPath('testingBank.json');
 let testingBank = {};
 try {
   if (fs.existsSync(TEST_BANK_FILE)) {
@@ -12791,8 +13634,9 @@ module.exports = { sendBotStatusMessage, sendBotShutdownMessage, setStatusChanne
 ```javascript
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 
-const CASH_FILE = path.resolve(__dirname, "../config/cash.json");
+const CASH_FILE = cfgPath('cash.json');
 const { enqueueWrite } = require('./writeQueue');
 
 let cash = {};
@@ -12805,7 +13649,7 @@ try {
 }
 
 // Testing overlay balances (persisted separately)
-const TEST_CASH_FILE = path.resolve(__dirname, "../config/testingCash.json");
+const TEST_CASH_FILE = cfgPath('testingCash.json');
 let testingCash = {};
 try {
   if (fs.existsSync(TEST_CASH_FILE)) {
@@ -13007,10 +13851,11 @@ module.exports = {
 ```javascript
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 const crypto = require("crypto");
 const { createEmbed } = require('./embeds');
 
-const SNAPSHOT_FILE = path.resolve(__dirname, "../config/changelogSnapshot.json");
+const SNAPSHOT_FILE = cfgPath('changelogSnapshot.json');
 
 function sha1(buf) {
   return crypto.createHash("sha1").update(buf).digest("hex");
@@ -13254,9 +14099,14 @@ module.exports = { buildClockInEmbed, ROLE_META };
 
 ===== FILE: utils/commandLogger.js =====
 ```javascript
-// In-memory command logger with optional channel reporting and expected vs actual diffing
+// In-memory + file-based command logger with optional channel reporting and expected vs actual diffing
 const { config } = require('./storage');
 const { CONFIG_LOG_CHANNEL } = require('./logChannels');
+const fs = require('fs');
+const path = require('path');
+
+const LOG_DIR = path.join(__dirname, '..', 'logs');
+const LOG_FILE = path.join(LOG_DIR, 'command_logs.json');
 
 const state = {
   logs: [],
@@ -13269,7 +14119,9 @@ function getLimit() {
 }
 
 function enabled() {
-  const cfg = config.commandLogging || {}; return !!cfg.enabled;
+  const cfg = config.commandLogging || {};
+  // Enabled by default; allow opt-out via config.commandLogging.enabled === false
+  return cfg.enabled !== false;
 }
 
 function add(log) {
@@ -13300,17 +14152,68 @@ function finish(client, startCtx, result) {
   };
   add(entry);
   maybeReport(client, entry);
+  persist(entry);
+}
+
+function sanitizeString(s) {
+  try {
+    if (!s || typeof s !== 'string') return s;
+    // Redact token-like strings: long base64ish strings
+    let out = s.replace(/[A-Za-z0-9_\-]{24,}/g, '[redacted]');
+    // Remove common secrets keys if present (defense-in-depth)
+    out = out.replace(/(token|apikey|api_key|authorization)\s*[:=]\s*[^\s]+/ig, '$1: [redacted]');
+    return out;
+  } catch { return s; }
+}
+
+function mapEmbeds(embeds) {
+  try {
+    if (!Array.isArray(embeds)) return [];
+    return embeds.map(e => {
+      const raw = typeof e?.toJSON === 'function' ? e.toJSON() : e;
+      // Shallow sanitize content-like fields
+      const safe = {};
+      for (const [k, v] of Object.entries(raw || {})) {
+        if (typeof v === 'string') safe[k] = sanitizeString(v).slice(0, 4000);
+        else safe[k] = v;
+      }
+      return safe;
+    });
+  } catch { return []; }
+}
+
+function mapComponents(components) {
+  try {
+    if (!Array.isArray(components)) return [];
+    // Keep a summarised but useful shape
+    return components.map(row => {
+      const comps = Array.isArray(row?.components) ? row.components : (row?.data?.components || []);
+      return {
+        type: row?.type || row?.data?.type || 'row',
+        components: comps.map(c => ({
+          type: c?.type || c?.data?.type,
+          custom_id: c?.customId || c?.data?.custom_id,
+          label: c?.label || c?.data?.label,
+          style: c?.style || c?.data?.style,
+          disabled: !!(c?.disabled || c?.data?.disabled),
+        }))
+      };
+    });
+  } catch { return []; }
 }
 
 function normalizeMsgShape(msg) {
   if (!msg) return null;
   const embeds = Array.isArray(msg.embeds) ? msg.embeds : (msg.embeds ? [msg.embeds] : []);
+  const comps = Array.isArray(msg.components) ? msg.components : [];
   return {
     id: msg.id,
     type: 'message',
-    content: (msg.content || '').slice(0, 1800),
+    content: sanitizeString((msg.content || '')).slice(0, 1800),
+    embeds: mapEmbeds(embeds),
+    components: mapComponents(comps),
     embedsCount: embeds.length,
-    componentsCount: Array.isArray(msg.components) ? msg.components.length : 0,
+    componentsCount: comps.length,
   };
 }
 
@@ -13357,8 +14260,150 @@ async function maybeReport(client, entry) {
 
 function getLogs() { return state.logs.slice(-getLimit()); }
 function clearLogs() { state.logs = []; }
+function ensureLogDir() { try { if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true }); } catch {} }
+function persist(entry) {
+  try {
+    ensureLogDir();
+    // Build a stable, readable record
+    const verbose = !!(config.commandLogging && config.commandLogging.verbose);
+    const record = {
+      ts: entry.ts,
+      name: entry.name,
+      userId: entry.userId,
+      channelId: entry.channelId,
+      guildId: entry.guildId,
+      input: entry.input || entry.params || null,
+      output: entry.actual || entry.output || null,
+      dt: entry.dt,
+      meta: entry.meta || null,
+      ...(verbose ? { expected: entry.expected || null, diff: entry.diff || null } : {})
+    };
+    const safe = JSON.stringify(record, null, 2);
+    fs.appendFile(LOG_FILE, safe + '\n', () => {}); // async append; ignore errors
+  } catch {}
+}
 
-module.exports = { start, finish, getLogs, clearLogs, normalizeMsgShape, diffExpected };
+// Wrap an interaction's reply/update methods to automatically log outputs
+function instrumentInteractionLogging(interaction) {
+  if (!enabled()) return;
+  if (interaction.__commandLoggingWrapped) return;
+  interaction.__commandLoggingWrapped = true;
+  const safeInput = () => {
+    try {
+      const base = {
+        type: interaction.type,
+        id: interaction.id,
+        customId: interaction.customId || null,
+        commandName: interaction.commandName || null,
+      };
+      // Buttons/selects
+      try {
+        if (typeof interaction.isButton === 'function' && interaction.isButton()) {
+          base.kind = 'button';
+          base.messageId = interaction.message?.id || null;
+        } else if (typeof interaction.isStringSelectMenu === 'function' && interaction.isStringSelectMenu()) {
+          base.kind = 'string_select';
+          base.messageId = interaction.message?.id || null;
+          base.values = Array.isArray(interaction.values) ? interaction.values.slice(0, 25).map(v => sanitizeString(String(v)).slice(0, 200)) : undefined;
+        }
+      } catch {}
+      // Slash/chat input options
+      try {
+        if (typeof interaction.isChatInputCommand === 'function' && interaction.isChatInputCommand()) {
+          const data = interaction.options?.data;
+          if (Array.isArray(data)) {
+            base.kind = 'chat_input';
+            base.options = data.map(d => ({ name: d?.name, value: sanitizeString(String(d?.value ?? '')).slice(0, 500) }));
+          }
+        }
+      } catch {}
+      // Modal submit fields
+      try {
+        if (typeof interaction.isModalSubmit === 'function' && interaction.isModalSubmit()) {
+          base.kind = 'modal_submit';
+          const fields = [];
+          const coll = interaction.fields && interaction.fields.fields ? interaction.fields.fields : null;
+          if (coll && typeof coll.forEach === 'function') {
+            coll.forEach((comp, key) => {
+              let val = null;
+              try { if (typeof interaction.fields.getTextInputValue === 'function') val = interaction.fields.getTextInputValue(key); } catch {}
+              if (val != null) fields.push({ id: key, value: sanitizeString(String(val)).slice(0, 1000) });
+            });
+          }
+          // Fallback: try common ids if collection not enumerable
+          if (!fields.length && typeof interaction.fields?.getTextInputValue === 'function') {
+            const common = ['reason','amount','notes','input','value'];
+            for (const k of common) {
+              try {
+                const v = interaction.fields.getTextInputValue(k);
+                if (v != null && v !== '') fields.push({ id: k, value: sanitizeString(String(v)).slice(0, 1000) });
+              } catch {}
+            }
+          }
+          base.fields = fields;
+        }
+      } catch {}
+
+      // Verbose: member/user and role names
+      try {
+        const verbose = !!(config.commandLogging && config.commandLogging.verbose);
+        if (verbose) {
+          if (interaction.user) {
+            const tag = interaction.user.tag || interaction.user.username || null;
+            if (tag) base.userTag = sanitizeString(String(tag)).slice(0, 100);
+          }
+          const dn = interaction.member?.displayName || interaction.member?.nickname || null;
+          if (dn) base.memberDisplayName = sanitizeString(String(dn)).slice(0, 100);
+          const rolesCache = interaction.member?.roles?.cache;
+          if (rolesCache && typeof rolesCache.map === 'function') {
+            const arr = rolesCache.map(r => ({ id: r.id, name: sanitizeString(String(r.name || '')).slice(0, 100) }));
+            base.memberRoles = Array.isArray(arr) ? arr.slice(0, 25) : undefined;
+          }
+        }
+      } catch {}
+      return base;
+    } catch { return {}; }
+  };
+  const meta = {
+    userId: interaction.user?.id,
+    channelId: interaction.channelId,
+    guildId: interaction.guildId,
+  };
+  const makeStart = (name) => start({ name, userId: meta.userId, channelId: meta.channelId, guildId: meta.guildId, input: safeInput() });
+  const wrap = (methodName) => {
+    if (typeof interaction[methodName] !== 'function') return;
+    const original = interaction[methodName].bind(interaction);
+    interaction[methodName] = async function wrapped(options, ...rest) {
+      let ctx = null;
+      try {
+        const baseName = interaction.commandName ? `slash:${interaction.commandName}` : (interaction.customId ? `ui:${interaction.customId}` : `interaction:${methodName}`);
+        ctx = makeStart(baseName);
+      } catch {}
+      let result;
+      try { result = await original(options, ...rest); } catch (e) {
+        // Log the failure as well
+        try { finish(interaction.client, ctx, { output: shapeFromOptions(options), error: String(e && e.message || e) }); } catch {}
+        throw e;
+      }
+      try { finish(interaction.client, ctx, { output: shapeFromOptions(options) }); } catch {}
+      return result;
+    };
+  };
+  ['reply','followUp','editReply','update'].forEach(wrap);
+}
+
+function shapeFromOptions(options) {
+  try {
+    if (!options) return null;
+    if (typeof options === 'string') return { content: sanitizeString(options) };
+    const content = options.content ? sanitizeString(options.content).slice(0, 1800) : undefined;
+    const embeds = options.embeds ? mapEmbeds(options.embeds) : undefined;
+    const components = options.components ? mapComponents(options.components) : undefined;
+    return { content, embeds, components };
+  } catch { return null; }
+}
+
+module.exports = { start, finish, getLogs, clearLogs, normalizeMsgShape, diffExpected, instrumentInteractionLogging, shapeFromOptions };
 
 ```
 
@@ -13453,9 +14498,10 @@ module.exports = { validateConfig };
 const fs = require('fs');
 const path = require('path');
 const { logError } = require('./errorUtil');
+const { cfgPath } = require('./paths');
 
-const ERROR_LOG_FILE = path.resolve(__dirname, '../config/errorLog.json');
-const CRASH_LATEST_FILE = path.resolve(__dirname, '../config/crash-latest.json');
+const ERROR_LOG_FILE = cfgPath('errorLog.json');
+const CRASH_LATEST_FILE = cfgPath('crash-latest.json');
 let attached = false;
 let clientRef = null;
 let fatalHandled = false;
@@ -13467,7 +14513,7 @@ function safeWrite(file, data) {
 
 function appendEmergency(entry) {
   // Fallback append-only line file if main JSON write somehow fails
-  const emergencyFile = path.resolve(__dirname, '../config/error-emergency.log');
+  const emergencyFile = cfgPath('error-emergency.log');
   try { fs.appendFileSync(emergencyFile, JSON.stringify(entry) + '\n'); } catch { /* ignore */ }
 }
 
@@ -13541,7 +14587,7 @@ function initEarly() {
   // Lightweight heartbeat every 60s so we can detect hung process vs crash by timestamp
   heartbeatTimer = setInterval(() => {
     try {
-      const hbFile = path.resolve(__dirname, '../config/process-heartbeat.json');
+  const hbFile = cfgPath('process-heartbeat.json');
       safeWrite(hbFile, JSON.stringify({ ts: Date.now() }, null, 2));
     } catch {}
   }, 60000);
@@ -13573,8 +14619,9 @@ module.exports = { initEarly, attachClient };
 ```javascript
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 
-const FILE = path.resolve(__dirname, "../config/depositProgress.json");
+const FILE = cfgPath('depositProgress.json');
 let data = { users: {}, day: null, resetAt: null }; // day = YYYY-MM-DD (UTC)
 
 function load() {
@@ -13715,8 +14762,9 @@ module.exports = { EPHEMERAL_FLAG: 1<<6 };
 // Centralized error handling helpers with persistence for next-run diagnostics.
 const fs = require('fs');
 const path = require('path');
+const { cfgPath } = require('./paths');
 
-const ERROR_LOG_FILE = path.resolve(__dirname, '../config/errorLog.json');
+const ERROR_LOG_FILE = cfgPath('errorLog.json');
 const MAX_ERRORS = 100; // retention cap
 let inMemoryErrors = [];
 const errorListeners = [];
@@ -13813,8 +14861,9 @@ module.exports = { logError, recordExternalError, setOriginalConsoleError, safeR
 ```javascript
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 
-const EVENTS_FILE = path.resolve(__dirname, "../config/events.json");
+const EVENTS_FILE = cfgPath('events.json');
 
 function ensureFile() {
   const dir = path.dirname(EVENTS_FILE);
@@ -14182,9 +15231,10 @@ module.exports = { handleLeveling, getUserModifier };
 ```javascript
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 const { enqueueWrite } = require('./writeQueue');
 
-const LEVELS_FILE = path.resolve(__dirname, "../config/levels.json");
+const LEVELS_FILE = cfgPath('levels.json');
 
 // in-memory cache
 let levels = {};
@@ -14504,6 +15554,33 @@ module.exports = { sendModLog };
 
 ```
 
+===== FILE: utils/paths.js =====
+```javascript
+const fs = require('fs');
+const path = require('path');
+
+function findProjectRoot(startDir) {
+  let dir = startDir;
+  const root = path.parse(dir).root;
+  while (dir && dir !== root) {
+    try {
+      if (fs.existsSync(path.join(dir, 'package.json'))) return dir;
+    } catch {}
+    dir = path.dirname(dir);
+  }
+  // Fallback to CWD when package.json not found
+  return process.cwd();
+}
+
+const projectRoot = findProjectRoot(__dirname);
+
+function cfgPath(...parts) { return path.join(projectRoot, 'config', ...parts); }
+function dataPath(...parts) { return path.join(projectRoot, ...parts); }
+
+module.exports = { projectRoot, cfgPath, dataPath };
+
+```
+
 ===== FILE: utils/permissionsCache.js =====
 ```javascript
 // Simple permission result cache to reduce repeated role/permission scanning.
@@ -14615,8 +15692,9 @@ module.exports = { sanitizeMentions };
 ```javascript
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 
-const SCHEDULES_FILE = path.resolve(__dirname, "../config/schedules.json");
+const SCHEDULES_FILE = cfgPath('schedules.json');
 
 function ensureFile() {
   const dir = path.dirname(SCHEDULES_FILE);
@@ -15038,7 +16116,7 @@ function startScheduler(client, opts = {}) {
                         const nameSafe = ev.name || 'Event';
                         const embed = {
                           title: `🕒 Staff Clock In — ${nameSafe}`,
-                          description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.',
+                          description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
                           color: 3447003,
                           fields: [
                             { name: '📝 Instance Manager (1 slot)', value: `${(state.positions.instance_manager||[]).length} / 1\n${fmtMentions(state.positions.instance_manager)}`, inline: false },
@@ -15077,12 +16155,52 @@ function startScheduler(client, opts = {}) {
                         if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
                         payload = applyPlaceholdersToJsonPayload(payload, ev);
                         if (!payload.content && !payload.embeds) payload.content = m.message || `Auto message (${ev.name})`;
-                        await channel.send(payload).catch(()=>{});
+                        const sent = await channel.send(payload).catch(()=>null);
+                        // Optional auto-delete (skip for testing)
+                        try {
+                          const delMs = Number(m.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
+                          if (!config.testingMode && sent && delMs > 0) {
+                            setTimeout(() => { try { sent.delete().catch(()=>{}); } catch {} }, delMs);
+                          }
+                        } catch {}
+                        // Track message for later refresh
+                        try {
+                          if (sent && sent.id) {
+                            const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? { ...ev.__notifMsgs } : {};
+                            const rec = map[m.id] && typeof map[m.id]==='object' ? { ...map[m.id] } : { channelId: channel.id, ids: [] };
+                            rec.channelId = channel.id;
+                            rec.ids = Array.isArray(rec.ids) ? rec.ids : [];
+                            rec.ids.push(sent.id);
+                            if (rec.ids.length > 20) rec.ids = rec.ids.slice(-20);
+                            map[m.id] = rec;
+                            updateEvent(ev.id, { __notifMsgs: map });
+                          }
+                        } catch {}
                       } else {
                         const raw = m.message || `Auto message (${ev.name})`;
                         let content = applyTimestampPlaceholders(raw, ev);
                         if (config.testingMode) content = content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
-                        await channel.send({ content }).catch(()=>{});
+                        const sent = await channel.send({ content }).catch(()=>null);
+                        // Optional auto-delete (skip for testing)
+                        try {
+                          const delMs = Number(m.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
+                          if (!config.testingMode && sent && delMs > 0) {
+                            setTimeout(() => { try { sent.delete().catch(()=>{}); } catch {} }, delMs);
+                          }
+                        } catch {}
+                        // Track message for later refresh
+                        try {
+                          if (sent && sent.id) {
+                            const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? { ...ev.__notifMsgs } : {};
+                            const rec = map[m.id] && typeof map[m.id]==='object' ? { ...map[m.id] } : { channelId: channel.id, ids: [] };
+                            rec.channelId = channel.id;
+                            rec.ids = Array.isArray(rec.ids) ? rec.ids : [];
+                            rec.ids.push(sent.id);
+                            if (rec.ids.length > 20) rec.ids = rec.ids.slice(-20);
+                            map[m.id] = rec;
+                            updateEvent(ev.id, { __notifMsgs: map });
+                          }
+                        } catch {}
                       }
                     }
                   } catch (e) {
@@ -15391,7 +16509,11 @@ const defaultConfig = {
   },
   maxPurgeLimit: 100,
   blacklistedChannels: [],
-  moderatorLogChannelId: null
+  moderatorLogChannelId: null,
+  // Auto-messages: default delete-after (ms); 0 disables auto-deletion
+  autoMessages: {
+    defaultDeleteMs: 0
+  }
 };
 
 // Setting metadata (timestamps, etc.) persisted separately
@@ -15443,6 +16565,10 @@ function validateConfig(cfg) {
   if (typeof cfg.commandLogging.testingCompare !== 'boolean') cfg.commandLogging.testingCompare = true;
   if (!cfg.commandLogging.logChannelId) cfg.commandLogging.logChannelId = null;
   if (!Number.isFinite(cfg.commandLogging.sendIntervalMs)) cfg.commandLogging.sendIntervalMs = 5000;
+
+  // Auto-messages defaults
+  if (typeof cfg.autoMessages !== 'object' || cfg.autoMessages === null) cfg.autoMessages = { ...defaultConfig.autoMessages };
+  if (!Number.isFinite(cfg.autoMessages.defaultDeleteMs) || cfg.autoMessages.defaultDeleteMs < 0) cfg.autoMessages.defaultDeleteMs = 0;
 
   // Sanitize levelRewards to { "level": [roleIds] }
   const cleanedRewards = {};
@@ -15598,9 +16724,10 @@ module.exports = { toTitleCase };
 // Centralized theme: colors and emojis used across embeds (now supports external override config/theme.json)
 const fs = require('fs');
 const path = require('path');
+const { cfgPath } = require('./paths');
 let external = null;
 try {
-  const ext = path.resolve(__dirname, '../config/theme.json');
+  const ext = cfgPath('theme.json');
   if (fs.existsSync(ext)) external = JSON.parse(fs.readFileSync(ext,'utf8'));
 } catch { external = null; }
 
@@ -15764,11 +16891,11 @@ function buildTimestampMap(ev) {
     map.opening1 = map.timestamp_opening1;
     map.closing1 = `<t:${r.endSec}:t>`;
     map.timestamp_closing1 = map.closing1;
-  // Backwards compatible aliases (un-numbered forms)
+  // Backwards compatible aliases (timestamp_* only; avoid bare common words)
   map.timestamp_opening = map.timestamp_opening1;
-  map.opening = map.opening1;
   map.timestamp_closing = map.timestamp_closing1;
-  map.closing = map.closing1;
+  // Additional close alias requested: timestamp_close -> timestamp_closing1
+  map.timestamp_close = map.timestamp_closing1;
   }
   // Static placeholders for second opening per user instruction
   map.timestamp_opening2 = '<t:1757412000:t>';
@@ -15782,6 +16909,14 @@ function applyTimestampPlaceholders(text, ev) {
   if (!text || typeof text !== 'string') return text;
   const map = buildTimestampMap(ev);
   let out = text;
+  // First, handle angle-bracket tokens like <timestamp_close:t> or <timestamp_closing:t>
+  // We only rewrite those we know, leaving others as-is.
+  out = out.replace(/<\s*(timestamp_(?:opening|closing|open|close)\d?|opening\d?|closing\d?|timestamp_(?:opening|closing)|timestamp_close)\s*:\s*t\s*>/g, (m, p1) => {
+    const key = String(p1).replace(/\s+/g, '');
+    const replacement = map[key] || null;
+    return replacement ? replacement : m; // preserve if unknown
+  });
+  // Then support bare tokens without angle brackets
   for (const [k,v] of Object.entries(map)) {
     if (!v) continue;
     out = out.split(k).join(v);
@@ -16006,8 +17141,9 @@ module.exports.diffEditMessage = diffEditMessage;
 const fs = require("fs");
 const path = require("path");
 const { enqueueWrite } = require('./writeQueue');
+const { cfgPath } = require('./paths');
 
-const VC_LEVELS_FILE = path.resolve(__dirname, "../config/vcLevels.json");
+const VC_LEVELS_FILE = cfgPath('vcLevels.json');
 
 // in-memory cache
 let vcLevels = {};

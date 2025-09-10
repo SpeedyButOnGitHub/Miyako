@@ -3,9 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 const { logError } = require('./errorUtil');
+const { cfgPath } = require('./paths');
 
-const ERROR_LOG_FILE = path.resolve(__dirname, '../config/errorLog.json');
-const CRASH_LATEST_FILE = path.resolve(__dirname, '../config/crash-latest.json');
+const ERROR_LOG_FILE = cfgPath('errorLog.json');
+const CRASH_LATEST_FILE = cfgPath('crash-latest.json');
 let attached = false;
 let clientRef = null;
 let fatalHandled = false;
@@ -17,7 +18,7 @@ function safeWrite(file, data) {
 
 function appendEmergency(entry) {
   // Fallback append-only line file if main JSON write somehow fails
-  const emergencyFile = path.resolve(__dirname, '../config/error-emergency.log');
+  const emergencyFile = cfgPath('error-emergency.log');
   try { fs.appendFileSync(emergencyFile, JSON.stringify(entry) + '\n'); } catch { /* ignore */ }
 }
 
@@ -91,7 +92,7 @@ function initEarly() {
   // Lightweight heartbeat every 60s so we can detect hung process vs crash by timestamp
   heartbeatTimer = setInterval(() => {
     try {
-      const hbFile = path.resolve(__dirname, '../config/process-heartbeat.json');
+  const hbFile = cfgPath('process-heartbeat.json');
       safeWrite(hbFile, JSON.stringify({ ts: Date.now() }, null, 2));
     } catch {}
   }, 60000);

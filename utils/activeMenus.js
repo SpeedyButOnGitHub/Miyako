@@ -1,7 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 
-const SESSIONS_FILE = path.resolve(__dirname, "../config/buttonSessions.json");
+const SESSIONS_FILE = cfgPath('buttonSessions.json');
 
 // Handlers by session.type
 const handlers = new Map();

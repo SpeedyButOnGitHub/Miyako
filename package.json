@@ -8,6 +8,7 @@
   "export:text": "node ./scripts/export-text.js",
   "export:summary": "node ./scripts/export-summary.js",
   "export:watch": "node ./scripts/export-watch.js",
+  "export:schedule": "node ./scripts/export-schedule-summary.js",
     "test": "jest --runInBand",
     "migrate:clockin": "node ./scripts/migrate-clockin.js"
   },

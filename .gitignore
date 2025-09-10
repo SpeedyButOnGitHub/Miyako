@@ -32,6 +32,10 @@ yarn-error.log*
 .pnpm-debug.log*
 logs/
 
+# Generated context summaries
+FULL_CONTEXT.txt
+PROJECT_SUMMARY.txt
+
 # OS
 .DS_Store
 .env

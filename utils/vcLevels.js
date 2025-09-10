@@ -1,8 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 const { enqueueWrite } = require('./writeQueue');
+const { cfgPath } = require('./paths');
 
-const VC_LEVELS_FILE = path.resolve(__dirname, "../config/vcLevels.json");
+const VC_LEVELS_FILE = cfgPath('vcLevels.json');
 
 // in-memory cache
 let vcLevels = {};

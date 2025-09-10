@@ -2,9 +2,10 @@ require('dotenv/config');
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { cfgPath } = require('../utils/paths');
 
 const CHANNEL_ID = '1232701768832516100';
-const LEVELS_FILE = path.resolve(__dirname, '../config/levels.json');
+const LEVELS_FILE = cfgPath('levels.json');
 
 function xpForLevel(level) {
   const BASE_XP = 150;

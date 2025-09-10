@@ -1,7 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { cfgPath } = require('./paths');
 
-const CASH_FILE = path.resolve(__dirname, "../config/cash.json");
+const CASH_FILE = cfgPath('cash.json');
 const { enqueueWrite } = require('./writeQueue');
 
 let cash = {};
@@ -14,7 +15,7 @@ try {
 }
 
 // Testing overlay balances (persisted separately)
-const TEST_CASH_FILE = path.resolve(__dirname, "../config/testingCash.json");
+const TEST_CASH_FILE = cfgPath('testingCash.json');
 let testingCash = {};
 try {
   if (fs.existsSync(TEST_CASH_FILE)) {
