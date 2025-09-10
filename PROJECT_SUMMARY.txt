@@ -1,0 +1,1145 @@
+===== COMPACT PROJECT SUMMARY =====
+Project: Miyako  (generated: 2025-09-10T09:04:37.525Z)
+
+// Project Structure
+Miyako/
+  ARCHITECTURE.md
+  commands/
+    balance.js
+    cash.js
+    clockin.js
+    configMenu/
+    configMenu.js
+      constants.js
+      handlers.js
+      index.js
+      render.js
+    diagnostics.js
+    help.js
+    leaderboard.js
+    level.js
+    metrics.js
+    moderation/
+      dm.js
+      index.js
+      moderationCommands.js
+      permissions.js
+      purge.js
+      replies.js
+      warnings.js
+    profile.js
+    schedule.js
+    scripts.js
+    snipes.js
+    test.js
+  config/
+    activeMenus.json
+    bank.json
+    botConfig.json
+    botStatus.json
+    buttonSessions.json
+    cash.json
+    categories.js
+    changelogSnapshot.json
+    clockInEmbedTemplate.json
+    crash-latest.json
+    depositProgress.json
+    errorLog.json
+    events.json
+    levels.json
+    process-heartbeat.json
+    roles.js
+    schedules.json
+    snipes.json
+    testingBank.json
+    testingCash.json
+    vcLevels.json
+  events/
+    guildEvents.js
+    interactionEvents.js
+    messages.js
+  index.js
+  package-lock.json
+  package.json
+  README.md
+  scripts/
+    check-ephemeral.js
+    export-summary.js
+    export-text.js
+    import-levels.js
+    migrate-clockin.js
+    migrateClockInCore.js
+    restartHelper.js
+    runner.js
+    smoke-load.js
+    startBot.js
+    stopBot.js
+  services/
+    economyService.js
+    leaderboardService.js
+    levelingService.js
+    metricsService.js
+    scheduleService.js
+    statusService.js
+  tests/
+    clockinMigration.test.js
+    leaderboardCache.test.js
+    leveling.test.js
+    tax.test.js
+    taxEdges.test.js
+    vcLeveling.test.js
+    xpModifier.test.js
+  utils/
+    activeMenus.js
+    bank.js
+    botStatus.js
+    cash.js
+    cashDrops.js
+    changelog.js
+    commandLogger.js
+    configLogs.js
+    configValidate.js
+    crashReporter.js
+    depositProgress.js
+    embeds.js
+    ephemeralShim.js
+    errorUtil.js
+    eventsStorage.js
+    health.js
+    leaderboards.js
+    leveling.js
+    levels.js
+    logChannels.js
+    memberLogs.js
+    messageLogs.js
+    modLogs.js
+    permissionsCache.js
+    policy.js
+    processHandlers.js
+    roleLogs.js
+    sanitize.js
+    scheduler.js
+    scheduleStorage.js
+    shutdownState.js
+    singleton.js
+    staffTeam.js
+    storage.js
+    testingBanner.js
+    text.js
+    theme.js
+    time.js
+    timestampPlaceholders.js
+    ui.js
+    vcLevels.js
+    voiceLeveling.js
+    writeQueue.js
+
+// Important Snippets (condensed)
+
+// FILE: ARCHITECTURE.md
+# Miyako Architecture
+
+// FILE: commands/balance.js
+// ...
+function bankColor(bank, base)
+function buildStatusLine(bank, base)
+const progressBar = (current, max, size = 14) => sharedProgressBar(current, max, size, { allowOverflow: true, showNumbers: false });
+function buildBalancePayload(userId)
+function buildDepositMenuPayload(userId)
+function buildWithdrawMenuPayload(userId)
+async function handleBalanceCommand(client, message)
+module.exports = {  }
+// ...
+
+// FILE: commands/cash.js
+// ...
+async function handleCashCommand(client, message)
+module.exports = {  }
+// ...
+
+// FILE: commands/clockin.js
+// ...
+function buildClockInStateEmbed()
+async function handleClockInStateCommand(client, message)
+module.exports = {  }
+// ...
+
+// FILE: commands/configMenu/constants.js
+// ...
+const list = (Array.isArray(roleIds) ? roleIds : [roleIds]).map(id => `<@&${id}>`).join(", ");
+const list = (Array.isArray(roleIds) ? roleIds : [roleIds]).map(id => `<@&${id}>`).join(", ");
+module.exports = {  }
+// ...
+
+// FILE: commands/configMenu/handlers.js
+// ...
+async function refreshSettingMessage(message, categoryName, settingName)
+async function openCategory(interaction, categoryName)
+async function openSetting(interaction, categoryName, settingName)
+async function handleButton(interaction, [categoryName, settingName, action])
+const ensureArray = (arr) => (Array.isArray(arr) ? arr : []);
+const parseId = (raw) => (raw || '').replace(/[^0-9]/g, '');
+const parseRolesCsv = (txt) =>
+const ensureLevelArr = (lvl) => 
+const parseRolesCsv = (txt) =>
+const ensureLevelArr = (lvl) => 
+async function handleModal() { return; }
+module.exports = { content, flags }
+// ...
+
+// FILE: commands/configMenu/index.js
+// ...
+function buildRootComponents(currentCat)
+async function handleConfigMenuCommand(message)
+ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
+module.exports = {  }
+// ...
+
+// FILE: commands/configMenu/render.js
+// ...
+function buildRootEmbed()
+function buildCategorySelect(currentCategory)
+function buildSettingButtons(categoryName, settingName)
+function buildCategoryEmbed(categoryName)
+function buildSettingEmbed(categoryName, settingName)
+function buildSettingSelect(categoryName)
+function buildSettingRow(categoryName, settingName)
+module.exports = {  }
+function renderSettingEmbed(categoryName, settingKey)
+module.exports.renderSettingEmbed = renderSettingEmbed;
+// ...
+
+// FILE: commands/configMenu.js
+// ...
+async function handleMessageCreate(client, message)
+async function handleConfigCommand(client, message)
+module.exports = {  }
+// ...
+
+// FILE: commands/diagnostics.js
+// ...
+function checkEmbedsCapitalization(msg)
+async function handleDiagnosticsCommand(client, message)
+module.exports = {  }
+// ...
+
+// FILE: commands/help.js
+// ...
+function buildHelpCategories(member)
+function filterCategories(member) { return buildHelpCategories(member); }
+function buildCategoryEmbed(guild, member, categories, current)
+function buildRows(categories, current)
+async function handleHelpCommand(client, message)
+ActiveMenus.registerHandler('helpv2', async (interaction, session) => {
+module.exports = { embeds, components }
+// ...
+
+// FILE: commands/leaderboard.js
+// ...
+async function handleLeaderboardCommand(client, message)
+module.exports = {  }
+// ...
+
+// FILE: commands/level.js
+// ...
+function getLevelXP(level)
+function createProgressBar(current, max, size = 20)
+async function handleLevelCommand(client, message)
+const rank = (() => 
+module.exports = {  }
+// ...
+
+// FILE: commands/metrics.js
+// ...
+async function handleMetricsCommand(client, message)
+module.exports = {  }
+// ...
+
+// FILE: commands/moderation/dm.js
+// ...
+async function sendUserDM(target, action, duration = null, reason = null, extra = null)
+module.exports = {  }
+// ...
+
+// FILE: commands/moderation/index.js
+// ...
+module.exports = {  }
+// ...
+
+// FILE: commands/moderation/moderationCommands.js
+// ...
+function formatDuration(duration)
+function ensureStores()
+function getStore()
+function getUserWarnings(userId)
+function setUserWarnings(userId, arr)
+function getThresholds()
+async function findTarget(message, args)
+async function tryTimeoutOrRoleMute(member, durationMs, reason)
+async function clearTimeoutAndRole(member, reason)
+async function handleModerationCommands(client, message, command, args)
+module.exports = {  }
+// ...
+
+// FILE: commands/moderation/permissions.js
+// ...
+function isModerator(member)
+const hasRole = (rid) => roleCache.has(rid);
+module.exports = {  }
+// ...
+
+// FILE: commands/moderation/purge.js
+// ...
+function getLimits()
+function isBlacklisted(channelId)
+function parseArgs(message, args)
+async function handlePurgeCommand(client, message, args)
+async function executePurge(client, message, count, userFilter, filters={})
+module.exports = { allowedMentions, repliedUser }
+// ...
+
+// FILE: commands/moderation/replies.js
+// ...
+function replySuccess(target, text)
+function replyError(target, text)
+module.exports = {  }
+// ...
+
+// FILE: commands/moderation/warnings.js
+// ...
+function ensureWarningsMap()
+function getStoreKey()
+function getUserWarnings(userId)
+function setUserWarnings(userId, arr)
+function getThresholds()
+function getNextPunishmentInfo(total)
+function maybeSeedTestingData(guild)
+function getVisibleWarnings(userId)
+function memberLabel(guild, userId)
+function formatWarnLine(guild, entry, idx)
+const ordinal = (n) => 
+function buildDashboardEmbed(guild, page)
+function buildUserView(guild, userId, page = 1, opts = {})
+async function showWarnings(client, message, targetUserId = null)
+async function handleWarningsCommand(client, message)
+function buildRemoveSelect(guild, userId)
+async function handleWarningButtons(client, interaction)
+const idxs = (interaction.values || []).map(v => Number(v)).filter(n => Number.isInteger(n));
+function cleanWarnings(userId = null)
+module.exports = {  }
+// ...
+
+// FILE: commands/profile.js
+// ...
+function getLevelXP(level)
+function createProgressBar(current, max, size = 18)
+function getRankFromLeaderboard(levelsObj, userId)
+function collectUserPermissions(member, mode = "text")
+function formatPermissionPhrases(perms)
+function buildRows(view = "main", page = 1, totalPages = 1, mode = "text")
+function buildRankEmbed(member, rank, level, progressBar, mode = "text")
+function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 10, mode = "text")
+async function handleProfileCommand(client, message)
+ActiveMenus.registerHandler("profile", async (interaction, session) => {
+module.exports = {  }
+async function handleRankCommand(client, message)
+module.exports.handleRankCommand = handleRankCommand;
+// ...
+
+// FILE: commands/schedule.js
+// ...
+function applyEventName(str, ev)
+function formatBarStyleAnchor(ev, nextEpoch)
+function parseOffsetInput(raw)
+function humanizeMinutes(mins)
+function summarizeEvent(ev)
+const days = (ev.days || []).map(d => DAY_NAMES[d] || d).join(" ") || "All";
+function buildMainEmbed(guild)
+function buildDetailEmbed(guild, ev)
+const days = (ev.days || []).length ? ev.days.map(d => DAY_NAMES[d] || d).join(", ") : "(none)";
+function mainRows()
+function buildSelectRows(kind)
+function detailRows(ev)
+function buildNotifsEmbed(guild, ev)
+function notifManagerRows(ev)
+function notifSelectRows(ev)
+const opts = (ev.autoMessages||[]).slice(0,25).map(n => ({ label: `${humanizeMinutes(n.offsetMinutes)} ${n.enabled?'(on)':'(off)'} #${n.id}`.slice(0,100), value: n.id, description: (n.messageJSON?.content || n.message || '').replace(/\n/g,' ').slice(0,90) }));
+function notifDetailRows(ev, notif)
+function buildNotifDetailEmbed(guild, ev, notif)
+const previewVal = (()=>{ if (notif.messageJSON){ if (notif.messageJSON.content) return notif.messageJSON.content.slice(0,200)||'(empty)'; if (Array.isArray(notif.messageJSON.embeds)&&notif.messageJSON.embeds.length) return (notif.messageJSON.embeds[0].title||notif.messageJSON.embeds[0].description||'(embed)').toString().slice(0,200); return 'JSON'; } return (notif.message||'').slice(0,200)||'(empty)';})();
+async function ensureAnchor(interactionOrClient, ev, basePayloadOverride)
+async function handleScheduleCommand(client, message)
+async function handleEventCreateModal(interaction)
+const healJSON = (txt) => 
+const clamp = (s,max=1900)=> (s && s.length>max? s.slice(0,max-3)+'...':s);
+async function handleScheduleModal(interaction)
+function sanitizeMentionsForTesting(content)
+async function manualTriggerAutoMessage(interaction, ev, notif)
+ActiveMenus.registerHandler('events', async (interaction, session) => {
+const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
+const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
+const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
+const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
+const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
+const list = (ev.autoMessages||[]).filter(n=>String(n.id)!==String(notifId));
+const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
+async function handleEventEditModal(interaction)
+async function handleEventNotificationModal(interaction)
+const healJSON = (txt) => txt.replace(/^```(json)?/i,'').replace(/```$/,'').trim().replace(/,\s*([}\]])/g,'$1');
+module.exports = { embeds, components }
+// ...
+
+// FILE: commands/scripts.js
+// ...
+function walkForJS(dir, baseDir, out = [])
+function chunk(arr, size)
+function buildEmbed(guild, pageItems, page, totalPages, totalFiles, totalLines)
+async function handleScriptsCommand(client, message)
+ActiveMenus.registerHandler("scripts", async (interaction, session) => {
+module.exports = {  }
+// ...
+
+// FILE: commands/snipes.js
+// ...
+async function loadSnipes()
+async function saveSnipes()
+function formatTodayTime(date)
+function cleanupSnipes()
+async function handleSnipeCommands(client, message, command, args)
+function handleMessageDelete(message)
+module.exports = {  }
+// ...
+
+// FILE: commands/test.js
+// ...
+function buildRootEmbed()
+function rootRows()
+function buildEventsEmbed()
+function eventsRows()
+function buildEconomyEmbed()
+function economyRows()
+async function handleTestCommand(client, message)
+ActiveMenus.registerHandler('testmenu', async (interaction, session) => {
+module.exports = { embeds, components }
+// ...
+
+// FILE: config/activeMenus.json
+// JSON Array (length=0)
+
+// FILE: config/bank.json
+/* JSON keys: 349282473085239298 */
+
+// FILE: config/botConfig.json
+/* JSON keys: snipingWhitelist, moderatorRoles, warnings, escalation, defaultMuteDuration, modLogChannelId, testingMode, roleLogBlacklist, snipeMode, snipingChannelList, levelRewards, vcLevelRewards, levelingMode, levelingChannelList, roleXPBlacklist, globalXPMultiplier, cashDrops, maxPurgeLimit, blacklistedChannels, moderatorLogChannelId, testingWarnings, testingSeed, commandLogging */
+
+// FILE: config/botStatus.json
+/* JSON keys: lastOnline */
+
+// FILE: config/buttonSessions.json
+/* JSON keys:  */
+
+// FILE: config/cash.json
+/* JSON keys: 349282473085239298, 608049611549966355, 442007276182568961, 439459732336410627, 653331598951055391, 800410857758261318, 743113043776503839 */
+
+// FILE: config/categories.js
+// ...
+module.exports = {  }
+// ...
+
+// FILE: config/changelogSnapshot.json
+/* JSON keys: createdAt, files */
+
+// FILE: config/clockInEmbedTemplate.json
+/* JSON keys: content, embeds, components */
+
+// FILE: config/crash-latest.json
+/* JSON keys: ts, scope, reason, code */
+
+// FILE: config/depositProgress.json
+/* JSON keys: users, day, resetAt */
+
+// FILE: config/errorLog.json
+// JSON Array (length=64)
+
+// FILE: config/events.json
+/* JSON keys: nextId, events */
+
+// FILE: config/levels.json
+/* JSON keys: 349282473085239298, 931601222857809920, 1253491653969449052, 653331598951055391, 1008095023969095813, 638777892985241631, 743113043776503839, 308724484490264577, 800410857758261318, 1298902060434984981, 1353456073750876200, 748278274937061558, 608049611549966355, 696080705871937557, 1167223063570550824, 1401183376882536558, 359375052895944725, 439459732336410627, 265924995996319745, 499797288382889984, 183744480648757249, 257708404372406272, 552312406576201729, 895402188573114409, 484707113805807618, 890182887960358912, 1357519019988484219, 1256825035868344375, 99882928762277888, 1400119667208749190, 390978327529259020, 1412249664446791771, 448240240679976960, 508974192146776076, 246768967996276737, 758153798677430343, 930505213238972458, 1346860068234072144, 1412408655327789106, 673303967241076796, 1225611134556704848, 494314708271366144, 1118811354766266429, 697242474170810419, 1017354453088747540, 1380688212040749086, 1165431695953121372, 1293024363028807690, 1360532400320544769, 1097723400220311562, 1370602070561914931, 165537874467356673, 353511558615269378, 557914352272015368, 1379265931691298906, 697918349405061250, 687821907436765200, 1368126314372010025, 465379659337564172, 1225579087305904139, 663385935647473694, 1310182935353102338, 283257294437875714, 157728781069451264, 495360710403031040, 1115790837721350246, 1332463449011261564, 435444479877578752, 1028439274229612565, 1053120511984533585, 535989990728007690, 1270694380042322035, 575373066142613507, 568819859656278017, 1087855429503172658, 1096244440399609966, 477680616473755648, 1386462447619018776, 788651733868871690, 1177479745185796148, 185804101034967041, 849491710089756683, 833444916524089414, 892453218997661707, 1139935864177303584, 966190985719717938, 815054828324651009, 445627853715931137, 456226577798135808, 1018290068215037962, 1016489094823551076, 766865070499430411, 1385053820060696636, 947238441341571144, 680595190045868054, 689585981015588890, 506429768426586112, 737247214677655633, 805273537082163200, 432665616160391169, 371781186361491466, 872553074194022451, 670253520036823070, 1382349513485713469, 978893646919258153, 972490051135082516, 760637967269625867, 315127034839957536, 1116670030332055593, 1193323172867608666, 243555445552185354, 860655046073253949, 357737825652703233, 1257267444293042191, 692691820966051843, 1272075031106682970, 1034737794574209054, 757988023211393236, 603739947853283337, 1374927159671394334, 900920665245368382, 1385849258313256981, 1386740747407065361, 1387717399226351616, 382321748026064896, 163791176678244352, 1304957869300518922, 680933798766313473, 198892440420089866, 1136331213121011832, 977638862056747110, 1068978083618639903, 923764544248102912, 1075543606330392708, 790442070456008734, 1346511965849391196, 1313603311126974484, 208224779386224641, 399542181599248384, 419747259584872450, 636213205844099082, 612606934796992512, 625282917815418881, 1138029740922523659, 1287667458756448357, 1216506291908776127, 1250188686587461648, 901827747909873664, 830660691882803210, 1380191349466206373, 392966638225457152, 1119856078520332349, 1287826824570863647, 442007276182568961, 799319081723232267, 791684202890002452 */
+
+// FILE: config/process-heartbeat.json
+/* JSON keys: ts */
+
+// FILE: config/roles.js
+// ...
+module.exports = { Owners, Manager, Security, Staff, Trainee, Inactive, ROLE_ORDER, ROLE_EMOJIS }
+// ...
+
+// FILE: config/schedules.json
+/* JSON keys: nextId, schedules */
+
+// FILE: config/snipes.json
+/* JSON keys: 1232701768383729790 */
+
+// FILE: config/testingBank.json
+/* JSON keys: 349282473085239298 */
+
+// FILE: config/testingCash.json
+/* JSON keys: 349282473085239298 */
+
+// FILE: config/vcLevels.json
+/* JSON keys: 349282473085239298 */
+
+// FILE: events/guildEvents.js
+// ...
+function attachGuildEvents(client)
+client.on("guildMemberRemove", async (member) => {
+client.on("guildMemberUpdate", async (oldMember, newMember) => {
+client.on("messageDelete", async (message) => {
+client.on("messageUpdate", async (oldMessage, newMessage) => {
+module.exports = {  }
+// ...
+
+// FILE: events/interactionEvents.js
+// ...
+function instrumentInteraction(interaction)
+const wrap = (methodName) => 
+function attachInteractionEvents(client)
+client.on("interactionCreate", async (interaction) => {
+const canActKickBan = (action) => 
+const ensureStores = () => 
+const getStore = () => (config.testingMode ? config.testingWarnings : config.warnings);
+const saveStore = () => { try { saveConfig(); } catch {} };
+const buildTopRow = () => new ActionRowBuilder().addComponents(
+const swapRows = async (rows) => 
+const buildTopRow = () => new ActionRowBuilder().addComponents(
+module.exports = { embeds, content, flags }
+// ...
+
+// FILE: events/messages.js
+// ...
+function cdOk(userId, cmd, ms=2000)
+function attachMessageEvents(client)
+client.on("messageCreate", async (message) => {
+const buildPage = (page) => 
+const row = (page) => buildNavRow([
+module.exports = { expected, content, flags, idx, ts, scope, first, title, description, color, id, label, enabled, embeds, components, author, member, reply }
+ActiveMenus.registerHandler('errors', async (interaction, session) => {
+ActiveMenus.registerHandler('purgeConfirm', async (interaction, session) => {
+// ...
+
+// FILE: index.js
+// ...
+process.on('warning', (w) => recordExternalError('warning', w));
+async function sendBotStatusMessage()
+async function setStatusChannelName(online)
+ActiveMenus.registerHandler('status', async (interaction, session) => {
+const fields = (embed.data.fields||[]).filter(f => !f.name.startsWith('Details'));
+// ...
+
+// FILE: package-lock.json
+/* JSON keys: name, lockfileVersion, requires, packages */
+
+// FILE: package.json
+/* JSON keys: scripts, dependencies, devDependencies */
+
+// FILE: README.md
+# Miyako
+
+// FILE: scripts/check-ephemeral.js
+// ...
+function listTracked()
+function scan()
+// ...
+
+// FILE: scripts/export-summary.js
+// ...
+function listAll(relDir = '.')
+function makeTree(lines)
+function extractObjectKeysFromBlock(src, startIdx)
+function summarizeJS(filePath)
+const push = (s) => out.push(s);
+module.exports = { keys, Project, generated, FILE, summarize }
+function summarizeJSON(filePath)
+function summarizeMD(filePath)
+function main()
+// ...
+
+// FILE: scripts/export-text.js
+// ...
+function langForExt(ext)
+function listFiles(dir)
+function main()
+ws.on('close', () => {
+// ...
+
+// FILE: scripts/import-levels.js
+// ...
+function xpForLevel(level)
+function loadLevels()
+function saveLevels(levels)
+function extractTextFromMessage(msg)
+function extractAtName(text)
+function parseLevelEvent(text, msg)
+async function fetchAllMessages(channel)
+async function main()
+const norm = (s) => String(s || '')
+async function ensureMemberIndex()
+function resolveNameToId(name)
+// ...
+
+// FILE: scripts/migrate-clockin.js
+// ...
+function run()
+module.exports = {  }
+// ...
+
+// FILE: scripts/migrateClockInCore.js
+// ...
+function migrateClockIn(events)
+module.exports = {  }
+// ...
+
+// FILE: scripts/restartHelper.js
+// ...
+function start()
+// ...
+
+// FILE: scripts/runner.js
+// ...
+function log(line)
+function readHeartbeatTs()
+function startChild()
+child.on('exit', (code, signal) => {
+function killChildTree(cb)
+process.on('SIGINT', () => { stopping = true; log('runner SIGINT'); killChildTree(() => process.exit(0)); });
+process.on('SIGTERM', () => { stopping = true; log('runner SIGTERM'); killChildTree(() => process.exit(0)); });
+process.on('exit', () => { stopping = true; killChildTree(); });
+// ...
+
+// FILE: scripts/smoke-load.js
+// ...
+// ...
+
+// FILE: scripts/startBot.js
+// ...
+// ...
+
+// FILE: scripts/stopBot.js
+// ...
+function processExists(p)
+// ...
+
+// FILE: services/economyService.js
+// ...
+function getUserBalances(userId)
+function deposit(userId, amount, opts)
+function withdraw(userId, amount)
+module.exports = {  }
+// ...
+
+// FILE: services/leaderboardService.js
+// ...
+function buildEntries(mode)
+function getEntries(mode = 'text')
+function computeRank(mode, viewerId)
+function buildBankSection()
+function buildLeaderboardEmbed(guild, viewerId, page = 1, pageSize = 10, mode = 'text')
+function invalidate(mode = 'both')
+module.exports = {  }
+// ...
+
+// FILE: services/levelingService.js
+// ...
+function getUserLevelData(userId, mode = 'text')
+module.exports = { handleLeveling, getUserModifier, levels, getXP, getLevel, vcLevels, getVCXP, getVCLevel }
+// ...
+
+// FILE: services/metricsService.js
+// ...
+function markCommand() { metrics.commands++; metrics.lastCommandAt = Date.now(); }
+function markInteraction() { metrics.interactions++; }
+function markError() { metrics.errors++; }
+function getMetrics() { return { ...metrics }; }
+module.exports = {  }
+// ...
+
+// FILE: services/scheduleService.js
+// ...
+function start(client, opts)
+function computeNextRun(schedule)
+function computeAfterRun(schedule)
+module.exports = { addSchedule, updateSchedule, getSchedules, getEvents, getEvent, addEvent, updateEvent, removeEvent }
+// ...
+
+// FILE: services/statusService.js
+// ...
+function readLastOnline()
+function writeLastOnline(ts = Date.now())
+async function postStartup(client, { channelId = CONFIG_LOG_CHANNEL } = {})
+async function postShutdown(client, { channelId = CONFIG_LOG_CHANNEL } = {})
+async function updateStatusChannelName(client, online, { channelId = CONFIG_LOG_CHANNEL } = {})
+module.exports = {  }
+// ...
+
+// FILE: tests/clockinMigration.test.js
+// ...
+// ...
+
+// FILE: tests/leaderboardCache.test.js
+// ...
+// ...
+
+// FILE: tests/leveling.test.js
+// ...
+// ...
+
+// FILE: tests/tax.test.js
+// ...
+// ...
+
+// FILE: tests/taxEdges.test.js
+// ...
+function tax(current, deposit)
+// ...
+
+// FILE: tests/vcLeveling.test.js
+// ...
+// ...
+
+// FILE: tests/xpModifier.test.js
+// ...
+function mockMessage(userId, channelId = 'c1')
+// ...
+
+// FILE: utils/activeMenus.js
+// ...
+function timeoutRow()
+function loadSessions()
+function saveSessions()
+function scheduleTimer(client, messageId)
+async function init(client)
+function registerHandler(type, fn)
+function registerMessage(message, session)
+function snapshotSessions()
+async function sweepOrphans(client)
+async function processInteraction(interaction)
+module.exports = { handled, id }
+// ...
+
+// FILE: utils/bank.js
+// ...
+function scheduleSave()
+function getBaseLimit()
+function getBank(userId)
+function setBank(userId, amount)
+function addBank(userId, delta)
+function marginalTaxRate(balanceAfter, L)
+function computeTaxForDeposit(currentBank, deposit, L)
+const segmentTax = (start, segLen) => 
+function computeNextThreshold(currentBank, L)
+function computeMaxAffordableDeposit(userId)
+function quoteDeposit(userId, amount)
+function amountToNextThreshold(userId)
+function depositToBank(userId, amount, { allowAboveLimit = false } = {})
+function withdrawFromBank(userId, amount)
+function getTopBank(limit = 10)
+module.exports = {  }
+// ...
+
+// FILE: utils/botStatus.js
+// ...
+async function sendBotStatusMessage(client) { return service.postStartup(client); }
+async function sendBotShutdownMessage(client) { return service.postShutdown(client); }
+async function setStatusChannelName(client, online) { return service.updateStatusChannelName(client, online); }
+module.exports = {  }
+// ...
+
+// FILE: utils/cash.js
+// ...
+function scheduleSave()
+function getCash(userId)
+function setCash(userId, amount)
+function addCash(userId, delta)
+function getTopCash(limit = 10)
+function formatCash(amount)
+function getTestingCash(userId)
+function addTestingCash(userId, delta)
+function clearTestingCash()
+module.exports = {  }
+// ...
+
+// FILE: utils/cashDrops.js
+// ...
+function pickFunWord()
+function randomInt(min, max)
+function maybeSpawnDrop(message)
+function normalizeContent(s)
+function tryClaimDrop(message)
+function spawnTestDrop(amount)
+function cleanupExpiredDrops()
+function startCashDrops()
+module.exports = {  }
+// ...
+
+// FILE: utils/changelog.js
+// ...
+function sha1(buf)
+function walkDir(dir, fileList = [])
+function createSnapshot(rootDir)
+function loadSnapshot()
+function saveSnapshot(snap)
+function compareSnapshots(prev, curr)
+function formatBytes(n)
+function buildChangelogEmbed(result)
+async function postStartupChangelog(client, channelId, rootDir = path.resolve(__dirname, ".."))
+module.exports = { embeds }
+// ...
+
+// FILE: utils/commandLogger.js
+// ...
+function getLimit()
+function enabled()
+function add(log)
+function start(ctx)
+function finish(client, startCtx, result)
+function normalizeMsgShape(msg)
+function diffExpected(actual, expected)
+async function maybeReport(client, entry)
+function getLogs() { return state.logs.slice(-getLimit()); }
+function clearLogs() { state.logs = []; }
+module.exports = {  }
+// ...
+
+// FILE: utils/configLogs.js
+// ...
+async function logConfigChange(client, { user, change, before, after })
+module.exports = {  }
+// ...
+
+// FILE: utils/configValidate.js
+// ...
+function validateConfig(guild)
+module.exports = {  }
+// ...
+
+// FILE: utils/crashReporter.js
+// ...
+function safeWrite(file, data)
+function appendEmergency(entry)
+async function gracefulShutdown(reason, err, graceful = false)
+function onUncaught(err) { gracefulShutdown('uncaughtException', err); }
+function onUnhandled(reason) { gracefulShutdown('unhandledRejection', reason); }
+function onSignal(sig)
+function initEarly()
+process.on('uncaughtException', onUncaught);
+process.on('unhandledRejection', onUnhandled);
+process.on('warning', (w) => { try { logError('warning', w); } catch {} });
+process.on('exit', (code) => {
+function attachClient(client)
+module.exports = {  }
+// ...
+
+// FILE: utils/depositProgress.js
+// ...
+function load()
+function save()
+function todayUTC()
+function nextMidnightUTC()
+function rolloverIfNeeded()
+function getProgress(userId)
+function addProgress(userId, delta)
+module.exports = {  }
+// ...
+
+// FILE: utils/embeds.js
+// ...
+function createEmbed({ title = null, description = null, color = 'primary', fields = [], footer = null, timestamp = true } = {})
+function infoEmbed(opts = {}) { return createEmbed({ color: 'primary', ...opts }); }
+function successEmbed(opts = {}) { return createEmbed({ color: 'success', ...opts }); }
+function warnEmbed(opts = {}) { return createEmbed({ color: 'warning', ...opts }); }
+function errorEmbed(opts = {}) { return createEmbed({ color: 'danger', ...opts }); }
+function safeAddField(embed, name, value, inline = false)
+function addChunkedField(embed, baseName, text, chunkSize = 1000)
+module.exports = {  }
+// ...
+
+// FILE: utils/ephemeralShim.js
+// ...
+module.exports = {  }
+// ...
+
+// FILE: utils/errorUtil.js
+// ...
+function loadExisting()
+function persist()
+function formatError(err)
+function appendEntry(scope, msg)
+function logError(scope, err)
+function recordExternalError(scope, errLike)
+function setOriginalConsoleError(fn) { originalConsoleError = fn; }
+function registerErrorListener(fn) { if (typeof fn === 'function') errorListeners.push(fn); }
+function getRecentErrors(limit = 50)
+function clearErrorLog()
+function safeReply(target, content, opts = {})
+module.exports = {  }
+// ...
+
+// FILE: utils/eventsStorage.js
+// ...
+function ensureFile()
+function loadObj()
+function saveObj(obj)
+function getEvents() { return loadObj().events; }
+function getEvent(id) { id = String(id); return loadObj().events.find(e => String(e.id) === id) || null; }
+function addEvent(ev) { const obj = loadObj(); const id = String(obj.nextId++); const withId = { id, ...ev }; obj.events.push(withId); saveObj(obj); return withId; }
+function updateEvent(id, patch) { id = String(id); const obj = loadObj(); const i = obj.events.findIndex(e => String(e.id) === id); if (i === -1) return null; obj.events[i] = { ...obj.events[i], ...patch }; saveObj(obj); return obj.events[i]; }
+function removeEvent(id) { id = String(id); const obj = loadObj(); const i = obj.events.findIndex(e => String(e.id) === id); if (i === -1) return false; obj.events.splice(i,1); saveObj(obj); return true; }
+module.exports = {  }
+// ...
+
+// FILE: utils/health.js
+// ...
+async function runHealthChecks(client)
+function formatHealthLines(results)
+module.exports = {  }
+// ...
+
+// FILE: utils/leaderboards.js
+// ...
+function computeEntries(levelsObj = {})
+function sortEntries(entries)
+function computeRank(levelsObj, viewerId)
+function buildBankSection()
+function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 10, mode = 'text')
+module.exports = {  }
+// ...
+
+// FILE: utils/leveling.js
+// ...
+function getUserModifier(userId)
+function getRandomXP()
+async function handleLeveling(message, LEVEL_ROLES = {})
+module.exports = {  }
+// ...
+
+// FILE: utils/levels.js
+// ...
+function saveLevels()
+function getXP(userId)
+function getLevel(userId)
+function xpForLevel(level)
+function addXP(userId, amount)
+module.exports = {  }
+// ...
+
+// FILE: utils/logChannels.js
+// ...
+module.exports = {  }
+// ...
+
+// FILE: utils/memberLogs.js
+// ...
+async function logMemberLeave(client, member, isTest = false)
+module.exports = {  }
+// ...
+
+// FILE: utils/messageLogs.js
+// ...
+async function logMessageDelete(client, message)
+async function logMessageEdit(client, oldMessage, newMessage)
+module.exports = {  }
+// ...
+
+// FILE: utils/modLogs.js
+// ...
+async function sendModLog(
+const toTitleCase = (s) => String(s || "").replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.substr(1));
+module.exports = { parse }
+// ...
+
+// FILE: utils/permissionsCache.js
+// ...
+function getCached(guildId, userId)
+function setCached(guildId, userId, ok)
+function sweep()
+module.exports = {  }
+// ...
+
+// FILE: utils/policy.js
+// ...
+function isOwnerId(id) { return String(id) === String(process.env.OWNER_ID); }
+function checkPolicy(command, ctx)
+module.exports = {  }
+// ...
+
+// FILE: utils/processHandlers.js
+// ...
+// ...
+
+// FILE: utils/roleLogs.js
+// ...
+async function logRoleChange(client, member, role, action)
+module.exports = {  }
+// ...
+
+// FILE: utils/sanitize.js
+// ...
+function sanitizeMentions(content, { codeWrap = true } = {})
+module.exports = {  }
+// ...
+
+// FILE: utils/scheduler.js
+// ...
+function applyPlaceholdersToJsonPayload(payload, ev)
+const repl = (s) => applyTimestampPlaceholders(String(s), ev);
+const sanitize = (s) => (config.testingMode ? String(s).replace(/<@&?\d+>/g, m=>`\`${m}\``) : s);
+const fixStr = (s) => sanitize(repl(s));
+function parseTimeToMsToday(timeStr)
+function computeNextRun(schedule)
+const timeMsOfDay = (() => 
+async function runScheduleOnce(client, schedule)
+function computeAfterRun(schedule)
+function startScheduler(client, opts = {})
+module.exports = { __clockIn }
+// ...
+
+// FILE: utils/scheduleStorage.js
+// ...
+function ensureFile()
+function loadObj()
+function saveObj(obj)
+function getSchedules() { return loadObj().schedules; }
+function getSchedule(id) { id = String(id); return loadObj().schedules.find(s => String(s.id) === id) || null; }
+function addSchedule(schedule) { const obj = loadObj(); const id = String(obj.nextId++); const withId = { id, ...schedule }; obj.schedules.push(withId); saveObj(obj); return withId; }
+function updateSchedule(id, patch)
+function removeSchedule(id)
+module.exports = {  }
+// ...
+
+// FILE: utils/shutdownState.js
+// ...
+function recordShutdown()
+function readLastShutdown()
+module.exports = {  }
+// ...
+
+// FILE: utils/singleton.js
+// ...
+function pidAlive(pid)
+function ensureSingleton()
+const cleanup = () => { try { if (fs.existsSync(LOCK_FILE)) fs.unlinkSync(LOCK_FILE); } catch {}; };
+module.exports = {  }
+// ...
+
+// FILE: utils/staffTeam.js
+// ...
+const formatMembersListInline = (membersArray) =>
+const generateStaffList = async (guild) => 
+const getStaffMessageRow = () =>
+const updateStaffMessage = async (guild) => 
+module.exports = {  }
+// ...
+
+// FILE: utils/storage.js
+// ...
+const defaultConfig = { snipingWhitelist, moderatorRoles, warnings, escalation, muteThreshold, muteDuration, kickThreshold, defaultMuteDuration, modLogChannelId, testingMode, roleLogBlacklist, snipeMode, snipingChannelList, rewards, levelRewards, vcLevelRewards, levelingMode, levelingChannelList, roleXPBlacklist, globalXPMultiplier, Economy, cashDrops, dropChance, minAmount, maxAmount, lifetimeMs, maxPurgeLimit, blacklistedChannels, moderatorLogChannelId, lastUpdated, recursive, level, val, v, defaults, config }
+function saveSettingMeta()
+function touchSettingMeta(key)
+function ensureDir()
+function validateConfig(cfg)
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+function saveConfig()
+module.exports = { config }
+module.exports.settingMeta = settingMeta;
+module.exports.touchSettingMeta = touchSettingMeta;
+// ...
+
+// FILE: utils/testingBanner.js
+// ...
+async function updateTestingStatus(client, enabled, actor)
+module.exports = {  }
+// ...
+
+// FILE: utils/text.js
+// ...
+function toTitleCase(str)
+module.exports = {  }
+// ...
+
+// FILE: utils/theme.js
+// ...
+// ...
+
+// FILE: utils/time.js
+// ...
+function parseDurationAndReason(args)
+module.exports = {  }
+// ...
+
+// FILE: utils/timestampPlaceholders.js
+// ...
+function parseHM(str)
+function computeNextRange(ev)
+function buildTimestampMap(ev)
+function applyTimestampPlaceholders(text, ev)
+module.exports = {  }
+// ...
+
+// FILE: utils/ui.js
+// ...
+function registerToggle(def)
+function getToggleState(key)
+function getToggleVisual(on)
+function semanticButton(kind, { id, label, emoji, active = false, enabled = true } = {})
+function buildNavRow(buttons)
+function buildToggleRow(toggles) { return buildNavRow(toggles); }
+function buildDestructiveRow(buttons) { return buildNavRow(buttons); }
+function btn(id, label, style = ButtonStyle.Secondary, emoji, disabled = false)
+function navBtn(id, label, active, emoji)
+function toggleModeBtn(id, mode, nextModeLabel, isVC)
+function backButton(id = 'back', label = 'Back')
+function primaryEmbed(title, description)
+function sectionField(name, value, inline = false)
+function progressBar(current, max, size = 20, { showNumbers = true, allowOverflow = true, style = 'blocks' } = {})
+function applyStandardFooter(embed, guild, { testingMode } = { testingMode: false })
+function paginationLabel(page, totalPages)
+function applyFooterWithPagination(embed, guild, { testingMode = false, page = null, totalPages = null, extra = null } = {})
+function paginationRow(prefix, page, totalPages)
+function closeRow(id = 'close_menu', label = 'Close')
+function applyToggleVisual(embed, { on } = { on: false })
+function buildSettingEmbedUnified({ title, description, current, toggleKey, lastUpdatedTs } = {})
+module.exports = { t, d, c, id, dis, style, lbl }
+async function diffEditMessage(target, { embeds, components, content })
+module.exports.diffEditMessage = diffEditMessage;
+// ...
+
+// FILE: utils/vcLevels.js
+// ...
+function saveVCLevels()
+function getVCXP(userId)
+function getVCLevel(userId)
+function xpForLevel(level)
+function addVCXP(userId, amount)
+module.exports = {  }
+// ...
+
+// FILE: utils/voiceLeveling.js
+// ...
+function startVoiceLeveling(client)
+client.on("voiceStateUpdate", (oldState, newState) => {
+function flushUser(userId)
+module.exports = {  }
+// ...
+
+// FILE: utils/writeQueue.js
+// ...
+function ensureDir(filePath)
+function flush(filePath)
+function flushAll()
+function enqueueWrite(filePath, getContentFn, { delay = 150 } = {})
+function getWriteQueueMetrics() { return { ...metrics, pending: pending.size }; }
+module.exports = {  }
+// ...
+
+===== END SUMMARY =====

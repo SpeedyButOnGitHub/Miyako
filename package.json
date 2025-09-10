@@ -5,6 +5,8 @@
     "start:bg": "node ./scripts/startBot.js",
     "stop": "node ./scripts/stopBot.js",
     "import-levels": "node ./scripts/import-levels.js",
+  "export:text": "node ./scripts/export-text.js",
+  "export:summary": "node ./scripts/export-summary.js",
     "test": "jest --runInBand",
     "migrate:clockin": "node ./scripts/migrate-clockin.js"
   },
