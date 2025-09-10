@@ -7,6 +7,24 @@ dist/
 .env.local
 .env.*.local
 
+schedule_summary.txt
+
+# Runtime data (dynamic user/storage files)
+config/activeMenus.json
+config/bank.json
+config/botStatus.json
+config/buttonSessions.json
+config/cash.json
+config/changelogSnapshot.json
+config/crash-latest.json
+config/depositProgress.json
+config/errorLog.json
+config/levels.json
+config/process-heartbeat.json
+config/snipes.json
+config/testingBank.json
+config/testingCash.json
+config/vcLevels.json
 # Logs
 npm-debug.log*
 yarn-debug.log*
