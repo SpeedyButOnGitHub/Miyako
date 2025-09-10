@@ -15,6 +15,6 @@ async function handleMetricsCommand(client, message) {
     description: lines.join('\n'),
     color: theme.colors.primary
   });
-  try { await message.reply({ embeds: [embed], allowedMentions: { repliedUser: false } }); } catch {}
+  try { return await message.reply({ embeds: [embed], allowedMentions: { repliedUser: false } }); } catch {}
 }
 module.exports = { handleMetricsCommand };

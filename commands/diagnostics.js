@@ -32,7 +32,7 @@ async function handleDiagnosticsCommand(client, message) {
     lines.push(`Toggle ${t.k}: ${t.st.on?'ON':'OFF'} (value=${t.st.value})`);
   }
   const embed = createEmbed({ title: `${theme.emojis.health||'🩺'} Diagnostics`, description: lines.join('\n'), color: emptyRows?theme.colors.danger:theme.colors.success });
-  await message.reply({ embeds:[embed], allowedMentions:{repliedUser:false} });
+  return await message.reply({ embeds:[embed], allowedMentions:{repliedUser:false} });
 }
 
 module.exports = { handleDiagnosticsCommand };

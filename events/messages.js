@@ -105,33 +105,45 @@ function attachMessageEvents(client) {
     const args = message.content.slice(1).trim().split(/\s+/);
     const command = args.shift().toLowerCase();
 
-    try {
+  const { start: logStart, finish: logFinish, normalizeMsgShape, diffExpected } = require('../utils/commandLogger');
+  let _logCtx = null; let _sentMsg = null; let _expected = null;
+  try {
       if (command === "help") {
-        await handleHelpCommand(client, message); markCommand();
+    _logCtx = logStart({ name: 'help', userId: message.author.id, channelId: message.channelId, params: {} });
+    _sentMsg = await handleHelpCommand(client, message); markCommand();
       } else if (["mute", "unmute", "timeout", "untimeout", "ban", "kick", "warn", "removewarn"].includes(command)) {
         if (!checkPolicy(command, message)) return;
         if (!cdOk(message.author.id, command, 2500)) return;
-        await handleModerationCommands(client, message, command, args); markCommand();
+    _logCtx = logStart({ name: command, userId: message.author.id, channelId: message.channelId, params: { args } });
+    _sentMsg = await handleModerationCommands(client, message, command, args); markCommand();
       } else if (command === 'purge' || command === 'clean') {
         if (!checkPolicy('purge', message)) return;
         if (!cdOk(message.author.id, 'purge', 5000)) return;
-        await handlePurgeCommand(client, message, args); markCommand();
+    _logCtx = logStart({ name: 'purge', userId: message.author.id, channelId: message.channelId, params: { args } });
+    _sentMsg = await handlePurgeCommand(client, message, args); markCommand();
       } else if (["snipe", "s", "ds"].includes(command)) {
-        await handleSnipeCommands(client, message, command, args); markCommand();
+    _logCtx = logStart({ name: 'snipe', userId: message.author.id, channelId: message.channelId, params: { alias: command, args } });
+    _sentMsg = await handleSnipeCommands(client, message, command, args); markCommand();
       } else if (command === "warnings" || command === "warns") {
-        await handleWarningsCommand(client, message); markCommand();
+    _logCtx = logStart({ name: 'warnings', userId: message.author.id, channelId: message.channelId, params: {} });
+    _sentMsg = await handleWarningsCommand(client, message); markCommand();
       } else if (command === "config") {
         if (!checkPolicy('config', message)) return;
-        await handleMessageCreate(client, message); markCommand();
+    _logCtx = logStart({ name: 'config', userId: message.author.id, channelId: message.channelId, params: {} });
+    _sentMsg = await handleMessageCreate(client, message); markCommand();
       } else if (command === "level" || command === "rank") {
-        await handleRankCommand(client, message); markCommand();
+    _logCtx = logStart({ name: 'rank', userId: message.author.id, channelId: message.channelId, params: {} });
+    _sentMsg = await handleRankCommand(client, message); markCommand();
       } else if (command === "profile" || command === "p") {
-        await handleProfileCommand(client, message); markCommand();
+    _logCtx = logStart({ name: 'profile', userId: message.author.id, channelId: message.channelId, params: {} });
+    _sentMsg = await handleProfileCommand(client, message); markCommand();
       } else if (command === "test") {
         if (!checkPolicy('test', message)) return;
-        await handleTestCommand(client, message); markCommand();
+    _logCtx = logStart({ name: 'test', userId: message.author.id, channelId: message.channelId, params: {} });
+    _sentMsg = await handleTestCommand(client, message); markCommand();
       } else if (command === "leaderboard" || command === "lb") {
-        await handleLeaderboardCommand(client, message); markCommand();
+    _logCtx = logStart({ name: 'leaderboard', userId: message.author.id, channelId: message.channelId, params: {} });
+    _sentMsg = await handleLeaderboardCommand(client, message); markCommand();
       } else if (command === "restart") {
         if (message.author.id !== process.env.OWNER_ID) return;
         // Record restart timestamp for next boot to compute downtime
@@ -140,16 +152,17 @@ function attachMessageEvents(client) {
             fs.writeFileSync("./config/lastShutdown.json", JSON.stringify({ ts: Date.now() }));
         } catch {}
         await message.reply({ content: "🔄 Restarting bot...", allowedMentions: { repliedUser: false } }).catch(() => {});
-        // Spawn a new detached process then exit current
+        // Spawn a tiny helper that waits for lock to clear, then starts index.js
         try {
           const { spawn } = require('child_process');
           const nodeExec = process.argv[0];
-          const entry = path.resolve(__dirname, '..', 'index.js');
-          const child = spawn(nodeExec, [entry], {
+          const helper = path.resolve(__dirname, '..', 'scripts', 'restartHelper.js');
+          const child = spawn(nodeExec, [helper], {
             cwd: process.cwd(),
             env: process.env,
             detached: true,
-            stdio: 'ignore'
+            stdio: 'ignore',
+            windowsHide: true
           });
           child.unref();
         } catch (e) {
@@ -162,19 +175,26 @@ function attachMessageEvents(client) {
         await message.reply("🛑 Stopping bot...");
         process.exit(0);
       } else if (command === "schedule") {
-        await handleScheduleCommand(client, message);
+  _logCtx = logStart({ name: 'schedule', userId: message.author.id, channelId: message.channelId, params: {} });
+  _sentMsg = await handleScheduleCommand(client, message);
       } else if (command === "scripts") {
-        await handleScriptsCommand(client, message); markCommand();
+  _logCtx = logStart({ name: 'scripts', userId: message.author.id, channelId: message.channelId, params: {} });
+  _sentMsg = await handleScriptsCommand(client, message); markCommand();
       } else if (command === "cash") {
-        await handleCashCommand(client, message); markCommand();
+  _logCtx = logStart({ name: 'cash', userId: message.author.id, channelId: message.channelId, params: {} });
+  _sentMsg = await handleCashCommand(client, message); markCommand();
       } else if (command === "balance" || command === "bal") {
-        await handleBalanceCommand(client, message); markCommand();
+  _logCtx = logStart({ name: 'balance', userId: message.author.id, channelId: message.channelId, params: {} });
+  _sentMsg = await handleBalanceCommand(client, message); markCommand();
       } else if (command === "diag" || command === "diagnostics") {
-        await handleDiagnosticsCommand(client, message); markCommand();
+  _logCtx = logStart({ name: 'diagnostics', userId: message.author.id, channelId: message.channelId, params: {} });
+  _sentMsg = await handleDiagnosticsCommand(client, message); markCommand();
       } else if (command === 'metrics') {
-        await handleMetricsCommand(client, message); markCommand();
+  _logCtx = logStart({ name: 'metrics', userId: message.author.id, channelId: message.channelId, params: {} });
+  _sentMsg = await handleMetricsCommand(client, message); markCommand();
   } else if (command === 'clockinstate') {
-        await handleClockInStateCommand(client, message); markCommand();
+  _logCtx = logStart({ name: 'clockinstate', userId: message.author.id, channelId: message.channelId, params: {} });
+  _sentMsg = await handleClockInStateCommand(client, message); markCommand();
   } else if (command === 'errors' || command === 'err') {
         if (message.author.id !== process.env.OWNER_ID) return;
         // Accept patterns: .errors, .errors 25, .errors embed 25, .errors 25 embed
@@ -235,6 +255,16 @@ function attachMessageEvents(client) {
       console.error(`[Message Command Error]:`, err);
       message.reply(`<:VRLSad:1413770577080094802> An error occurred while executing \`${command}\`.\nDetails: \`${err.message || err}\``);
     }
+
+    // finalize logging for commands we wrapped
+    try {
+      if (_logCtx) {
+        const actual = normalizeMsgShape(_sentMsg);
+        let diff = null;
+        if (config.testingMode && _expected) diff = diffExpected(actual, _expected);
+        logFinish(client, _logCtx, { actual, expected: _expected || null, diff });
+      }
+    } catch {}
 
     // Already handled above for all messages
   });

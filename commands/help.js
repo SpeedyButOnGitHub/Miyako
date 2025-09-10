@@ -106,7 +106,7 @@ async function handleHelpCommand(client, message) {
   const current = cats[0]?.id || 'general';
   const embed = buildCategoryEmbed(message.guild, member, cats, current);
   const rows = buildRows(cats, current);
-  const msg = await message.reply({ embeds: [embed], components: rows, allowedMentions:{repliedUser:false} }).catch(()=>null);
+    return await message.reply({ embeds: [embed], components: rows, allowedMentions:{repliedUser:false} });
   if (!msg) return;
   ActiveMenus.registerMessage(msg, { type: 'helpv2', userId: message.author.id, data: { current } });
 }

@@ -6,6 +6,35 @@ const ms = require("ms");
 const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const theme = require('./theme');
 const { createEmbed } = require('./embeds');
+const { CONFIG_LOG_CHANNEL } = require('./logChannels');
+
+function applyPlaceholdersToJsonPayload(payload, ev) {
+  if (!payload || typeof payload !== 'object') return payload;
+  const repl = (s) => applyTimestampPlaceholders(String(s), ev);
+  const sanitize = (s) => (config.testingMode ? String(s).replace(/<@&?\d+>/g, m=>`\`${m}\``) : s);
+  const fixStr = (s) => sanitize(repl(s));
+  const copy = { ...payload };
+  if (typeof copy.content === 'string') copy.content = fixStr(copy.content).slice(0, 2000);
+  if (Array.isArray(copy.embeds)) {
+    copy.embeds = copy.embeds.map(e => {
+      if (!e || typeof e !== 'object') return e;
+      const ee = { ...e };
+      if (typeof ee.title === 'string') ee.title = fixStr(ee.title);
+      if (typeof ee.description === 'string') ee.description = fixStr(ee.description);
+      if (ee.footer && typeof ee.footer.text === 'string') ee.footer = { ...ee.footer, text: fixStr(ee.footer.text) };
+      if (ee.author && typeof ee.author.name === 'string') ee.author = { ...ee.author, name: fixStr(ee.author.name) };
+      if (Array.isArray(ee.fields)) ee.fields = ee.fields.map(f => {
+        if (!f || typeof f !== 'object') return f;
+        const ff = { ...f };
+        if (typeof ff.name === 'string') ff.name = fixStr(ff.name).slice(0, 256);
+        if (typeof ff.value === 'string') ff.value = fixStr(ff.value).slice(0, 1024);
+        return ff;
+      });
+      return ee;
+    });
+  }
+  return copy;
+}
 
 /**
  * Schedule object shape (stored in schedules.json):
@@ -46,8 +75,10 @@ function computeNextRun(schedule) {
   if (type === "once") {
     if (schedule.date && schedule.time) {
       const [y, m, d] = schedule.date.split("-").map(Number);
-      const next = new Date(y, (m || 1) - 1, d || 1, ...((schedule.time || "00:00").split(":").map(Number)));
-      return next.getTime();
+  const [hh = 0, mm = 0] = (schedule.time || "00:00").split(":").map(Number);
+  const next = new Date(y, (m || 1) - 1, d || 1, hh, mm, 0, 0);
+  const ts = next.getTime();
+  return ts > now ? ts : null; // if time is in the past, do not reschedule
     }
     // fallback: schedule.nextRun if present
     return schedule.nextRun || null;
@@ -93,11 +124,17 @@ function computeNextRun(schedule) {
     // schedule.dayOfMonth
     const day = Math.max(1, Number(schedule.dayOfMonth) || 1);
     const [hh = 0, mm = 0] = (schedule.time || "00:00").split(":").map(Number);
-    let candidate = new Date();
-    candidate.setDate(day);
-    candidate.setHours(hh, mm, 0, 0);
+    const base = new Date();
+    const year = base.getFullYear();
+    const month = base.getMonth();
+    const lastDayThisMonth = new Date(year, month + 1, 0).getDate();
+    const dom = Math.min(day, lastDayThisMonth);
+    let candidate = new Date(year, month, dom, hh, mm, 0, 0);
     if (candidate.getTime() <= now) {
-      const next = new Date(candidate.getFullYear(), candidate.getMonth() + 1, day, hh, mm, 0, 0);
+      const nextMonth = month + 1;
+      const lastDayNextMonth = new Date(year, nextMonth + 1, 0).getDate();
+      const dom2 = Math.min(day, lastDayNextMonth);
+      const next = new Date(year, nextMonth, dom2, hh, mm, 0, 0);
       return next.getTime();
     }
     return candidate.getTime();
@@ -108,9 +145,23 @@ function computeNextRun(schedule) {
 
 async function runScheduleOnce(client, schedule) {
   try {
-    const channel = await client.channels.fetch(schedule.channelId).catch(() => null);
+  const chId = config.testingMode ? (schedule.logChannelId || CONFIG_LOG_CHANNEL || schedule.channelId) : schedule.channelId;
+  const channel = await client.channels.fetch(chId).catch(() => null);
     if (!channel || !channel.send) throw new Error("Invalid channel");
-    await channel.send({ content: schedule.message || "Scheduled message" });
+    // Support simple content or JSON payloads + timestamp placeholders
+    // If messageJSON exists, prefer its content (even if empty) and do not fallback to the raw string in schedule.message.
+    let content = '';
+    if (schedule.messageJSON && typeof schedule.messageJSON === 'object') {
+      let payload = { ...schedule.messageJSON };
+      if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
+      payload = applyPlaceholdersToJsonPayload(payload, schedule.eventRef || {});
+      await channel.send(payload);
+    } else {
+      const raw = schedule.message || 'Scheduled message';
+      content = applyTimestampPlaceholders(raw, schedule.eventRef || {});
+      if (config.testingMode && content) content = content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
+      await channel.send({ content });
+    }
     console.log(`Scheduled message sent for schedule ${schedule.id}`);
   } catch (err) {
     console.error("Failed to send scheduled message:", err);
@@ -126,6 +177,12 @@ function computeAfterRun(schedule) {
       schedule.nextRun = null;
       return schedule;
     }
+  }
+  // One-off schedules should disable after first run unless explicitly repeated
+  if ((schedule.type || 'once') === 'once') {
+    schedule.enabled = false;
+    schedule.nextRun = null;
+    return schedule;
   }
   // nextRun based on schedule type
   schedule.nextRun = computeNextRun(schedule);
@@ -234,12 +291,14 @@ function startScheduler(client, opts = {}) {
               const [th, tm] = t.split(':').map(x=>parseInt(x,10));
               if (Number.isNaN(th) || Number.isNaN(tm)) continue;
               const eventStartMin = th*60+tm;
-              const targetMin = Math.max(0, eventStartMin - offset);
+              // Skip offsets that would land on previous day to avoid midnight duplicates
+              if (eventStartMin - offset < 0) continue;
+              const targetMin = eventStartMin - offset;
               if (curMinutes === targetMin) {
                 const fireKey = `__auto_${m.id}_${t}`;
                 if (!(ev[fireKey] && now - ev[fireKey] < 60000)) {
                   try {
-                    const targetChannelId = m.channelId || ev.channelId;
+                    const targetChannelId = config.testingMode ? CONFIG_LOG_CHANNEL : (m.channelId || ev.channelId);
                     const channel = await client.channels.fetch(targetChannelId).catch(()=>null);
                     if (channel && channel.send) {
                       // Clock-In special behavior
@@ -307,7 +366,11 @@ function startScheduler(client, opts = {}) {
                           .setCustomId(`clockin:${ev.id}:${m.id}`)
                           .setPlaceholder('📋 Select a position')
                           .addOptions(
-                            POSITIONS.map(p => ({ label: `${p.label.replace(/^[^ ]+ /,'')}`.slice(0,100), value: p.key, description: `${p.short} slots ${p.max}`.slice(0,100) }))
+                            POSITIONS.map(p => ({
+                              label: `${p.label.replace(/^[^ ]+ /,'')}`.slice(0,100),
+                              value: p.key,
+                              description: p.max ? `${p.short} slots ${p.max}` : `${p.short}`
+                            }))
                           );
                         const row = new ActionRowBuilder().addComponents(menu);
                         const sent = await channel.send({ embeds: [embed], components: [row] }).catch(()=>null);
@@ -316,16 +379,14 @@ function startScheduler(client, opts = {}) {
                           // Cleanup orphaned / non-existent ids beyond cap
                           if (state.messageIds.length > CLOCKIN_ORPHAN_MAX) state.messageIds = state.messageIds.slice(-CLOCKIN_ORPHAN_MAX);
                           state.lastSentTs = Date.now();
+                          state.channelId = targetChannelId;
                           updateEvent(ev.id, { [clockKey]: state });
                         }
                       } else if (m.messageJSON && typeof m.messageJSON === 'object') {
-                        const payload = { ...m.messageJSON };
+                        let payload = { ...m.messageJSON };
                         if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
-                        if (payload.content) payload.content = applyTimestampPlaceholders(payload.content, ev);
-                        if (payload.content && payload.content.length > 2000) payload.content = payload.content.slice(0,1997)+'...';
+                        payload = applyPlaceholdersToJsonPayload(payload, ev);
                         if (!payload.content && !payload.embeds) payload.content = m.message || `Auto message (${ev.name})`;
-                        if (payload.content) payload.content = applyTimestampPlaceholders(payload.content, ev);
-                        if (config.testingMode && payload.content) payload.content = payload.content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
                         await channel.send(payload).catch(()=>{});
                       } else {
                         const raw = m.message || `Auto message (${ev.name})`;
@@ -397,12 +458,13 @@ function startScheduler(client, opts = {}) {
           } catch (e) { /* ignore anchor update errors */ }
         }
         // Periodic prune of stale clock-in message IDs (deleted messages)
-        try {
+    try {
           if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds)) {
             const pruneInterval = 5 * 60 * 1000; // 5m
             const nowTs = Date.now();
             if (!ev.__clockIn.lastPruneTs || (nowTs - ev.__clockIn.lastPruneTs) > pruneInterval) {
-              const channel = ev.channelId ? await client.channels.fetch(ev.channelId).catch(()=>null) : null;
+      const chId = ev.__clockIn.channelId || ev.channelId;
+      const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
               if (channel && channel.messages) {
                 const kept = [];
                 for (const mid of ev.__clockIn.messageIds.slice(-10)) { // only check recent subset

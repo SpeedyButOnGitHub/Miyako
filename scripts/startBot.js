@@ -14,7 +14,8 @@ if (fs.existsSync(pidFile)) {
 const child = spawn(process.execPath, ['index.js'], {
   cwd: root,
   detached: true,
-  stdio: 'ignore'
+  stdio: 'ignore',
+  windowsHide: true
 });
 
 child.unref();

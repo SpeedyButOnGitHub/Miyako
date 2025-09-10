@@ -1,0 +1,192 @@
+[2025-09-10T07:42:39.262Z] child started pid=5636
+[2025-09-10T07:42:39.836Z] child exit code=1 signal=null uptimeMs=599
+[2025-09-10T07:42:41.859Z] child started pid=8952
+[2025-09-10T07:42:42.376Z] child exit code=1 signal=null uptimeMs=538
+[2025-09-10T07:42:46.410Z] child started pid=20040
+[2025-09-10T07:42:46.992Z] child exit code=1 signal=null uptimeMs=608
+[2025-09-10T07:42:55.028Z] child started pid=24728
+[2025-09-10T07:42:55.575Z] child exit code=1 signal=null uptimeMs=569
+[2025-09-10T07:43:11.596Z] child started pid=25140
+[2025-09-10T07:43:12.125Z] child exit code=1 signal=null uptimeMs=549
+[2025-09-10T07:43:42.149Z] child started pid=25016
+[2025-09-10T07:43:42.687Z] child exit code=1 signal=null uptimeMs=558
+[2025-09-10T07:44:12.713Z] child started pid=20088
+[2025-09-10T07:44:13.297Z] child exit code=1 signal=null uptimeMs=606
+[2025-09-10T07:44:43.337Z] child started pid=13104
+[2025-09-10T07:44:43.935Z] child exit code=1 signal=null uptimeMs=624
+[2025-09-10T07:45:13.976Z] child started pid=25804
+[2025-09-10T07:45:14.560Z] child exit code=1 signal=null uptimeMs=611
+[2025-09-10T07:45:44.598Z] child started pid=14204
+[2025-09-10T07:45:45.164Z] child exit code=1 signal=null uptimeMs=590
+[2025-09-10T07:46:15.203Z] child started pid=28388
+[2025-09-10T07:46:15.796Z] child exit code=1 signal=null uptimeMs=627
+[2025-09-10T07:46:45.862Z] child started pid=22668
+[2025-09-10T07:46:46.595Z] child exit code=1 signal=null uptimeMs=789
+[2025-09-10T07:47:16.640Z] child started pid=28000
+[2025-09-10T07:47:17.222Z] child exit code=1 signal=null uptimeMs=622
+[2025-09-10T07:47:47.265Z] child started pid=4328
+[2025-09-10T07:47:47.882Z] child exit code=1 signal=null uptimeMs=649
+[2025-09-10T07:48:17.935Z] child started pid=15432
+[2025-09-10T07:48:18.556Z] child exit code=1 signal=null uptimeMs=663
+[2025-09-10T07:48:48.590Z] child started pid=18924
+[2025-09-10T07:48:49.245Z] child exit code=1 signal=null uptimeMs=689
+[2025-09-10T07:49:19.290Z] child started pid=9812
+[2025-09-10T07:49:19.931Z] child exit code=1 signal=null uptimeMs=677
+[2025-09-10T07:49:49.978Z] child started pid=26820
+[2025-09-10T07:49:50.679Z] child exit code=1 signal=null uptimeMs=736
+[2025-09-10T07:50:20.731Z] child started pid=28684
+[2025-09-10T07:50:21.334Z] child exit code=1 signal=null uptimeMs=649
+[2025-09-10T07:50:51.384Z] child started pid=29596
+[2025-09-10T07:50:51.997Z] child exit code=1 signal=null uptimeMs=649
+[2025-09-10T07:51:22.040Z] child started pid=28804
+[2025-09-10T07:51:22.625Z] child exit code=1 signal=null uptimeMs=618
+[2025-09-10T07:51:52.662Z] child started pid=4768
+[2025-09-10T07:51:53.317Z] child exit code=1 signal=null uptimeMs=687
+[2025-09-10T07:52:23.354Z] child started pid=14608
+[2025-09-10T07:52:23.975Z] child exit code=1 signal=null uptimeMs=657
+[2025-09-10T07:52:54.008Z] child started pid=17696
+[2025-09-10T07:52:54.662Z] child exit code=1 signal=null uptimeMs=685
+[2025-09-10T07:53:24.718Z] child started pid=3780
+[2025-09-10T07:53:25.297Z] child exit code=1 signal=null uptimeMs=622
+[2025-09-10T07:53:55.359Z] child started pid=29224
+[2025-09-10T07:53:55.979Z] child exit code=1 signal=null uptimeMs=671
+[2025-09-10T07:54:26.018Z] child started pid=27968
+[2025-09-10T07:54:32.664Z] child exit code=3221225786 signal=null uptimeMs=6679
+[2025-09-10T07:55:02.705Z] child started pid=25220
+[2025-09-10T07:55:03.314Z] child exit code=1 signal=null uptimeMs=646
+[2025-09-10T07:55:33.359Z] child started pid=29404
+[2025-09-10T07:55:33.960Z] child exit code=1 signal=null uptimeMs=635
+[2025-09-10T07:56:04.008Z] child started pid=24352
+[2025-09-10T07:56:04.649Z] child exit code=1 signal=null uptimeMs=676
+[2025-09-10T07:56:34.698Z] child started pid=22884
+[2025-09-10T07:56:35.362Z] child exit code=1 signal=null uptimeMs=700
+[2025-09-10T07:57:05.402Z] child started pid=14536
+[2025-09-10T07:57:06.033Z] child exit code=1 signal=null uptimeMs=666
+[2025-09-10T07:57:36.073Z] child started pid=28548
+[2025-09-10T07:57:36.730Z] child exit code=1 signal=null uptimeMs=691
+[2025-09-10T07:58:07.405Z] child started pid=17732
+[2025-09-10T08:07:37.469Z] child exit code=0 signal=null uptimeMs=570735
+[2025-09-10T08:08:07.517Z] child started pid=2840
+[2025-09-10T08:08:09.772Z] child exit code=3221225786 signal=null uptimeMs=2288
+[2025-09-10T08:08:39.814Z] child started pid=16968
+[2025-09-10T08:08:43.598Z] child exit code=3221225786 signal=null uptimeMs=3817
+[2025-09-10T08:09:13.646Z] child started pid=6168
+[2025-09-10T08:09:15.857Z] child exit code=3221225786 signal=null uptimeMs=2246
+[2025-09-10T08:09:45.918Z] child started pid=26676
+[2025-09-10T08:09:50.966Z] child exit code=3221225786 signal=null uptimeMs=5104
+[2025-09-10T08:10:21.010Z] child started pid=17064
+[2025-09-10T08:10:26.170Z] child exit code=3221225786 signal=null uptimeMs=5195
+[2025-09-10T08:10:39.459Z] heartbeat stale (211356ms) -> restarting child
+[2025-09-10T08:10:56.204Z] child started pid=2324
+[2025-09-10T08:11:00.111Z] child exit code=3221225786 signal=null uptimeMs=3940
+[2025-09-10T08:11:30.149Z] child started pid=28660
+[2025-09-10T08:11:30.733Z] child exit code=1 signal=null uptimeMs=617
+[2025-09-10T08:11:39.460Z] heartbeat stale (271358ms) -> restarting child
+[2025-09-10T08:12:00.766Z] child started pid=17548
+[2025-09-10T08:12:01.320Z] child exit code=1 signal=null uptimeMs=585
+[2025-09-10T08:12:31.369Z] child started pid=28716
+[2025-09-10T08:12:31.954Z] child exit code=1 signal=null uptimeMs=619
+[2025-09-10T08:13:01.988Z] child started pid=29496
+[2025-09-10T08:13:02.627Z] child exit code=1 signal=null uptimeMs=670
+[2025-09-10T08:13:32.661Z] child started pid=28360
+[2025-09-10T08:13:33.227Z] child exit code=1 signal=null uptimeMs=596
+[2025-09-10T08:14:03.270Z] child started pid=29292
+[2025-09-10T08:14:03.875Z] child exit code=1 signal=null uptimeMs=637
+[2025-09-10T08:14:33.907Z] child started pid=20664
+[2025-09-10T08:14:34.470Z] child exit code=1 signal=null uptimeMs=595
+[2025-09-10T08:15:04.498Z] child started pid=28908
+[2025-09-10T08:15:05.096Z] child exit code=1 signal=null uptimeMs=619
+[2025-09-10T08:15:35.142Z] child started pid=28688
+[2025-09-10T08:15:35.692Z] child exit code=1 signal=null uptimeMs=583
+[2025-09-10T08:16:05.737Z] child started pid=24212
+[2025-09-10T08:16:06.379Z] child exit code=1 signal=null uptimeMs=677
+[2025-09-10T08:16:36.426Z] child started pid=27292
+[2025-09-10T08:16:37.007Z] child exit code=1 signal=null uptimeMs=616
+[2025-09-10T08:17:07.055Z] child started pid=7520
+[2025-09-10T08:17:07.667Z] child exit code=1 signal=null uptimeMs=645
+[2025-09-10T08:17:37.714Z] child started pid=7616
+[2025-09-10T08:17:38.277Z] child exit code=1 signal=null uptimeMs=596
+[2025-09-10T08:18:08.316Z] child started pid=15440
+[2025-09-10T08:18:08.853Z] child exit code=1 signal=null uptimeMs=567
+[2025-09-10T08:18:38.884Z] child started pid=28344
+[2025-09-10T08:18:39.436Z] child exit code=1 signal=null uptimeMs=582
+[2025-09-10T08:19:09.481Z] child started pid=22156
+[2025-09-10T08:19:10.038Z] child exit code=1 signal=null uptimeMs=591
+[2025-09-10T08:19:40.079Z] child started pid=22968
+[2025-09-10T08:19:40.618Z] child exit code=1 signal=null uptimeMs=569
+[2025-09-10T08:20:10.655Z] child started pid=29212
+[2025-09-10T08:20:11.200Z] child exit code=1 signal=null uptimeMs=577
+[2025-09-10T08:20:41.230Z] child started pid=3648
+[2025-09-10T08:20:41.777Z] child exit code=1 signal=null uptimeMs=574
+[2025-09-10T08:21:11.818Z] child started pid=9132
+[2025-09-10T08:21:12.390Z] child exit code=1 signal=null uptimeMs=602
+[2025-09-10T08:21:42.424Z] child started pid=6712
+[2025-09-10T08:21:42.970Z] child exit code=1 signal=null uptimeMs=577
+[2025-09-10T08:22:13.008Z] child started pid=12808
+[2025-09-10T08:22:13.566Z] child exit code=1 signal=null uptimeMs=589
+[2025-09-10T08:22:43.599Z] child started pid=29420
+[2025-09-10T08:22:44.134Z] child exit code=1 signal=null uptimeMs=567
+[2025-09-10T08:23:14.179Z] child started pid=16044
+[2025-09-10T08:23:14.802Z] child exit code=1 signal=null uptimeMs=655
+[2025-09-10T08:23:44.835Z] child started pid=8884
+[2025-09-10T08:23:45.394Z] child exit code=1 signal=null uptimeMs=591
+[2025-09-10T08:24:15.439Z] child started pid=3776
+[2025-09-10T08:24:16.001Z] child exit code=1 signal=null uptimeMs=593
+[2025-09-10T08:24:46.040Z] child started pid=29412
+[2025-09-10T08:24:46.593Z] child exit code=1 signal=null uptimeMs=584
+[2025-09-10T08:25:16.627Z] child started pid=2376
+[2025-09-10T08:25:17.217Z] child exit code=1 signal=null uptimeMs=624
+[2025-09-10T08:25:47.246Z] child started pid=16044
+[2025-09-10T08:25:47.843Z] child exit code=1 signal=null uptimeMs=624
+[2025-09-10T08:26:17.883Z] child started pid=16044
+[2025-09-10T08:26:18.461Z] child exit code=1 signal=null uptimeMs=609
+[2025-09-10T08:26:48.504Z] child started pid=16516
+[2025-09-10T08:26:49.112Z] child exit code=1 signal=null uptimeMs=645
+[2025-09-10T08:27:19.146Z] child started pid=25400
+[2025-09-10T08:27:19.682Z] child exit code=1 signal=null uptimeMs=563
+[2025-09-10T08:27:49.727Z] child started pid=6736
+[2025-09-10T08:27:50.301Z] child exit code=1 signal=null uptimeMs=607
+[2025-09-10T08:28:20.333Z] child started pid=22652
+[2025-09-10T08:28:20.888Z] child exit code=1 signal=null uptimeMs=585
+[2025-09-10T08:28:50.919Z] child started pid=4876
+[2025-09-10T08:28:51.456Z] child exit code=1 signal=null uptimeMs=566
+[2025-09-10T08:29:21.502Z] child started pid=28568
+[2025-09-10T08:29:22.039Z] child exit code=1 signal=null uptimeMs=569
+[2025-09-10T08:29:52.083Z] child started pid=13536
+[2025-09-10T08:29:52.640Z] child exit code=1 signal=null uptimeMs=587
+[2025-09-10T08:30:22.681Z] child started pid=6224
+[2025-09-10T08:30:23.252Z] child exit code=1 signal=null uptimeMs=603
+[2025-09-10T08:30:53.299Z] child started pid=15676
+[2025-09-10T08:30:53.942Z] child exit code=1 signal=null uptimeMs=679
+[2025-09-10T08:31:23.981Z] child started pid=21948
+[2025-09-10T08:31:24.535Z] child exit code=1 signal=null uptimeMs=590
+[2025-09-10T08:31:54.574Z] child started pid=7648
+[2025-09-10T08:31:55.134Z] child exit code=1 signal=null uptimeMs=594
+[2025-09-10T08:32:25.178Z] child started pid=22832
+[2025-09-10T08:32:25.724Z] child exit code=1 signal=null uptimeMs=582
+[2025-09-10T08:32:55.760Z] child started pid=27640
+[2025-09-10T08:32:56.294Z] child exit code=1 signal=null uptimeMs=568
+[2025-09-10T08:33:26.339Z] child started pid=27424
+[2025-09-10T08:33:26.895Z] child exit code=1 signal=null uptimeMs=591
+[2025-09-10T08:33:56.936Z] child started pid=22180
+[2025-09-10T08:33:57.525Z] child exit code=1 signal=null uptimeMs=622
+[2025-09-10T08:34:27.573Z] child started pid=6612
+[2025-09-10T08:34:28.130Z] child exit code=1 signal=null uptimeMs=593
+[2025-09-10T08:34:58.174Z] child started pid=5988
+[2025-09-10T08:34:58.752Z] child exit code=1 signal=null uptimeMs=612
+[2025-09-10T08:35:28.801Z] child started pid=29156
+[2025-09-10T08:35:29.369Z] child exit code=1 signal=null uptimeMs=602
+[2025-09-10T08:35:59.419Z] child started pid=29532
+[2025-09-10T08:35:59.991Z] child exit code=1 signal=null uptimeMs=608
+[2025-09-10T08:36:30.035Z] child started pid=28248
+[2025-09-10T08:36:30.610Z] child exit code=1 signal=null uptimeMs=609
+[2025-09-10T08:37:00.653Z] child started pid=24300
+[2025-09-10T08:37:01.255Z] child exit code=1 signal=null uptimeMs=637
+[2025-09-10T08:37:31.286Z] child started pid=15196
+[2025-09-10T08:37:31.876Z] child exit code=1 signal=null uptimeMs=620
+[2025-09-10T08:38:01.921Z] child started pid=29632
+[2025-09-10T08:38:02.491Z] child exit code=1 signal=null uptimeMs=602
+[2025-09-10T08:38:32.533Z] child started pid=22876
+[2025-09-10T08:38:33.103Z] child exit code=1 signal=null uptimeMs=604
+[2025-09-10T08:39:03.149Z] child started pid=18584
+[2025-09-10T08:39:03.790Z] child exit code=1 signal=null uptimeMs=676

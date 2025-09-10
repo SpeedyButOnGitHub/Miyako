@@ -83,6 +83,14 @@ function validateConfig(cfg) {
   if (!Array.isArray(cfg.blacklistedChannels)) cfg.blacklistedChannels = [];
   if (cfg.moderatorLogChannelId && typeof cfg.moderatorLogChannelId !== 'string') cfg.moderatorLogChannelId = String(cfg.moderatorLogChannelId);
 
+  // Command logging defaults
+  if (typeof cfg.commandLogging !== 'object' || cfg.commandLogging === null) cfg.commandLogging = {};
+  if (typeof cfg.commandLogging.enabled !== 'boolean') cfg.commandLogging.enabled = false;
+  if (!Number.isFinite(cfg.commandLogging.maxEntries)) cfg.commandLogging.maxEntries = 500;
+  if (typeof cfg.commandLogging.testingCompare !== 'boolean') cfg.commandLogging.testingCompare = true;
+  if (!cfg.commandLogging.logChannelId) cfg.commandLogging.logChannelId = null;
+  if (!Number.isFinite(cfg.commandLogging.sendIntervalMs)) cfg.commandLogging.sendIntervalMs = 5000;
+
   // Sanitize levelRewards to { "level": [roleIds] }
   const cleanedRewards = {};
   for (const [lvl, val] of Object.entries(cfg.levelRewards)) {

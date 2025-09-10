@@ -334,6 +334,7 @@ async function handleScheduleCommand(client, message) {
   const embed = buildMainEmbed(message.guild);
   const sent = await message.reply({ embeds: [embed], components: mainRows(), allowedMentions: { repliedUser: false } }).catch(()=>null);
   if (sent) ActiveMenus.registerMessage(sent, { type: 'events', userId: message.author.id, data: { mode: 'main' } });
+  return sent;
 }
 
 // Handle creation modal: id pattern event_create_modal_<managerMessageId>
@@ -463,8 +464,15 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     }
     return !!sent;
   }
-  let content = notif.messageJSON?.content || notif.message || '';
-  if (!content && notif.messageJSON) content = '';
+  // If a JSON payload exists, prefer its content exclusively (even if empty),
+  // and do NOT fall back to the raw JSON string saved in notif.message — otherwise
+  // the JSON body gets echoed as plain text alongside the embed/components.
+  let content = '';
+  if (notif.messageJSON && typeof notif.messageJSON === 'object') {
+    content = notif.messageJSON.content || '';
+  } else {
+    content = notif.message || '';
+  }
   content = applyTimestampPlaceholders(content, ev);
   if (config.testingMode) content = sanitizeMentionsForTesting(content);
   if (!content) content = `Auto message (${ev.name})`;

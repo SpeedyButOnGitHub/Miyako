@@ -8,6 +8,15 @@
 			"args": [],
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "Run minimal Jest tests to ensure no regressions",
+			"type": "shell",
+			"command": "npm test --silent -- -i",
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
 		}
 	]
 }
