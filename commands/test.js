@@ -8,7 +8,7 @@ if (process.env.JEST_WORKER_ID !== undefined) {
     });
   });
 }
-const { OWNER_ID } = require("./moderation/permissions");
+const { OWNER_ID } = require("../src/commands/moderation/permissions");
 const { config, saveConfig } = require("../utils/storage");
 const { TEST_LOG_CHANNEL } = require("../utils/logChannels");
 const { spawnTestDrop } = require("../utils/cashDrops");

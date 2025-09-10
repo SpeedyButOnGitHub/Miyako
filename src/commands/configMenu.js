@@ -1,1 +1,1 @@
-module.exports = require('../../commands/configMenu');
+module.exports = require('./configMenu');

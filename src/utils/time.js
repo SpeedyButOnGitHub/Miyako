@@ -1,1 +1,21 @@
-module.exports = require('../../utils/time');
+const ms = require("ms");
+
+function parseDurationAndReason(args) {
+	let duration = null;
+	let reasonParts = [];
+	for (const arg of args) {
+		const parsed = ms(arg);
+		if (parsed && !duration) {
+			duration = parsed;
+		} else {
+			reasonParts.push(arg);
+		}
+	}
+	const reason = reasonParts.join(" ").trim() || null;
+	return { duration, reason };
+}
+
+module.exports = {
+	parseDurationAndReason,
+	ms
+};
