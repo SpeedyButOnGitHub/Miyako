@@ -412,17 +412,17 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   if (!channel) throw new Error('Channel not found');
   const { applyTimestampPlaceholders } = require('../utils/timestampPlaceholders');
   if (notif.isClockIn) {
-    // Build a minimal clock-in message (doesn't alter state beyond skip marker when not testing)
-  const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
-  const theme = require('../utils/theme');
-    // Modernized: Only Instance Master has a cap (1). Others unlimited.
+    // Build staff clock-in message to match the expected template
+    const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+    const theme = require('../utils/theme');
+    // Capacities per template and standardized labels
     const POSITIONS = [
-      { key:'instance_manager', label:'🗝️ Instance Master', max:1 },
-      { key:'manager', label:'🛠️ Manager' },
-      { key:'bouncer', label:'🛡️ Bouncer' },
-      { key:'bartender', label:'🍸 Bartender' },
-      { key:'backup', label:'🎯 Backup' },
-      { key:'maybe', label:'⏳ Maybe/Late' }
+      { key:'instance_manager', emoji:'🗝️', label:'Instance Manager', cap:1, short:'IM' },
+      { key:'manager',          emoji:'🛠️', label:'Manager',          cap:5, short:'M' },
+      { key:'bouncer',          emoji:'🛡️', label:'Bouncer',          cap:10, short:'B' },
+      { key:'bartender',        emoji:'🍸', label:'Bartender',        cap:15, short:'BT' },
+      { key:'backup',           emoji:'🎯', label:'Backup',           cap:20, short:'BK' },
+      { key:'maybe',            emoji:'⏳', label:'Maybe/Late',        cap:50, short:'?' }
     ];
     ev.__clockIn = ev.__clockIn || { positions:{}, messageIds:[] };
     for (const p of POSITIONS) { if (!Array.isArray(ev.__clockIn.positions[p.key])) ev.__clockIn.positions[p.key] = []; }
@@ -437,25 +437,26 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
         return true; // treat as success without duplication
       }
     } catch {}
-  // Enforce standardized staff clock-in header (ignore saved custom message)
-  let baseText = `🕒 Staff Clock-In — ${ev.name}`;
-  baseText = applyEventName(baseText, ev);
-    baseText = applyTimestampPlaceholders(baseText, ev).replace(/\n{3,}/g,'\n\n');
-    if (config.testingMode) baseText = sanitizeMentionsForTesting(baseText);
-    const embed = createEmbed({
-      title: `🕒 Staff Clock-In — ${ev.name}`,
-      description: `${baseText}\n\nSelect a position below. Instance Master limited to 1 slot; selecting updates your role.`,
-      color: theme.colors?.primary || 0x5865F2
-    });
+    // Build embed matching clockInEmbedTemplate.json expectations
+    const title = `🕒 Staff Clock-In — ${ev.name}`;
+    let description = `🕒 Staff Clock-In — ${ev.name}\n\nSelect a position from the menu below. One slot per staff (auto-updates).`;
+    description = applyTimestampPlaceholders(description, ev);
+    if (config.testingMode) description = sanitizeMentionsForTesting(description);
+    const embed = createEmbed({ title, description, color: theme.colors?.primary || 0x5865F2 });
     for (const p of POSITIONS) {
       const arr = ev.__clockIn.positions[p.key];
       const value = arr.length ? arr.map(id=>`<@${id}>`).join(', ') : '—';
-      const name = p.key === 'instance_manager' ? `${p.label} (${arr.length}/1)` : `${p.label} (${arr.length})`;
+      const name = `${p.emoji} ${p.label} (${arr.length}/${p.cap})`;
       embed.addFields({ name, value: value.substring(0,1024), inline: true });
     }
-  const menu = new StringSelectMenuBuilder().setCustomId(`clockin:${ev.id}:${notif.id}`).setPlaceholder('📋 Select a position').addOptions(POSITIONS.map(p=>({ label: p.label.replace(/^\S+\s+/,'').slice(0,100), value:p.key })));
+    // Build select menu with option descriptions like "IM slots 1"
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId(`clockin:${ev.id}:${notif.id}`)
+      .setPlaceholder('📋 Select a position')
+      .addOptions(POSITIONS.map(p => ({ label: p.label, value: p.key, description: `${p.short} slots ${p.cap}` })));
     const row = new ActionRowBuilder().addComponents(menu);
-    const sent = await channel.send({ embeds:[embed], components:[row] }).catch(()=>null);
+    // Content is intentionally empty to match template
+    const sent = await channel.send({ content: '', embeds:[embed], components:[row] }).catch(()=>null);
     if (sent && !config.testingMode) {
       notif.__skipUntil = Date.now() + 60*60*1000; // skip for an hour
       notif.lastManualTrigger = Date.now();

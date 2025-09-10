@@ -175,7 +175,12 @@
     "message": "process exiting with code 0"
   },
   {
-    "ts": 1757493543780,
+    "ts": 1757494246653,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757494248391,
     "scope": "fatal:exit",
     "message": "abnormal exit code 1"
   }
