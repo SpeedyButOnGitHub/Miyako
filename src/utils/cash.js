@@ -1,5 +1,4 @@
 const fs = require("fs");
-const path = require("path");
 const { cfgPath } = require('./paths');
 
 const CASH_FILE = cfgPath('cash.json');

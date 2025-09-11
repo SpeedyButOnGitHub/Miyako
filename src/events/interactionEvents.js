@@ -1,5 +1,5 @@
 const { InteractionType, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const { ALLOWED_ROLES, CHATBOX_BUTTON_ID, isModerator, OWNER_ID } = require("../commands/moderation/permissions");
+const { ALLOWED_ROLES, CHATBOX_BUTTON_ID, isModerator } = require("../commands/moderation/permissions");
 const { handleWarningButtons } = require("../commands/moderation/index");
 const { config, saveConfig } = require("../utils/storage");
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("../commands/moderation/replies");
@@ -8,34 +8,15 @@ const { handleScheduleModal, handleEventCreateModal, handleEventEditModal, handl
 const { getEvent, updateEvent } = require('../utils/eventsStorage');
 const ActiveMenus = require("../utils/activeMenus");
 const { sendModLog } = require("../utils/modLogs");
-const { logError } = require('../utils/errorUtil');
 
 // Instrumentation: detect legacy ephemeral property usage at runtime.
-function instrumentInteraction(interaction) {
-	if (interaction.__ephemeralInstrumented) return;
-	interaction.__ephemeralInstrumented = true;
-	const wrap = (methodName) => {
-		if (typeof interaction[methodName] !== 'function') return;
-		const original = interaction[methodName].bind(interaction);
-		interaction[methodName] = async function wrapped(options, ...rest) {
-			try {
-				if (options && typeof options === 'object' && 'ephemeral' in options) {
-					logError('deprecated_ephemeral', new Error(`Interaction.${methodName} invoked with deprecated ephemeral option (id=${interaction.id})`));
-				}
-			} catch {}
-			return original(options, ...rest);
-		};
-	};
-	['reply','followUp','editReply','deferReply','deferUpdate'].forEach(wrap);
-}
+// removed unused instrumentInteraction (ephemeral option audit)
 const { sendUserDM } = require("../commands/moderation/dm");
-const { parseDurationAndReason } = require("../utils/time");
-const { handleBalanceCommand, buildDepositMenuPayload, buildWithdrawMenuPayload, buildBalancePayload, bankColor, buildStatusLine } = require("../commands/balance");
+const { buildDepositMenuPayload, buildWithdrawMenuPayload, buildBalancePayload } = require("../commands/balance");
 const { addProgress } = require("../utils/depositProgress");
-const { depositToBank, withdrawFromBank, amountToNextThreshold, quoteDeposit, getBank, getBaseLimit, computeMaxAffordableDeposit, computeTaxForDeposit } = require("../utils/bank");
-const { getCash, getTestingCash } = require("../utils/cash");
-const theme = require("../utils/theme");
-const { semanticButton, buildNavRow } = require("../utils/ui");
+const { depositToBank, withdrawFromBank, quoteDeposit, getBank, getBaseLimit, computeMaxAffordableDeposit } = require("../utils/bank");
+// const { getCash, getTestingCash } = require("../utils/cash");
+const { semanticButton } = require("../utils/ui");
 
 // Pending Kick/Ban confirmations: key = `${userId}:${action}:${moderatorId}` -> { reason: string|null, originChannelId?:string, originMessageId?:string }
 const pendingPunishments = new Map();
@@ -221,7 +202,7 @@ function attachInteractionEvents(client) {
 				const parts = interaction.customId.split(":");
 				const depositAmt = Number(parts[2])||0;
 				const tax = Number(parts[3])||0;
-				const total = Number(parts[4])|| (depositAmt+tax);
+				// total is not used further; compute only if needed
 				const rootId = parts[5];
 				const res = depositToBank(interaction.user.id, depositAmt, { allowAboveLimit:true });
 				if (!res.ok) { await interaction.reply({ content: `❌ ${res.error||"Deposit failed"}`, flags:1<<6 }).catch(()=>{}); return; }
@@ -854,7 +835,7 @@ function attachInteractionEvents(client) {
 			if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clockin:')) {
 				const parts = interaction.customId.split(':'); // clockin:eventId:notifId
 				const evId = parts[1];
-				const notifId = parts[2]; // not used yet for constraints
+				// const notifId = parts[2]; // reserved for future constraints
 				let ev = getEvent(evId);
 				if (!ev) {
 					try { const { getEvent: ge } = require('../utils/eventsStorage'); ev = ge(evId); } catch {}

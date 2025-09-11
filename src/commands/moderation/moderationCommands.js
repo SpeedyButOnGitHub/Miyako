@@ -108,7 +108,6 @@ async function handleModerationCommands(client, message, command, args) {
 	// Enforce requested thresholds (mute=3, kick=5) with config override if provided
 	const muteThreshold = Math.max(3, Number.isFinite(escalation.muteThreshold) ? escalation.muteThreshold : 3);
 	const kickThreshold = Math.max(5, Number.isFinite(escalation.kickThreshold) ? escalation.kickThreshold : 5);
-	const muteDurationMs = Number.isFinite(escalation.muteDuration) ? escalation.muteDuration : 2 * 60 * 60 * 1000;
 
 	// Restriction checks (skip in testing to avoid noise)
 	if (!isTesting) {

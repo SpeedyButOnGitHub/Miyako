@@ -25,11 +25,7 @@ const { handleClockInStateCommand } = require("../commands/clockin");
 const { markCommand } = require('../services/metricsService');
 const { checkPolicy } = require('../utils/policy');
 const theme = require("../utils/theme");
-const { TEST_LOG_CHANNEL } = require("../utils/logChannels");
-const { snapshotSessions } = require("../utils/activeMenus");
-const { levels } = require("../utils/levels");
-const { vcLevels } = require("../utils/vcLevels");
-const { getTopCash } = require("../utils/cash");
+// Unused imports removed to reduce ESLint noise
 const { getRecentErrors, clearErrorLog } = require('../utils/errorUtil');
 // Simple in-memory command cooldowns
 const _cooldowns = new Map(); // key cmd:user -> lastTs
@@ -230,7 +226,6 @@ function attachMessageEvents(client) {
 					}
 					return embed;
 				};
-				const { ActionRowBuilder } = require('discord.js');
 				const row = (page) => buildNavRow([
 					semanticButton('nav', { id: 'err_prev', label: 'Prev', enabled: page!==0 }),
 					semanticButton('nav', { id: 'err_next', label: 'Next', enabled: page < totalPages-1 }),
@@ -319,7 +314,6 @@ try {
 
 // Purge confirmation handler
 try {
-	const { executePurge } = require('../commands/moderation/purge');
 	ActiveMenus.registerHandler('purgeConfirm', async (interaction, session) => {
 		if (!interaction.isButton()) return;
 		if (interaction.user.id !== session.userId) {

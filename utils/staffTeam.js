@@ -1,3 +1,6 @@
+// This file has been forwarded to the src implementation to avoid depending on root commands.
+module.exports = require('../src/utils/staffTeam');
+
 const { ROLES, ROLE_ORDER, ROLE_EMOJIS, CHANNEL_ID } = require("../config/roles");
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { STAFF_MANAGER_ROLE, STAFF_SECURITY_ROLE, STAFF_MODERATOR_ROLE, STAFF_STAFF_ROLE, STAFF_ADMIN_ROLE, ALLOWED_ROLES, CHATBOX_BUTTON_ID } = require("../commands/moderation/permissions");

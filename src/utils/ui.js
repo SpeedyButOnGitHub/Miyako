@@ -1,4 +1,4 @@
-const { ButtonBuilder, ButtonStyle, EmbedBuilder, ActionRowBuilder } = require('discord.js');
+const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const theme = require('./theme');
 const { createEmbed } = require('./embeds');
 const { toTitleCase } = require('./text');
@@ -162,7 +162,7 @@ function applyToggleVisual(embed, { on } = { on: false }) {
 		const visual = getToggleVisual(on);
 		embed.setColor(visual.color);
 		if (embed.data && embed.data.title) {
-			const t = embed.data.title.replace(/^([🔴🟢✅❌]\s*)*/, '');
+				const t = embed.data.title.replace(/^([🔴🟢✅❌]\s*)*/u, '');
 			embed.setTitle(`${visual.prefix} ${t}`);
 		}
 	} catch {}

@@ -3,17 +3,6 @@ const { getToggleState } = require('../utils/ui');
 const ActiveMenus = require('../utils/activeMenus');
 const theme = require('../utils/theme');
 
-function checkEmbedsCapitalization(msg) {
-	const issues = [];
-	for (const e of msg.embeds||[]) {
-		const title = e.title || e.data?.title;
-		if (title && title !== title.replace(/\b(\w)/g, (m) => m.toUpperCase())) {
-			issues.push(`Title not properly capitalized: "${title}"`);
-		}
-	}
-	return issues;
-}
-
 async function handleDiagnosticsCommand(client, message) {
 	const sessions = ActiveMenus.snapshotSessions ? ActiveMenus.snapshotSessions() : [];
 	let emptyRows = 0;

@@ -5,13 +5,12 @@ try { require('./utils/singleton').ensureSingleton(); } catch {}
 try { process.title = 'MiyakoBot'; } catch {}
 require('dotenv/config');
 // (ephemeralShim removed; all interactions now use flags:1<<6 directly)
-const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
 const { semanticButton, buildNavRow } = require('./utils/ui');
 const fs = require('fs');
 const path = require('path');
 const projectRoot = path.resolve(process.cwd());
 const { config, saveConfig } = require('./utils/storage');
-const { postStartupChangelog } = require('./utils/changelog');
 const { registerErrorListener } = require('./utils/errorUtil');
 let lastOfflineDurationMs = null;
 try {

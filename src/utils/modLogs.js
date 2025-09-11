@@ -79,10 +79,7 @@ async function sendModLog(
 	const toTitleCase = (s) => String(s || "").replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.substr(1));
 	let actionTitle = toTitleCase(action).replace(/\bX(\d+)\b/g, (m, n) => `x${n}`);
 
-	const userObj = target?.user || target; // target can be GuildMember or User
-	const avatarURL = typeof userObj?.displayAvatarURL === "function"
-		? userObj.displayAvatarURL({ dynamic: true })
-		: undefined;
+	// target can be GuildMember or User
 
 	const embed = createEmbed({
 		color,

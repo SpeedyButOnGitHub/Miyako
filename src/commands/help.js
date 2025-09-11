@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder } = require("discord.js");
 const { isModerator } = require("./moderation/index");
 const { OWNER_ID } = require("./moderation/permissions");
 const ActiveMenus = require("../utils/activeMenus");

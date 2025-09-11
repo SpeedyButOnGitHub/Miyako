@@ -1,6 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
 const theme = require("../../utils/theme");
-const { applyStandardFooter } = require("../../utils/ui");
 
 async function sendUserDM(target, action, duration = null, reason = null, extra = null) {
 	let description;

@@ -1,6 +1,5 @@
 // Centralized theme: colors and emojis used across embeds (now supports external override config/theme.json)
 const fs = require('fs');
-const path = require('path');
 const { cfgPath } = require('./paths');
 let external = null;
 try {

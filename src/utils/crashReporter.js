@@ -1,11 +1,9 @@
 // Robust early crash reporter to guarantee logging of fatal conditions.
 // Attach this BEFORE other heavy requires so uncaught exceptions during module load are captured.
 const fs = require('fs');
-const path = require('path');
 const { logError } = require('./errorUtil');
 const { cfgPath } = require('./paths');
 
-const ERROR_LOG_FILE = cfgPath('errorLog.json');
 const CRASH_LATEST_FILE = cfgPath('crash-latest.json');
 let attached = false;
 let clientRef = null;

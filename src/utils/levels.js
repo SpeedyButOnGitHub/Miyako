@@ -1,5 +1,4 @@
 const fs = require("fs");
-const path = require("path");
 const { cfgPath } = require('./paths');
 const { enqueueWrite } = require('./writeQueue');
 

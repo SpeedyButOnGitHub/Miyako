@@ -1,13 +1,10 @@
-const { addSchedule, updateSchedule, getSchedules } = require("./scheduleStorage");
+const { updateSchedule, getSchedules } = require("./scheduleStorage");
 const { getEvents, updateEvent } = require("./eventsStorage");
 const { applyTimestampPlaceholders } = require('./timestampPlaceholders');
 const { config } = require('./storage');
-const ms = require("ms");
-const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-const theme = require('./theme');
-const { createEmbed } = require('./embeds');
+// UI helpers not used in scheduler core
 const { CONFIG_LOG_CHANNEL } = require('./logChannels');
-const { buildClockInEmbed } = require('./clockinEmbed');
+// const { buildClockInEmbed } = require('./clockinEmbed');
 
 function applyPlaceholdersToJsonPayload(payload, ev) {
 	if (!payload || typeof payload !== 'object') return payload;
@@ -37,22 +34,17 @@ function applyPlaceholdersToJsonPayload(payload, ev) {
 	return copy;
 }
 
-function parseTimeToMsToday(timeStr) {
-	const [hh, mm] = (timeStr || "00:00").split(":").map(Number);
-	const now = new Date();
-	const t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh || 0, mm || 0, 0, 0);
-	return t.getTime();
-}
+// parseTimeToMsToday was unused; removed
 
 function computeNextRun(schedule) {
 	const now = Date.now();
 	const type = schedule.type || "once";
 
-	const timeMsOfDay = (() => {
-		if (!schedule.time) return 0;
-		const [hh = 0, mm = 0] = schedule.time.split(":").map(Number);
-		return hh * 3600000 + (mm || 0) * 60000;
-	})();
+	// const timeMsOfDay = (() => {
+	//     if (!schedule.time) return 0;
+	//     const [hh = 0, mm = 0] = schedule.time.split(":").map(Number);
+	//     return hh * 3600000 + (mm || 0) * 60000;
+	// })();
 
 	if (type === "once") {
 		if (schedule.date && schedule.time) {
@@ -122,7 +114,7 @@ async function runScheduleOnce(client, schedule) {
 		const channel = await client.channels.fetch(chId).catch(() => null);
 		if (!channel || !channel.send) throw new Error("Invalid channel");
 		try {
-			const { seenRecently } = require('./sendOnce');
+			const { seenRecently } = require('./sendOnce'); // eslint-disable-line no-unused-vars
 			const key = `sched:${schedule.id}:${chId}`;
 			if (seenRecently(key, 8000)) return;
 		} catch {}
@@ -153,7 +145,7 @@ function computeAfterRun(schedule) {
 			return schedule;
 		}
 	}
-	if ((schedule.type || 'once') === 'once') {
+	if ((schedule.type || 'once') === 'once') { // eslint-disable-line no-unused-vars
 		schedule.enabled = false;
 		schedule.nextRun = null;
 		return schedule;
@@ -164,8 +156,8 @@ function computeAfterRun(schedule) {
 
 function startScheduler(client, opts = {}) {
 	const tickInterval = opts.intervalMs || 15 * 1000;
-	const CLOCKIN_DEDUP_MS = Number(process.env.CLOCKIN_DEDUP_MS) || opts.clockInDedupMs || (5 * 60 * 1000);
-	const CLOCKIN_ORPHAN_MAX = Number(process.env.CLOCKIN_ORPHAN_MAX) || 10;
+	// const CLOCKIN_DEDUP_MS = Number(process.env.CLOCKIN_DEDUP_MS) || opts.clockInDedupMs || (5 * 60 * 1000);
+	// const CLOCKIN_ORPHAN_MAX = Number(process.env.CLOCKIN_ORPHAN_MAX) || 10;
 
 	const schedules = getSchedules();
 	for (const s of schedules) {
@@ -210,7 +202,6 @@ function startScheduler(client, opts = {}) {
 				const now = Date.now();
 				const hasAnchor = ev.anchorMessageId && ev.anchorChannelId;
 				let status = 'upcoming';
-				let activeRange = null;
 				if (Array.isArray(ev.ranges) && ev.ranges.length) {
 					for (const r of ev.ranges) {
 						if (!r || !r.start || !r.end) continue;
@@ -220,7 +211,7 @@ function startScheduler(client, opts = {}) {
 						const startMinutes = sh*60+sm;
 						const endMinutes = eh*60+em;
 						const curMinutes = parseInt(hh,10)*60+parseInt(mm,10);
-						if (curMinutes >= startMinutes && curMinutes < endMinutes) { status='open'; activeRange = r; break; }
+						if (curMinutes >= startMinutes && curMinutes < endMinutes) { status='open'; break; }
 						if (curMinutes >= endMinutes) { status='closed'; }
 					}
 				} else {

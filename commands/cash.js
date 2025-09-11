@@ -1,8 +1,2 @@
-const { formatCash, getCash } = require("../utils/cash");
-
-async function handleCashCommand(client, message) {
-  const amount = getCash(message.author.id);
-  await message.reply(`💸 You have ${formatCash(amount)}.`).catch(() => {});
-}
-
-module.exports = { handleCashCommand };
+// Forwarder to canonical implementation in src to avoid duplication/drift.
+module.exports = require('../src/commands/cash');

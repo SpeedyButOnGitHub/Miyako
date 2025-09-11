@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { createEmbed, safeAddField } = require('../utils/embeds');
 // Service layer imports
 const {
@@ -12,8 +12,8 @@ const { bank: bankService, cash: cashService } = require('../services/economySer
 const { config } = require("../utils/storage");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
-const { progressBar: sharedProgressBar, applyStandardFooter, applyFooterWithPagination, paginationRow } = require("../utils/ui");
-const { formatCash } = require("../utils/cash");
+const { progressBar: sharedProgressBar, applyStandardFooter, paginationRow } = require("../utils/ui");
+// const { formatCash } = require("../utils/cash"); // unused
 const { buildLeaderboardEmbed: sharedLeaderboardEmbed } = require("../services/leaderboardService");
 const { getBaseLimit } = require("../utils/bank");
 

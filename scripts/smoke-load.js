@@ -1,17 +1,17 @@
-// Minimal smoke test: load modules and exit to avoid lingering timers/intervals
+// Minimal smoke test: load modules from src and exit to avoid lingering timers/intervals
 try {
   [
-    '../commands/profile.js',
-    '../commands/leaderboard.js',
-    '../commands/help.js',
-    '../commands/schedule.js',
-    '../commands/test.js',
-    '../commands/scripts.js',
-    '../events/messages.js',
-    '../events/interactionEvents.js',
-    '../utils/activeMenus.js',
-    '../utils/leveling.js',
-    '../utils/cashDrops.js'
+    '../src/commands/profile.js',
+    '../src/commands/leaderboard.js',
+    '../src/commands/help.js',
+    '../src/commands/schedule.js',
+    '../src/commands/test.js',
+    '../src/commands/scripts.js',
+    '../src/events/messages.js',
+    '../src/events/interactionEvents.js',
+    '../src/utils/activeMenus.js',
+    '../src/utils/leveling.js',
+    '../src/utils/cashDrops.js'
   ].forEach(m => require(m));
   console.log('[smoke] modules loaded');
 } catch (e) {

@@ -1,6 +1,5 @@
 // Centralized error handling helpers with persistence for next-run diagnostics.
 const fs = require('fs');
-const path = require('path');
 const { cfgPath } = require('./paths');
 
 const ERROR_LOG_FILE = cfgPath('errorLog.json');

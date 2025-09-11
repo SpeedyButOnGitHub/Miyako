@@ -1,5 +1,5 @@
 // Shared leaderboard builders extracted from profile command for reuse
-const { EmbedBuilder } = require('discord.js');
+// const { EmbedBuilder } = require('discord.js');
 const theme = require('./theme');
 const { applyFooterWithPagination } = require('./ui');
 const { createEmbed } = require('./embeds');

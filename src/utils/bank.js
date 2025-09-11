@@ -1,5 +1,4 @@
 const fs = require("fs");
-const path = require("path");
 const { cfgPath } = require('./paths');
 const { getCash, addCash, getTestingCash, addTestingCash } = require("./cash");
 const { config } = require("./storage");
