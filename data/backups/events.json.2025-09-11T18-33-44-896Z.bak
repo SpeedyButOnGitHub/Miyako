@@ -5,7 +5,6 @@
       "id": "3",
       "name": "Midnight Bar",
       "description": "Midnight Bar",
-      "channelId": "1232701768832516098",
       "message": "# ⊰-------『✩ Midnight Bar :wine_glass: ✩』-------⊱\n\n Check our ongoing Instances [here](https://vrchat.com/home/group/grp_d05ea22e-5c38-476e-9884-1cbea50643eb/instances).\nWe open daily, check the schedule in: https://discord.com/channels/1232701768316620840/1375987053950533722/1406328803227340941.\n### :busts_in_silhouette: Looking to apply for staff?\nHead over to <#1232701768832516101> and fill out a staff application.\nApplying for Staff will get you a spot on the TV as well! \n\n### :alarm_clock: Today's Opening Times: \n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n**1st Opening**: <t:1754452800:t> - <t:1754467200:t>\n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n~~**2nd Opening**: <t:1757412000:t> - <t:1757433600:t>~~\n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n\n### :bell: Want to get notified for this event?\nHead over to <#1402656938956689419> and subscribe to the Midnight Bar.\nOr simply press the button below to subscribe to get notified.\n\n[Support us on Patreon! ](https://www.patreon.com/c/lnhvrc) <a:heartsblack:1402694900163809402>\n\n# The Midnight bar is opening: <t:1757390400:R>",
       "messageJSON": null,
       "ranges": [
@@ -27,9 +26,6 @@
       ],
       "type": "multi-daily",
       "color": 43520,
-      "dynamicBaseContent": "# ⊰-------『✩ Midnight Bar :wine_glass: ✩』-------⊱\n\n Check our ongoing Instances [here](https://vrchat.com/home/group/grp_d05ea22e-5c38-476e-9884-1cbea50643eb/instances).\nWe open daily, check the schedule in: https://discord.com/channels/1232701768316620840/1375987053950533722/1406328803227340941.\n### :busts_in_silhouette: Looking to apply for staff?\nHead over to <#1232701768832516101> and fill out a staff application.\nApplying for Staff will get you a spot on the TV as well! \n\n### :alarm_clock: Today's Opening Times: \n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n**1st Opening**: <t:1754452800:t> - <t:1754467200:t>\n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n~~**2nd Opening**: <t:1757412000:t> - <t:1757433600:t>~~\n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n\n### :bell: Want to get notified for this event?\nHead over to <#1402656938956689419> and subscribe to the Midnight Bar.\nOr simply press the button below to subscribe to get notified.\n\n[Support us on Patreon! ](https://www.patreon.com/c/lnhvrc) <a:heartsblack:1402694900163809402>\n\n# The Midnight bar is opening: <t:1757649600:R>",
-      "anchorChannelId": "1232701768832516098",
-      "anchorMessageId": "1414992903914258454",
       "autoMessages": [
         {
           "id": "1",
@@ -169,40 +165,11 @@
           },
           "channelId": "1376497592871030865",
           "isClockIn": false,
-          "__skipUntil": 1757611093471,
-          "lastManualTrigger": 1757607493471
+          "__skipUntil": 1757619218307,
+          "lastManualTrigger": 1757615618307
         }
       ],
-      "nextAutoId": 3,
-      "__auto_2_6:00-10:00": 1757455214645,
-      "__auto_1_6:00-10:00": 1757476809648,
-      "__notifMsgs": {
-        "2": {
-          "channelId": "1376497592871030865",
-          "ids": [
-            "1415303188491538564",
-            "1415303239468843131",
-            "1415726536212090950",
-            "1415729356063510548",
-            "1415729567083139276",
-            "1415730154382168085",
-            "1415730988587159664",
-            "1415733164915167323"
-          ]
-        }
-      },
-      "__clockIn": {
-        "positions": {
-          "manager": [
-            "349282473085239298"
-          ],
-          "instance_manager": [],
-          "bouncer": [],
-          "backup": []
-        },
-        "messageIds": [],
-        "lastPruneTs": 1757612142579
-      }
+      "nextAutoId": 3
     }
   ]
 }

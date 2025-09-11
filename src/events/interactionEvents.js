@@ -944,28 +944,8 @@ function attachInteractionEvents(client) {
 				updateEvent(ev.id, { [clockKey]: state });
 				// Re-render all clock-in messages for this event
 				try {
-					// Build embed JSON per the required template (keeps IM limited, others unlimited)
-					const fmtMentions = (arr=[]) => {
-						if (!Array.isArray(arr) || arr.length === 0) return '*None*';
-						const s = arr.map(id=>`<@${id}>`).join(', ');
-						return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
-					};
-					const nameSafe = ev.name || 'Event';
-					const embed = {
-						title: `🕒 Staff Clock In — ${nameSafe}`,
-						description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
-						color: 3447003,
-						fields: [
-							{ name: '📝 Instance Manager (1 slot)', value: `${(state.positions.instance_manager||[]).length} / 1\n${fmtMentions(state.positions.instance_manager)}`, inline: false },
-							{ name: '🛠️ Manager',   value: fmtMentions(state.positions.manager),   inline: true },
-							{ name: '🛡️ Bouncer',   value: fmtMentions(state.positions.bouncer),   inline: true },
-							{ name: '🍸 Bartender', value: fmtMentions(state.positions.bartender), inline: true },
-							{ name: '🎯 Backup',    value: fmtMentions(state.positions.backup),    inline: true },
-							{ name: '⏳ Maybe / Late', value: fmtMentions(state.positions.maybe), inline: false },
-							{ name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
-						],
-						footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
-					};
+					const { buildClockInEmbed } = require('../utils/clockinTemplate');
+					const embed = buildClockInEmbed(ev);
 					// Choose a channel: prefer stored clock-in channel, then event channel, finally current interaction channel
 					const chId = (ev.__clockIn && ev.__clockIn.channelId) || ev.channelId || interaction.channelId;
 					const channel = chId ? (await interaction.client.channels.fetch(chId).catch(()=>null)) : null;

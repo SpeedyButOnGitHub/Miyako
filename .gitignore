@@ -16,6 +16,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 logs_runner.txt
+data/private/
+data/private/**
 
 # Generated context summaries
 FULL_CONTEXT.txt
