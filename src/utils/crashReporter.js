@@ -90,7 +90,8 @@ function initEarly() {
 	// Lightweight heartbeat every 60s so we can detect hung process vs crash by timestamp
 	heartbeatTimer = setInterval(() => {
 		try {
-				const hbFile = runtimeFile('process-heartbeat.json');
+			const hbFile = runtimeFile('process-heartbeat.json');
+			// Keep a rolling aggregate of heartbeats in backups aggregate
 			safeWrite(hbFile, JSON.stringify({ ts: Date.now() }, null, 2));
 		} catch {}
 	}, 60000);
