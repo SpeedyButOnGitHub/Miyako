@@ -1,4 +1,4 @@
-const { seenRecently } = require('../utils/sendOnce');
+const { seenRecently } = require('../src/utils/sendOnce');
 
 describe('sendOnce TTL guard', () => {
   test('returns false on first sight, true if seen within TTL, then false after TTL', async () => {

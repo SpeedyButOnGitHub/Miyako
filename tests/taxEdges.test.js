@@ -1,5 +1,5 @@
-const { computeTaxForDeposit } = require('../utils/bank');
-const { getBaseLimit } = require('../utils/bank');
+const { computeTaxForDeposit } = require('../src/utils/bank');
+const { getBaseLimit } = require('../src/utils/bank');
 
 describe('Progressive tax edge bands', () => {
   const L = 10000; // We'll stub base limit logic by monkeypatching if needed

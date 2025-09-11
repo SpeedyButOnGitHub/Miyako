@@ -1,5 +1,5 @@
-const { buildLeaderboardEmbed, getEntries } = require('../services/leaderboardService');
-const { levels } = require('../services/levelingService');
+const { buildLeaderboardEmbed, getEntries } = require('../src/services/leaderboardService');
+const { levels } = require('../src/services/levelingService');
 
 describe('leaderboardService cache', () => {
   test('Entries stable within TTL', () => {

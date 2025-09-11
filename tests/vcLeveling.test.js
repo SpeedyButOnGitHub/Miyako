@@ -1,5 +1,5 @@
-const { getVCXP, getVCLevel, vcLevels } = require('../services/levelingService');
-const { addVCXP } = require('../utils/vcLevels');
+const { getVCXP, getVCLevel, vcLevels } = require('../src/services/levelingService');
+const { addVCXP } = require('../src/utils/vcLevels');
 
 describe('VC Leveling basic progression', () => {
   const user = 'u_vc';

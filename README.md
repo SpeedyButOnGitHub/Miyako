@@ -13,7 +13,7 @@ npm install
 2. Configure environment
 
 - Copy `.env.example` to `.env` and fill in your values.
-- Ensure your log channel IDs in `utils/logChannels.js` match your server.
+- Ensure your log channel IDs in `src/utils/logChannels.js` match your server.
 
 3. Run a quick smoke test (loads modules only)
 
@@ -69,3 +69,11 @@ chmod +x .git/hooks/pre-commit
 ```
 
 The hook aborts the commit if any `ephemeral:true` remains.
+
+## Project layout
+
+- `src/` — primary code (commands, services, utils, events)
+- `config/` — JSON-backed state and settings
+- `scripts/` — maintenance and export scripts
+
+Note: The old root-level modules have been migrated; the temporary `legacy/` folder is no longer used and can be safely removed.

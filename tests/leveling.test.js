@@ -1,8 +1,8 @@
-const { addXP, getLevel, getXP, saveLevels } = require('../utils/levels');
+const { addXP, getLevel, getXP, saveLevels } = require('../src/utils/levels');
 
 beforeEach(() => {
   // reset in-memory levels (direct access)
-  const levelsModule = require('../utils/levels');
+  const levelsModule = require('../src/utils/levels');
   Object.keys(levelsModule.levels).forEach(k => delete levelsModule.levels[k]);
 });
 

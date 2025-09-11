@@ -1,7 +1,7 @@
 // Emit a quick schedule summary (counts and next runs) into schedule_summary.txt
 const fs = require('fs');
 const path = require('path');
-const { cfgPath } = require('../utils/paths');
+const { cfgPath } = require('../src/utils/paths');
 
 function formatTs(ms) {
   if (!ms || !Number.isFinite(ms)) return 'n/a';

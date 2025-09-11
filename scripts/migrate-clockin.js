@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Migration CLI wrapper
-const { getEvents, updateEvent } = require('../utils/eventsStorage');
+const { getEvents, updateEvent } = require('../src/utils/eventsStorage');
 const { migrateClockIn } = require('./migrateClockInCore');
 
 function run() {

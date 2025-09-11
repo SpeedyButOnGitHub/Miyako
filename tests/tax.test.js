@@ -1,4 +1,4 @@
-const { computeTaxForDeposit, getBaseLimit } = require('../utils/bank');
+const { computeTaxForDeposit, getBaseLimit } = require('../src/utils/bank');
 
 // Basic tax progression validation
 

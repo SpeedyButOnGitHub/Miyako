@@ -1,5 +1,5 @@
-const { handleLeveling, getUserModifier } = require('../services/levelingService');
-const levelingUtils = require('../utils/leveling');
+const { handleLeveling, getUserModifier } = require('../src/services/levelingService');
+const levelingUtils = require('../src/utils/leveling');
 
 // We'll simulate messages to test modifier streak growth & cap.
 function mockMessage(userId, channelId = 'c1') {
