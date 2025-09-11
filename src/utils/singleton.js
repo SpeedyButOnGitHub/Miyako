@@ -14,7 +14,7 @@ function ensureSingleton() {
       try {
         const data = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8'));
         if (data && pidAlive(data.pid)) {
-          console.error(`[singleton] Another Miyako instance appears to be running (PID ${data.pid}). Aborting.`);
+          try { require('./logger').error('[singleton] duplicate instance detected', { existingPid: data.pid }); } catch {}
           process.exit(1);
         } else {
           // stale lock

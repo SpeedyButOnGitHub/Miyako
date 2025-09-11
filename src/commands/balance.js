@@ -1,6 +1,6 @@
 const { createEmbed, safeAddField } = require('../utils/embeds');
 const theme = require("../utils/theme");
-const { progressBar: sharedProgressBar, applyStandardFooter, semanticButton, buildNavRow } = require("../utils/ui");
+const { progressBar: sharedProgressBar, applyStandardFooter, semanticButton, buildNavRow } = require("../ui");
 const { cash: cashUtils } = require("../services/economyService");
 const { bank: bankUtils } = require("../services/economyService");
 const { getUserModifier } = require("../services/levelingService");

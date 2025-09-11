@@ -138,7 +138,7 @@ async function executePurge(client, message, count, userFilter, filters={}) {
 		});
 		try { await message.reply({ embeds: [resultEmbed], allowedMentions: { repliedUser: false } }); } catch {}
 	} catch (err) {
-		console.error('[purge] error', err);
+		try { require('../../utils/logger').error('[purge] error', { err: err.message }); } catch {}
 		try { await message.reply({ content: `Error during purge: ${err.message || err}`, allowedMentions: { repliedUser: false } }); } catch {}
 	}
 }

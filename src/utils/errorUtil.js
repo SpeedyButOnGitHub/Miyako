@@ -1,8 +1,8 @@
 // Centralized error handling helpers with persistence for next-run diagnostics.
 const fs = require('fs');
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
 
-const ERROR_LOG_FILE = cfgPath('errorLog.json');
+const ERROR_LOG_FILE = runtimeFile('errorLog.json');
 const MAX_ERRORS = 100; // retention cap
 let inMemoryErrors = [];
 const errorListeners = [];

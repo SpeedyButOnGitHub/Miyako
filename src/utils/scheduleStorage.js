@@ -1,8 +1,8 @@
 const fs = require("fs");
 const path = require("path");
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
 
-const SCHEDULES_FILE = cfgPath('schedules.json');
+const SCHEDULES_FILE = runtimeFile('schedules.json');
 const { enqueueWrite } = require('./writeQueue');
 
 function ensureFile() {

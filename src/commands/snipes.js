@@ -4,7 +4,7 @@ const { createEmbed } = require('../utils/embeds');
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
 const fs = require("fs/promises");
 const { cfgPath } = require('../utils/paths');
-const SNIPES_FILE = cfgPath('snipes.json');
+const SNIPES_FILE = require('../utils/paths').runtimeFile('snipes.json');
 
 const snipes = new Map();
 const lastSnipeMessage = new Map();
@@ -46,7 +46,7 @@ async function saveSnipes() {
 	try {
 		await fs.writeFile(SNIPES_FILE, JSON.stringify(obj, null, 2));
 	} catch (err) {
-		console.error(`[Snipes Error] Failed to save snipes:`, err);
+		try { require('../utils/logger').error('[Snipes save error]', { err: err.message }); } catch {}
 	}
 }
 
@@ -108,7 +108,7 @@ async function handleSnipeCommands(client, message, command, args) {
 						});
 					}
 				} catch (err) {
-					console.error(`[Snipes Error] Failed to edit snipe message:`, err);
+					try { require('../utils/logger').warn('[Snipes edit error]', { err: err.message }); } catch {}
 				}
 			}
 		} else {

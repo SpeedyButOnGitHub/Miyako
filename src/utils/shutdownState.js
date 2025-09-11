@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
 
-const FILE = path.resolve(cfgPath('lastShutdown.json'));
+const FILE = path.resolve(runtimeFile('lastShutdown.json'));
 
 function recordShutdown() {
 	try { fs.writeFileSync(FILE, JSON.stringify({ ts: Date.now() })); } catch {}

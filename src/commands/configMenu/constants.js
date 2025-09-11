@@ -2,7 +2,8 @@ const { ButtonStyle } = require("discord.js");
 const { config } = require("../../utils/storage");
 
 // Keep same file path semantics as legacy implementation
-const ACTIVE_MENUS_FILE = "./config/activeMenus.json";
+const { runtimeFile } = require('../../utils/paths');
+const ACTIVE_MENUS_FILE = runtimeFile('activeMenus.json');
 
 // Category/setting registry used by UI builders and handlers
 const configCategories = {

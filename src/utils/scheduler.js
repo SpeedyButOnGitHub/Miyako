@@ -4,6 +4,7 @@ const { applyTimestampPlaceholders } = require('./timestampPlaceholders');
 const { config } = require('./storage');
 // UI helpers not used in scheduler core
 const { CONFIG_LOG_CHANNEL } = require('./logChannels');
+const logger = require('./logger');
 // const { buildClockInEmbed } = require('./clockinEmbed');
 
 function applyPlaceholdersToJsonPayload(payload, ev) {
@@ -130,9 +131,11 @@ async function runScheduleOnce(client, schedule) {
 			if (config.testingMode && content) content = content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
 			await channel.send({ content });
 		}
-		console.log(`Scheduled message sent for schedule ${schedule.id}`);
+		const logger = require('./logger');
+		logger.info(`Scheduled message sent`, { scheduleId: schedule.id });
 	} catch (err) {
-		console.error("Failed to send scheduled message:", err);
+		const logger = require('./logger');
+		logger.error('Scheduled message send failed', { scheduleId: schedule.id, err: err.message });
 	}
 }
 
@@ -160,6 +163,7 @@ function startScheduler(client, opts = {}) {
 	// const CLOCKIN_ORPHAN_MAX = Number(process.env.CLOCKIN_ORPHAN_MAX) || 10;
 
 	const schedules = getSchedules();
+	logger.debug(`[scheduler] init with ${schedules.length} schedule(s)`);
 	for (const s of schedules) {
 		if (!s.nextRun || s.nextRun < Date.now()) {
 			const nr = computeNextRun(s);
@@ -168,8 +172,10 @@ function startScheduler(client, opts = {}) {
 	}
 
 	setInterval(async () => {
+		const loopStart = Date.now();
 		const list = getSchedules();
 		const now = Date.now();
+		let ran = 0;
 		for (const schedule of list) {
 			try {
 				if (!schedule.enabled) continue;
@@ -182,9 +188,10 @@ function startScheduler(client, opts = {}) {
 					await runScheduleOnce(client, schedule);
 					const after = computeAfterRun({ ...schedule });
 					await updateSchedule(schedule.id, after);
+					ran++;
 				}
 			} catch (err) {
-				console.error("Scheduler loop error for schedule", schedule.id, err);
+				logger.error(`Scheduler loop error schedule=${schedule.id} msg=${err.message}`);
 			}
 		}
 		try {
@@ -231,7 +238,7 @@ function startScheduler(client, opts = {}) {
 										await channel.send({ content: ev.message || `Event: ${ev.name}` }).catch(()=>{});
 									}
 								}
-							} catch (e) { console.error('Event dispatch failed', ev.id, e); }
+							} catch (e) { logger.error('Event dispatch failed', { eventId: ev.id, err: e.message }); }
 							ev[lastKey] = now; updateEvent(ev.id, { [lastKey]: now });
 						}
 					}
@@ -311,6 +318,8 @@ function startScheduler(client, opts = {}) {
 				} catch {}
 			}
 		} catch (e) { /* ignore event errors */ }
+		const dur = Date.now() - loopStart;
+		if (dur > 2000 || ran > 0) logger.debug(`[scheduler] tick ran=${ran} durMs=${dur}`);
 	}, tickInterval);
 }
 

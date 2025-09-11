@@ -2,9 +2,9 @@
 // Attach this BEFORE other heavy requires so uncaught exceptions during module load are captured.
 const fs = require('fs');
 const { logError } = require('./errorUtil');
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
 
-const CRASH_LATEST_FILE = cfgPath('crash-latest.json');
+const CRASH_LATEST_FILE = runtimeFile('crash-latest.json');
 let attached = false;
 let clientRef = null;
 let fatalHandled = false;
@@ -16,7 +16,7 @@ function safeWrite(file, data) {
 
 function appendEmergency(entry) {
 	// Fallback append-only line file if main JSON write somehow fails
-	const emergencyFile = cfgPath('error-emergency.log');
+		const emergencyFile = runtimeFile('error-emergency.log');
 	try { fs.appendFileSync(emergencyFile, JSON.stringify(entry) + '\n'); } catch { /* ignore */ }
 }
 
@@ -90,7 +90,7 @@ function initEarly() {
 	// Lightweight heartbeat every 60s so we can detect hung process vs crash by timestamp
 	heartbeatTimer = setInterval(() => {
 		try {
-			const hbFile = cfgPath('process-heartbeat.json');
+				const hbFile = runtimeFile('process-heartbeat.json');
 			safeWrite(hbFile, JSON.stringify({ ts: Date.now() }, null, 2));
 		} catch {}
 	}, 60000);

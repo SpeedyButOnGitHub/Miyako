@@ -120,17 +120,64 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
       return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
     };
     const nameSafe = ev.name || 'Event';
+
+    // Build positions to display; in testing mode seed up to 5 random users per role (IM max 1).
+    let displayPositions = { ...ev.__clockIn.positions };
+    try {
+      if (config.testingMode && interaction.guild) {
+        const guild = interaction.guild;
+        // Try to have some member IDs, avoid heavy fetch if cache is sufficient
+        let membs = guild.members?.cache?.filter(m => !m.user?.bot)?.map(m => m.id) || [];
+        if (!membs || membs.length < 10) {
+          try {
+            const fetched = await guild.members.fetch({ time: 5000 }).catch(() => null);
+            if (fetched) membs = fetched.filter(m => !m.user?.bot).map(m => m.id);
+          } catch {}
+        }
+        const sample = (arr, n) => {
+          const out = [];
+          const pool = Array.isArray(arr) ? [...arr] : [];
+          for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+          }
+          for (let i=0; i<Math.min(n, pool.length); i++) out.push(pool[i]);
+          return out;
+        };
+        const ensure = (key, cap) => {
+          const current = Array.isArray(displayPositions[key]) ? [...displayPositions[key]] : [];
+          const maxFill = Math.min(cap ?? 5, 5);
+          const need = Math.max(0, maxFill - current.length);
+          if (need > 0 && membs && membs.length) {
+            const add = sample(membs, need);
+            // avoid duplicates
+            for (const id of add) if (!current.includes(id)) current.push(id);
+          }
+          if (Number.isFinite(cap)) {
+            while (current.length > cap) current.pop();
+          }
+          displayPositions[key] = current;
+        };
+        ensure('instance_manager', 1);
+        ensure('manager');
+        ensure('bouncer');
+        ensure('bartender');
+        ensure('backup');
+        ensure('maybe');
+      }
+    } catch {}
+
     const embedJson = {
       title: `🕒 Staff Clock In — ${nameSafe}`,
       description: "Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.",
       color: 3447003,
       fields: [
-        { name: '📝 Instance Manager (1 slot)', value: `${(ev.__clockIn.positions.instance_manager||[]).length} / 1\n${fmtMentions(ev.__clockIn.positions.instance_manager)}`, inline: false },
-        { name: '🛠️ Manager',   value: fmtMentions(ev.__clockIn.positions.manager),   inline: true },
-        { name: '🛡️ Bouncer',   value: fmtMentions(ev.__clockIn.positions.bouncer),   inline: true },
-        { name: '🍸 Bartender', value: fmtMentions(ev.__clockIn.positions.bartender), inline: true },
-        { name: '🎯 Backup',    value: fmtMentions(ev.__clockIn.positions.backup),    inline: true },
-        { name: '⏳ Maybe / Late', value: fmtMentions(ev.__clockIn.positions.maybe), inline: false },
+        { name: '📝 Instance Manager (1 slot)', value: `${(displayPositions.instance_manager||[]).length} / 1\n${fmtMentions(displayPositions.instance_manager)}`, inline: false },
+        { name: '🛠️ Manager',   value: fmtMentions(displayPositions.manager),   inline: true },
+        { name: '🛡️ Bouncer',   value: fmtMentions(displayPositions.bouncer),   inline: true },
+        { name: '🍸 Bartender', value: fmtMentions(displayPositions.bartender), inline: true },
+        { name: '🎯 Backup',    value: fmtMentions(displayPositions.backup),    inline: true },
+        { name: '⏳ Maybe / Late', value: fmtMentions(displayPositions.maybe), inline: false },
         { name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
       ],
       footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
@@ -144,15 +191,21 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
         { label: 'Bouncer',          value: 'bouncer',                              emoji: { name: '🛡️' } },
         { label: 'Bartender',        value: 'bartender',                            emoji: { name: '🍸' } },
         { label: 'Backup',           value: 'backup',                               emoji: { name: '🎯' } },
-        { label: 'Maybe / Late',     value: 'maybe',                                emoji: { name: '⏳' } }
+        { label: 'Maybe / Late',     value: 'maybe',                                emoji: { name: '⏳' } },
+        { label: 'Unregister / Clear', value: 'none',                               emoji: { name: '🚫' } }
       ]);
     const row = new ActionRowBuilder().addComponents(menu);
     const sent = await channel.send({ content: '', embeds:[embedJson], components:[row] }).catch(()=>null);
     if (sent && !config.testingMode) {
+      // Backoff future auto-triggers and persist clock-in context
       notif.__skipUntil = Date.now() + 60*60*1000;
       notif.lastManualTrigger = Date.now();
       ev.__clockIn.lastSentTs = Date.now();
       ev.__clockIn.channelId = channel.id;
+      // Track the message ID so interaction fallback can resolve the event by message
+      if (!Array.isArray(ev.__clockIn.messageIds)) ev.__clockIn.messageIds = [];
+      ev.__clockIn.messageIds.push(sent.id);
+      if (ev.__clockIn.messageIds.length > 10) ev.__clockIn.messageIds = ev.__clockIn.messageIds.slice(-10);
       updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn });
     }
     return !!sent;

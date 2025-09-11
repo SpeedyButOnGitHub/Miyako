@@ -52,7 +52,7 @@ function processQueue(state, filePath) {
     doAtomicWrite(filePath, content, job.opts);
   } catch (e) {
     // Best-effort: log to console; caller can add more structured logging
-    console.error('[writeQueue] write failed for', filePath, e);
+    try { require('./logger').error('[writeQueue] write failed', { file: filePath, err: e.message }); } catch {}
   } finally {
     state.writing = false;
     // Schedule next to yield back to event loop

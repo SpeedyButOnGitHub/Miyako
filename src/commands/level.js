@@ -10,7 +10,7 @@ function getLevelXP(level) {
 }
 
 function createProgressBar(current, max, size = 20) {
-	const { progressBar } = require("../utils/ui");
+	const { progressBar } = require("../ui");
 	return progressBar(current, max, size, { showNumbers: true, allowOverflow: false });
 }
 

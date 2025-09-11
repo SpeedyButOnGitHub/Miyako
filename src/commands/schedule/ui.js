@@ -1,6 +1,6 @@
 const theme = require('../../utils/theme');
 const { createEmbed, safeAddField } = require('../../utils/embeds');
-const { applyFooterWithPagination, semanticButton, buildNavRow } = require('../../utils/ui');
+const { applyFooterWithPagination, semanticButton, buildNavRow } = require('../../ui');
 
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -71,7 +71,7 @@ function buildSelectRows(kind, events) {
 }
 
 function detailRows(ev) {
-  const { buildNavRow, semanticButton } = require('../../utils/ui');
+  const { buildNavRow, semanticButton } = require('../../ui');
   const row = buildNavRow([
     semanticButton(ev.enabled ? 'danger' : 'success', { id: `events_toggle_${ev.id}`, label: ev.enabled ? 'Disable' : 'Enable', emoji: ev.enabled ? theme.emojis.disable : theme.emojis.enable }),
     semanticButton('primary', { id: `events_edit_${ev.id}`, label: 'Edit', emoji: theme.emojis.edit || theme.emojis.message || '✏️' }),

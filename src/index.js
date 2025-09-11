@@ -1,12 +1,15 @@
 // Early crash reporter (must be first)
 require('./utils/crashReporter').initEarly();
+// Phase 2: ensure runtime JSON migrated to /data (idempotent)
+try { require('../scripts/migrate-runtime-data').migrate(); } catch {}
 // Prevent multiple concurrent bot instances (esp. if accidentally started twice)
 try { require('./utils/singleton').ensureSingleton(); } catch {}
 try { process.title = 'MiyakoBot'; } catch {}
 require('dotenv/config');
 // (ephemeralShim removed; all interactions now use flags:1<<6 directly)
 const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
-const { semanticButton, buildNavRow } = require('./utils/ui');
+// UI layer (Phase 3 consolidated)
+const { semanticButton, buildNavRow, createEmbed } = require('./ui');
 const fs = require('fs');
 const path = require('path');
 const projectRoot = path.resolve(process.cwd());
@@ -31,6 +34,7 @@ const { attachInteractionEvents } = require('./events/interactionEvents');
 try { delete require.cache[require.resolve('../events/messageEvents')]; } catch {}
 let CRASH_LOG_CHANNEL_ID = null; // resolved post-config load
 const { startScheduler } = require('./utils/scheduler');
+const logger = require('./utils/logger');
 const ActiveMenus = require('./utils/activeMenus');
 const { startVoiceLeveling } = require('./utils/voiceLeveling');
 const { validateConfig } = require('./utils/configValidate');
@@ -103,7 +107,7 @@ try { require('./utils/crashReporter').attachClient(client); } catch {}
 
 const { runHealthChecks, formatHealthLines } = require('./utils/health');
 const { CONFIG_LOG_CHANNEL } = require('./utils/logChannels');
-const { createEmbed, safeAddField } = require('./utils/embeds');
+const { safeAddField } = require('./ui');
 
 async function sendBotStatusMessage() {
   let lastOnline = 0;
@@ -201,7 +205,7 @@ async function setStatusChannelName(online) {
 // Use 'clientReady' instead of deprecated 'ready' (v15 will remove 'ready')
 client.once('clientReady', async () => {
   config.testingMode = false; saveConfig();
-  console.log(`✅ Logged in as ${client.user.tag}`);
+  logger.info(`Logged in as ${client.user.tag}`);
   await sendBotStatusMessage();
   await setStatusChannelName(true);
 
@@ -222,31 +226,31 @@ client.once('clientReady', async () => {
             channel.send({ content: `⚠️ Config validation found ${issues.length} issue(s):\n` + issues.map(i => `• ${i}`).join('\n') }).catch(() => {});
             try { fs.writeFileSync(stampFile, hash); } catch {}
           } else {
-            console.log('[config] issues unchanged since last boot; not re-sent');
+            logger.debug('Config issues unchanged since last boot; not re-sent');
           }
         }
       }
     } else {
-      console.log('[config] validation passed');
+  logger.info('Config validation passed');
     }
   } catch (err) {
-    console.error('[config] validation error', err);
+    logger.error('[config] validation error', { err: err.message });
   }
   // Changelog now included inside the status embed above
 
   // Initialize global button/session manager (restores timers and disables expired UIs)
-  try { await ActiveMenus.init(client); } catch (e) { console.error('[ActiveMenus init]', e); }
+  try { await ActiveMenus.init(client); } catch (e) { logger.error('[ActiveMenus init]', { err: e.message }); }
   // Sweep orphaned (stale) interactive menus (older than 1h) for cleanliness
   try { if (ActiveMenus.sweepOrphans) await ActiveMenus.sweepOrphans(client); } catch {}
 
   // Start the scheduler loop
-  try { startScheduler(client); } catch (e) { console.error('[Scheduler] start error:', e); }
+  try { startScheduler(client); } catch (e) { logger.error('[Scheduler] start error', { err: e.message }); }
 
   // Start voice leveling loop
-  try { startVoiceLeveling(client); } catch (e) { console.error('[VoiceLeveling] start error:', e); }
+  try { startVoiceLeveling(client); } catch (e) { logger.error('[VoiceLeveling] start error', { err: e.message }); }
 
   // Start cash drops cleanup loop
-  try { startCashDrops(); } catch (e) { console.error('[CashDrops] start error:', e); }
+  try { startCashDrops(); } catch (e) { logger.error('[CashDrops] start error', { err: e.message }); }
 
   // Basic permission health check for critical channels
   try {
@@ -269,7 +273,7 @@ client.once('clientReady', async () => {
       try { await refreshTrackedAutoMessages(client, ev); } catch {}
       await new Promise((r) => setTimeout(r, 150));
     }
-  } catch (e) { console.error('[Startup Refresh] error', e); }
+  } catch (e) { logger.error('[Startup Refresh] error', { err: e.message }); }
 
   // Cleanup lingering menus on restart
   if (fs.existsSync(ACTIVE_MENUS_FILE)) {
@@ -283,7 +287,7 @@ client.once('clientReady', async () => {
         }
       }
       fs.writeFileSync(ACTIVE_MENUS_FILE, '[]');
-    } catch (err) { console.error('[Startup Menu Cleanup Error]:', err); }
+  } catch (err) { logger.warn('[Startup Menu Cleanup Error]', { err: err.message }); }
   }
 });
 

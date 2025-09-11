@@ -16,7 +16,7 @@ const { handleScheduleCommand } = require("../commands/schedule");
 const { handleScriptsCommand } = require("../commands/scripts");
 const { maybeSpawnDrop, tryClaimDrop } = require("../utils/cashDrops");
 const { EmbedBuilder } = require("discord.js");
-const { semanticButton, buildNavRow } = require('../utils/ui');
+const { semanticButton, buildNavRow } = require('../ui');
 const { config } = require("../utils/storage");
 const { handleCashCommand } = require("../commands/cash");
 const { handleBalanceCommand } = require("../commands/balance");
@@ -163,7 +163,7 @@ function attachMessageEvents(client) {
 					});
 					child.unref();
 				} catch (e) {
-					console.error('[restart spawn failed]', e);
+					try { require('../utils/logger').error('[restart spawn failed]', { err: e.message }); } catch {}
 					// Fall back to plain exit (expect external supervisor like pm2/systemd/VSCode to restart)
 				}
 				setTimeout(() => process.exit(0), 200);
@@ -252,7 +252,7 @@ function attachMessageEvents(client) {
 				_sentMsg = await message.reply({ embeds:[embed], allowedMentions:{repliedUser:false}});
 			}
 		} catch (err) {
-			console.error(`[Message Command Error]:`, err);
+			try { require('../utils/logger').error('Message command error', { err: err.message }); } catch {}
 			message.reply(`<:VRLSad:1413770577080094802> An error occurred while executing \`${command}\`.\nDetails: \`${err.message || err}\``);
 		}
 
@@ -300,7 +300,7 @@ try {
 		const slice = rows.slice(start, start + pageSize);
 		const embed = createEmbed({ title: '🧾 Recent Errors', description: `Page ${page+1}/${totalPages} • ${rows.length} item(s)`, color: 'danger' });
 		for (const r of slice) safeAddField(embed, `#${r.idx} [${r.scope}] ${r.ts.split(' ')[1]}`, r.first || '(no message)');
-		const { buildNavRow, semanticButton } = require('../utils/ui');
+		const { buildNavRow, semanticButton } = require('../ui');
 		const row = buildNavRow([
 			semanticButton('nav', { id: 'err_prev', label: 'Prev', enabled: page!==0 }),
 			semanticButton('nav', { id: 'err_next', label: 'Next', enabled: page < totalPages-1 }),

@@ -1,10 +1,10 @@
 const fs = require("fs");
 const path = require("path");
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
 const crypto = require("crypto");
 const { createEmbed } = require('./embeds');
 
-const SNAPSHOT_FILE = cfgPath('changelogSnapshot.json');
+const SNAPSHOT_FILE = runtimeFile('changelogSnapshot.json');
 
 function sha1(buf) {
 	return crypto.createHash("sha1").update(buf).digest("hex");

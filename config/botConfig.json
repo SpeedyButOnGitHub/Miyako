@@ -102,6 +102,8 @@
   "autoMessages": {
     "defaultDeleteMs": 0
   },
+  "debugMode": false,
+  "logLevel": "info",
   "testingWarnings": {
     "349282473085239298": [
       {

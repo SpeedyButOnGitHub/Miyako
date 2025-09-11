@@ -1,0 +1,208 @@
+{
+  "nextId": 4,
+  "events": [
+    {
+      "id": "3",
+      "name": "Midnight Bar",
+      "description": "Midnight Bar",
+      "channelId": "1232701768832516098",
+      "message": "# ⊰-------『✩ Midnight Bar :wine_glass: ✩』-------⊱\n\n Check our ongoing Instances [here](https://vrchat.com/home/group/grp_d05ea22e-5c38-476e-9884-1cbea50643eb/instances).\nWe open daily, check the schedule in: https://discord.com/channels/1232701768316620840/1375987053950533722/1406328803227340941.\n### :busts_in_silhouette: Looking to apply for staff?\nHead over to <#1232701768832516101> and fill out a staff application.\nApplying for Staff will get you a spot on the TV as well! \n\n### :alarm_clock: Today's Opening Times: \n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n**1st Opening**: <t:1754452800:t> - <t:1754467200:t>\n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n~~**2nd Opening**: <t:1757412000:t> - <t:1757433600:t>~~\n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n\n### :bell: Want to get notified for this event?\nHead over to <#1402656938956689419> and subscribe to the Midnight Bar.\nOr simply press the button below to subscribe to get notified.\n\n[Support us on Patreon! ](https://www.patreon.com/c/lnhvrc) <a:heartsblack:1402694900163809402>\n\n# The Midnight bar is opening: <t:1757390400:R>",
+      "messageJSON": null,
+      "ranges": [
+        {
+          "start": "6:00",
+          "end": "10:00"
+        }
+      ],
+      "enabled": true,
+      "times": [
+        "6:00-10:00"
+      ],
+      "days": [
+        2,
+        3,
+        4,
+        5,
+        0
+      ],
+      "type": "multi-daily",
+      "color": 43520,
+      "dynamicBaseContent": "# ⊰-------『✩ Midnight Bar :wine_glass: ✩』-------⊱\n\n Check our ongoing Instances [here](https://vrchat.com/home/group/grp_d05ea22e-5c38-476e-9884-1cbea50643eb/instances).\nWe open daily, check the schedule in: https://discord.com/channels/1232701768316620840/1375987053950533722/1406328803227340941.\n### :busts_in_silhouette: Looking to apply for staff?\nHead over to <#1232701768832516101> and fill out a staff application.\nApplying for Staff will get you a spot on the TV as well! \n\n### :alarm_clock: Today's Opening Times: \n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n**1st Opening**: <t:1754452800:t> - <t:1754467200:t>\n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n~~**2nd Opening**: <t:1757412000:t> - <t:1757433600:t>~~\n˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸˸\n\n### :bell: Want to get notified for this event?\nHead over to <#1402656938956689419> and subscribe to the Midnight Bar.\nOr simply press the button below to subscribe to get notified.\n\n[Support us on Patreon! ](https://www.patreon.com/c/lnhvrc) <a:heartsblack:1402694900163809402>\n\n# The Midnight bar is opening: <t:1757649600:R>",
+      "anchorChannelId": "1232701768832516098",
+      "anchorMessageId": "1414992903914258454",
+      "autoMessages": [
+        {
+          "id": "1",
+          "offsetMinutes": 0,
+          "enabled": true,
+          "message": "{\n  \"embeds\": [\n    {\n      \"title\": \"Midnight Bar is open!\",\n      \"description\": \"**The Midnight Bar** is now open, [come join us for a drink!](https://vrchat.com/home/group/grp_d05ea22e-5c38-476e-9884-1cbea50643eb/instances)\\n\\nWe will be open until: <timestamp_close:t>\",\n      \"fields\": []\n    }\n  ],\n  \"content\": \"<@&1380303846877696153>\"\n}",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "Midnight Bar is open!",
+                "description": "**The Midnight Bar** is now open, [come join us for a drink!](https://vrchat.com/home/group/grp_d05ea22e-5c38-476e-9884-1cbea50643eb/instances)\n\nWe will be open until: <timestamp_close:t>",
+                "fields": []
+              }
+            ],
+            "content": "<@&1380303846877696153>"
+          }
+        },
+        {
+          "id": "2",
+          "offsetMinutes": 1200,
+          "enabled": true,
+          "message": "{\n  \"content\": \"\",\n  \"embeds\": [\n    {\n      \"title\": \"🕒 Staff Clock In — Midnight Bar\",\n      \"description\": \"Staff clock-in for: https://discord.com/channels/1232701768316620840/1232701768832516098/1414992903914258454\\nPlease select your role below to clock in.\\n\\n**Instance Manager** is responsible for opening, managing, and closing an instance.\",\n      \"color\": 3447003,\n      \"fields\": [\n        {\n          \"name\": \"📝 Instance Manager (1 slot)\",\n          \"value\": \"0 / 1\\n\",\n          \"inline\": false\n        },\n        {\n          \"name\": \"🛠️ Manager\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"🛡️ Bouncer\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"🍸 Bartender\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"🎯 Backup\",\n          \"value\": \"*None*\",\n          \"inline\": true\n        },\n        {\n          \"name\": \"⏳ Maybe / Late\",\n          \"value\": \"*None*\",\n          \"inline\": false\n        },\n        {\n          \"name\": \"Eligable roles\",\n          \"value\": \"<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>\"\n        }\n      ],\n      \"footer\": {\n        \"text\": \"Late Night Hours | Staff clock in for the Midnight Bar\"\n      }\n    }\n  ],\n  \"components\": [\n    {\n      \"type\": 1,\n      \"components\": [\n        {\n          \"type\": 3,\n          \"custom_id\": \"clockin:{{EVENT_ID}}:{{AUTO_MESSAGE_ID}}\",\n          \"placeholder\": \"📋 Select your position\",\n          \"options\": [\n            {\n              \"label\": \"Instance Manager\",\n              \"value\": \"instance_manager\",\n              \"description\": \"1 slot available\",\n              \"emoji\": {\n                \"name\": \"📝\"\n              }\n            },\n            {\n              \"label\": \"Manager\",\n              \"value\": \"manager\",\n              \"emoji\": {\n                \"name\": \"🛠️\"\n              }\n            },\n            {\n              \"label\": \"Bouncer\",\n              \"value\": \"bouncer\",\n              \"emoji\": {\n                \"name\": \"🛡️\"\n              }\n            },\n            {\n              \"label\": \"Bartender\",\n              \"value\": \"bartender\",\n              \"emoji\": {\n                \"name\": \"🍸\"\n              }\n            },\n            {\n              \"label\": \"Backup\",\n              \"value\": \"backup\",\n              \"emoji\": {\n                \"name\": \"🎯\"\n              }\n            },\n            {\n              \"label\": \"Maybe / Late\",\n              \"value\": \"maybe\",\n              \"emoji\": {\n                \"name\": \"⏳\"\n              }\n            }\n          ],\n          \"flows\": {\n            \"maybe\": {\n              \"actions\": [\n                {\n                  \"type\": 0\n                }\n              ]\n            }\n          }\n        }\n      ]\n    }\n  ]\n}",
+          "messageJSON": {
+            "content": "",
+            "embeds": [
+              {
+                "title": "🕒 Staff Clock In — Midnight Bar",
+                "description": "Staff clock-in for: https://discord.com/channels/1232701768316620840/1232701768832516098/1414992903914258454\nPlease select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing, and closing an instance.",
+                "color": 3447003,
+                "fields": [
+                  {
+                    "name": "📝 Instance Manager (1 slot)",
+                    "value": "0 / 1\n",
+                    "inline": false
+                  },
+                  {
+                    "name": "🛠️ Manager",
+                    "value": "*None*",
+                    "inline": true
+                  },
+                  {
+                    "name": "🛡️ Bouncer",
+                    "value": "*None*",
+                    "inline": true
+                  },
+                  {
+                    "name": "🍸 Bartender",
+                    "value": "*None*",
+                    "inline": true
+                  },
+                  {
+                    "name": "🎯 Backup",
+                    "value": "*None*",
+                    "inline": true
+                  },
+                  {
+                    "name": "⏳ Maybe / Late",
+                    "value": "*None*",
+                    "inline": false
+                  },
+                  {
+                    "name": "Eligable roles",
+                    "value": "<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>"
+                  }
+                ],
+                "footer": {
+                  "text": "Late Night Hours | Staff clock in for the Midnight Bar"
+                }
+              }
+            ],
+            "components": [
+              {
+                "type": 1,
+                "components": [
+                  {
+                    "type": 3,
+                    "custom_id": "clockin:{{EVENT_ID}}:{{AUTO_MESSAGE_ID}}",
+                    "placeholder": "📋 Select your position",
+                    "options": [
+                      {
+                        "label": "Instance Manager",
+                        "value": "instance_manager",
+                        "description": "1 slot available",
+                        "emoji": {
+                          "name": "📝"
+                        }
+                      },
+                      {
+                        "label": "Manager",
+                        "value": "manager",
+                        "emoji": {
+                          "name": "🛠️"
+                        }
+                      },
+                      {
+                        "label": "Bouncer",
+                        "value": "bouncer",
+                        "emoji": {
+                          "name": "🛡️"
+                        }
+                      },
+                      {
+                        "label": "Bartender",
+                        "value": "bartender",
+                        "emoji": {
+                          "name": "🍸"
+                        }
+                      },
+                      {
+                        "label": "Backup",
+                        "value": "backup",
+                        "emoji": {
+                          "name": "🎯"
+                        }
+                      },
+                      {
+                        "label": "Maybe / Late",
+                        "value": "maybe",
+                        "emoji": {
+                          "name": "⏳"
+                        }
+                      }
+                    ],
+                    "flows": {
+                      "maybe": {
+                        "actions": [
+                          {
+                            "type": 0
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "channelId": "1376497592871030865",
+          "isClockIn": false,
+          "__skipUntil": 1757611093471,
+          "lastManualTrigger": 1757607493471
+        }
+      ],
+      "nextAutoId": 3,
+      "__auto_2_6:00-10:00": 1757455214645,
+      "__auto_1_6:00-10:00": 1757476809648,
+      "__notifMsgs": {
+        "2": {
+          "channelId": "1376497592871030865",
+          "ids": [
+            "1415303188491538564",
+            "1415303239468843131",
+            "1415726536212090950",
+            "1415729356063510548",
+            "1415729567083139276",
+            "1415730154382168085",
+            "1415730988587159664",
+            "1415733164915167323"
+          ]
+        }
+      },
+      "__clockIn": {
+        "positions": {
+          "manager": [
+            "349282473085239298"
+          ],
+          "instance_manager": [],
+          "bouncer": [],
+          "backup": []
+        },
+        "messageIds": [],
+        "lastPruneTs": 1757613043291
+      }
+    }
+  ]
+}

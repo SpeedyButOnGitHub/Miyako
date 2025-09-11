@@ -1,6 +1,6 @@
 const theme = require('../../utils/theme');
 const { createEmbed, safeAddField } = require('../../utils/embeds');
-const { buildNavRow, semanticButton } = require('../../utils/ui');
+const { buildNavRow, semanticButton } = require('../../ui');
 const { config } = require('../../utils/storage');
 const { humanizeMinutes, humanizeMs, applyPlaceholdersToJsonPayload, sanitizeMentionsForTesting } = require('./helpers');
 
@@ -42,7 +42,7 @@ function buildNotifsEmbed(guild, ev) {
   } else {
     safeAddField(embed, 'Messages', '*None defined yet.*');
   }
-  const { applyFooterWithPagination } = require('../../utils/ui');
+  const { applyFooterWithPagination } = require('../../ui');
   applyFooterWithPagination(embed, guild, { page:1, totalPages:1, extra: 'Auto Messages' });
   return embed;
 }

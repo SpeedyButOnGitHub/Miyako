@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonStyle } = require("discord.js");
-const { semanticButton, buildNavRow, applyToggleVisual, buildSettingEmbedUnified, registerToggle } = require('../../utils/ui');
+const { semanticButton, buildNavRow, applyToggleVisual, buildSettingEmbedUnified, registerToggle } = require('../../ui');
 const theme = require("../../utils/theme");
 const { config, settingMeta } = require("../../utils/storage");
 const { configCategories } = require("./constants");

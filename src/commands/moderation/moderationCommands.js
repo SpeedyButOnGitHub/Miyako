@@ -264,7 +264,7 @@ async function handleModerationCommands(client, message, command, args) {
 				return replyError(message, "Unknown moderation command.");
 		}
 	} catch (err) {
-		console.error(`[Moderation Command Error] ${command}:`, err);
+		try { require('../../utils/logger').error('[Moderation Command Error]', { command, err: err.message }); } catch {}
 		await replyError(message, `An error occurred while executing \`${command}\`.\nDetails: \`${err.message || err}\``);
 	}
 }

@@ -16,7 +16,7 @@ const { buildDepositMenuPayload, buildWithdrawMenuPayload, buildBalancePayload }
 const { addProgress } = require("../utils/depositProgress");
 const { depositToBank, withdrawFromBank, quoteDeposit, getBank, getBaseLimit, computeMaxAffordableDeposit } = require("../utils/bank");
 // const { getCash, getTestingCash } = require("../utils/cash");
-const { semanticButton } = require("../utils/ui");
+const { semanticButton } = require("../ui");
 
 // Pending Kick/Ban confirmations: key = `${userId}:${action}:${moderatorId}` -> { reason: string|null, originChannelId?:string, originMessageId?:string }
 const pendingPunishments = new Map();
@@ -338,7 +338,7 @@ function attachInteractionEvents(client) {
 				const saveStore = () => { try { saveConfig(); } catch {} };
 
 				// Helpers to build and swap rows on the original message
-				const { semanticButton } = require('../utils/ui');
+				const { semanticButton } = require('../ui');
 				const buildTopRow = () => new ActionRowBuilder().addComponents(
 					semanticButton('nav', { id: `modact:menu:warnings:${uid}`, label: 'Warnings', emoji: '⚠️' }),
 					semanticButton('nav', { id: `modact:menu:mute:${uid}`, label: 'Mute', emoji: '⏰' }),
@@ -482,7 +482,7 @@ function attachInteractionEvents(client) {
 									const channel = await client.channels.fetch(state.originChannelId).catch(() => null);
 									const msg = await channel?.messages?.fetch?.(state.originMessageId).catch(() => null);
 									if (msg) {
-										const { semanticButton } = require('../utils/ui');
+										const { semanticButton } = require('../ui');
 										const buildTopRow = () => new ActionRowBuilder().addComponents(
 											semanticButton('nav', { id: `modact:menu:warnings:${uid}`, label: 'Warnings', emoji: '⚠️' }),
 											semanticButton('nav', { id: `modact:menu:mute:${uid}`, label: 'Mute', emoji: '⏰' }),
@@ -835,20 +835,80 @@ function attachInteractionEvents(client) {
 			if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clockin:')) {
 				const parts = interaction.customId.split(':'); // clockin:eventId:notifId
 				const evId = parts[1];
-				// const notifId = parts[2]; // reserved for future constraints
+				const notifId = parts[2]; // may help to resolve if eventId is stale
 				let ev = getEvent(evId);
 				if (!ev) {
 					try { const { getEvent: ge } = require('../utils/eventsStorage'); ev = ge(evId); } catch {}
 				}
-				// Fallback: try to resolve by message id if the event id was not found (e.g., after restart)
-				if (!ev && interaction.message?.id) {
+				// Fallbacks: by message id, then by notif id (if present)
+				if (!ev) {
 					try {
 						const { getEvents } = require('../utils/eventsStorage');
 						const all = getEvents();
-						ev = all.find(e => Array.isArray(e.__clockIn?.messageIds) && e.__clockIn.messageIds.includes(interaction.message.id)) || null;
+						// 1) resolve by message id present on clock-in records
+						if (interaction.message?.id) {
+							ev = all.find(e => Array.isArray(e.__clockIn?.messageIds) && e.__clockIn.messageIds.includes(interaction.message.id)) || null;
+						}
+						// 2) resolve by notif id belonging to this event's autoMessages
+						if (!ev && notifId) {
+							ev = all.find(e => Array.isArray(e.autoMessages) && e.autoMessages.some(n => String(n.id) === String(notifId) && n.isClockIn)) || null;
+						}
+						// 3) templated customId recovery: if evId looks like a template (e.g., {{EVENT_ID}}), try channel/name heuristics
+						const looksTemplated = (s) => typeof s === 'string' && s.includes('{');
+						if (!ev && looksTemplated(evId)) {
+							// a) try by embed title -> event name
+							try {
+								const title = interaction.message?.embeds?.[0]?.title || '';
+								const partsT = title.split('—'); // em dash separator
+								let name = null;
+								if (partsT.length >= 2) name = partsT[partsT.length - 1].trim();
+								if (name && name !== '{{EVENT_NAME}}') {
+									ev = all.find(e => (e.name || '').trim() === name) || ev;
+								}
+							} catch {}
+							// b) try by channel affinity (stored clock-in channel or event channel)
+							if (!ev && interaction.channelId) {
+								const cand = all.filter(e => (e.__clockIn?.channelId === interaction.channelId) || (e.channelId === interaction.channelId));
+								if (cand.length === 1) ev = cand[0];
+								else if (cand.length > 1) {
+									// Prefer the most recently clock-in-sent event
+									cand.sort((a,b) => (b.__clockIn?.lastSentTs||0) - (a.__clockIn?.lastSentTs||0));
+									ev = cand[0];
+								}
+							}
+						}
 					} catch {}
 				}
-				if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
+				// If we recovered an event via heuristics, backfill this message id for future lookups
+				if (ev && interaction.message?.id) {
+					try {
+						const clock = ev.__clockIn && typeof ev.__clockIn==='object' ? { ...ev.__clockIn } : { positions:{}, messageIds:[] };
+						if (!Array.isArray(clock.messageIds)) clock.messageIds = [];
+						if (!clock.messageIds.includes(interaction.message.id)) {
+							clock.messageIds.push(interaction.message.id);
+							if (clock.messageIds.length > 10) clock.messageIds = clock.messageIds.slice(-10);
+							updateEvent(ev.id, { __clockIn: clock });
+						}
+					} catch {}
+				}
+				if (!ev) {
+					await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{});
+					// Also log details to the config log channel for maintainers to debug
+					try {
+						const { CONFIG_LOG_CHANNEL } = require('../utils/logChannels');
+						if (CONFIG_LOG_CHANNEL) {
+							const ch = await interaction.client.channels.fetch(CONFIG_LOG_CHANNEL).catch(()=>null);
+							if (ch) {
+								const gid = interaction.guildId || 'guild';
+								const cid = interaction.channelId || 'channel';
+								const mid = interaction.message?.id;
+								const link = mid ? `https://discord.com/channels/${gid}/${cid}/${mid}` : '(no message id)';
+								await ch.send({ content: `⚠️ Clock-in select could not resolve event. customId="${interaction.customId}" user=<@${interaction.user?.id}> link: ${link}` }).catch(()=>{});
+							}
+						}
+					} catch {}
+					return;
+				}
 				const member = interaction.member;
 				if (!member) { await interaction.reply({ content:'Member not found.', flags:1<<6 }).catch(()=>{}); return; }
 				const choice = interaction.values[0];
@@ -859,11 +919,12 @@ function attachInteractionEvents(client) {
 					'bouncer': { label: 'Bouncer', max:Infinity },
 					'bartender': { label: 'Bartender', max:Infinity },
 					'backup': { label: 'Backup', max:Infinity },
-					'maybe': { label: 'Maybe/Late', max:Infinity }
+					'maybe': { label: 'Maybe/Late', max:Infinity },
+					'none': { label: 'Unregister', max:Infinity }
 				};
 				if (!POS_META[choice]) { await interaction.reply({ content:'Invalid selection.', flags:1<<6 }).catch(()=>{}); return; }
 				const meta = POS_META[choice];
-				if (meta.role && !member.roles.cache.has(meta.role)) {
+				if (choice !== 'none' && meta.role && !member.roles.cache.has(meta.role)) {
 					await interaction.reply({ content:`You need the required role to select ${meta.label}.`, flags:1<<6 }).catch(()=>{}); return;
 				}
 				const clockKey = '__clockIn';
@@ -873,11 +934,13 @@ function attachInteractionEvents(client) {
 				for (const key of Object.keys(state.positions)) {
 					state.positions[key] = Array.isArray(state.positions[key]) ? state.positions[key].filter(id=>id!==member.id) : [];
 				}
-				if (!Array.isArray(state.positions[choice])) state.positions[choice] = [];
-				if (meta.max !== Infinity && state.positions[choice].length >= meta.max) {
-					await interaction.reply({ content:`${meta.label} is full.`, flags:1<<6 }).catch(()=>{}); return;
+				if (choice !== 'none') {
+					if (!Array.isArray(state.positions[choice])) state.positions[choice] = [];
+					if (meta.max !== Infinity && state.positions[choice].length >= meta.max) {
+						await interaction.reply({ content:`${meta.label} is full.`, flags:1<<6 }).catch(()=>{}); return;
+					}
+					state.positions[choice].push(member.id);
 				}
-				state.positions[choice].push(member.id);
 				updateEvent(ev.id, { [clockKey]: state });
 				// Re-render all clock-in messages for this event
 				try {
@@ -913,11 +976,12 @@ function attachInteractionEvents(client) {
 						} catch {}
 					}
 				} catch {}
-				await interaction.reply({ content:`Registered as ${meta.label}.`, flags:1<<6 }).catch(()=>{});
+				const msgTxt = choice === 'none' ? 'Registration cleared.' : `Registered as ${meta.label}.`;
+				await interaction.reply({ content: msgTxt, flags:1<<6 }).catch(()=>{});
 				return;
 			}
 		} catch (err) {
-			console.error("[Interaction Error]", err);
+			try { require('../utils/logger').error('[Interaction Error]', { err: err.message }); } catch {}
 			if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
 				await interaction.reply({ content: `An error occurred.\n${err.message || err}`, flags: 1<<6 }).catch(() => {});
 			}

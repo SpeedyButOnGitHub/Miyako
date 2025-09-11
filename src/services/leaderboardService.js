@@ -4,7 +4,7 @@
 
 const { createEmbed } = require('../utils/embeds');
 const theme = require('../utils/theme');
-const { applyFooterWithPagination } = require('../utils/ui');
+const { applyFooterWithPagination } = require('../ui');
 const { levels, vcLevels } = require('./levelingService');
 const { getTopBank } = require('../utils/bank');
 

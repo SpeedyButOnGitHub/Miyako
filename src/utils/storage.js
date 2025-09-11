@@ -42,7 +42,11 @@ const defaultConfig = {
 	// Auto-messages: default delete-after (ms); 0 disables auto-deletion
 	autoMessages: {
 		defaultDeleteMs: 0
-	}
+	},
+	// Debug / verbose logging
+	debugMode: false,
+	// Minimum log level: debug < info < warn < error
+	logLevel: 'info'
 };
 
 // Setting metadata (timestamps, etc.) persisted separately
@@ -83,6 +87,8 @@ function validateConfig(cfg) {
 	if (!Array.isArray(cfg.levelingChannelList)) cfg.levelingChannelList = [];
 	if (!Array.isArray(cfg.roleXPBlacklist)) cfg.roleXPBlacklist = [];
 	if (typeof cfg.globalXPMultiplier !== "number" || !Number.isFinite(cfg.globalXPMultiplier)) cfg.globalXPMultiplier = 1.0;
+	if (typeof cfg.debugMode !== 'boolean') cfg.debugMode = false;
+	if (!['debug','info','warn','error'].includes(cfg.logLevel)) cfg.logLevel = 'info';
 	if (typeof cfg.maxPurgeLimit !== 'number' || cfg.maxPurgeLimit <= 0) cfg.maxPurgeLimit = 100;
 	if (!Array.isArray(cfg.blacklistedChannels)) cfg.blacklistedChannels = [];
 	if (cfg.moderatorLogChannelId && typeof cfg.moderatorLogChannelId !== 'string') cfg.moderatorLogChannelId = String(cfg.moderatorLogChannelId);
@@ -174,7 +180,7 @@ try {
 		config = { ...defaultConfig };
 	}
 } catch (err) {
-	console.error("[Config] Failed to read/parse config, rewriting defaults:", err?.message || err);
+	try { require('./logger').warn('[Config] read/parse failed; rewriting defaults', { err: err?.message || String(err) }); } catch {}
 	try {
 		ensureDir();
 		fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
@@ -187,7 +193,7 @@ function saveConfig() {
 		ensureDir();
 		fs.writeFileSync(CONFIG_FILE, JSON.stringify(validateConfig({ ...config }), null, 2));
 	} catch (err) {
-		console.error("[Config] Failed to save config:", err?.message || err);
+		try { require('./logger').warn('[Config] save failed', { err: err?.message || String(err) }); } catch {}
 	}
 }
 

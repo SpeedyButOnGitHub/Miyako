@@ -3,7 +3,7 @@ const { isModerator } = require("./moderation/index");
 const { OWNER_ID } = require("./moderation/permissions");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
-const { applyStandardFooter, semanticButton } = require("../utils/ui");
+const { applyStandardFooter, semanticButton } = require("../ui");
 
 const COMMAND_META = [
 	{ cmd: '.help', cat: 'general', desc: 'Show this menu' },

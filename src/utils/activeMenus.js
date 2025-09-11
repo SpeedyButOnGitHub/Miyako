@@ -1,8 +1,8 @@
 const fs = require("fs");
 const path = require("path");
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
 
-const SESSIONS_FILE = cfgPath('buttonSessions.json');
+const SESSIONS_FILE = runtimeFile('buttonSessions.json');
 
 // Handlers by session.type
 const handlers = new Map();

@@ -57,7 +57,7 @@ const updateStaffMessage = async (guild) => {
 			try { await staffMessage.pin(); } catch {}
 		}
 		return staffMessage;
-	} catch (err) { console.error("Failed to update staff message:", err); return null; }
+	} catch (err) { try { require('./logger').error('Failed to update staff message', { err: err.message }); } catch {}; return null; }
 };
 
 module.exports = {

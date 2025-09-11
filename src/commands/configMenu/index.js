@@ -21,7 +21,7 @@ async function handleConfigMenuCommand(message) {
 	try {
 		sent = await message.channel.send({ embeds: [embed], components });
 	} catch (e) {
-		console.error('[configMenu] send failed', e);
+		try { require('../../utils/logger').error('[configMenu] send failed', { err: e.message }); } catch {}
 		try { await message.reply({ content: 'Failed to open config menu (logged).', flags: 1<<6 }); } catch {}
 		return;
 	}
@@ -84,7 +84,7 @@ ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
 			return;
 		}
 	} catch (err) {
-		console.error('[configMenu] handler error:', err);
+		try { require('../../utils/logger').error('[configMenu] handler error', { err: err.message }); } catch {}
 		if (interaction.isRepliable() && !interaction.replied) {
 			try { await interaction.reply({ content: 'Error handling config interaction.', flags: 1<<6 }); } catch {}
 		}

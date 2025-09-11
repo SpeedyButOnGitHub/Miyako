@@ -1,5 +1,5 @@
 const { createEmbed } = require('../utils/embeds');
-const { getToggleState } = require('../utils/ui');
+const { getToggleState } = require('../ui');
 const ActiveMenus = require('../utils/activeMenus');
 const theme = require('../utils/theme');
 

@@ -1,15 +1,15 @@
 const fs = require("fs");
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
 const { getCash, addCash, getTestingCash, addTestingCash } = require("./cash");
 const { config } = require("./storage");
 
-const BANK_FILE = cfgPath('bank.json');
+const BANK_FILE = runtimeFile('bank.json');
 const { enqueueWrite } = require('./writeQueue');
 
 // Persistent bank balances
 let bank = {};
 // Testing overlay (persisted separately) value per userId = number
-const TEST_BANK_FILE = cfgPath('testingBank.json');
+const TEST_BANK_FILE = runtimeFile('testingBank.json');
 let testingBank = {};
 try {
 	if (fs.existsSync(TEST_BANK_FILE)) {

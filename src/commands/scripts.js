@@ -3,7 +3,7 @@ const path = require("path");
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { createEmbed } = require('../utils/embeds');
 const theme = require("../utils/theme");
-const { applyFooterWithPagination, paginationRow } = require("../utils/ui");
+const { applyFooterWithPagination, paginationRow } = require("../ui");
 const ActiveMenus = require("../utils/activeMenus");
 
 // Recursively collect .js files excluding common non-source folders

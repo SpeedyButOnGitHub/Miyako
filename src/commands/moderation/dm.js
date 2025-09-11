@@ -59,7 +59,7 @@ async function sendUserDM(target, action, duration = null, reason = null, extra 
 		}
 	} catch (err) {
 		const tag = user?.tag || user?.username || user?.id || "unknown";
-		console.error(`[DM Error] Could not DM ${tag}:`, err);
+		try { require('../../utils/logger').warn('[DM Error] Could not DM user', { user: tag, err: err.message }); } catch {}
 	}
 }
 

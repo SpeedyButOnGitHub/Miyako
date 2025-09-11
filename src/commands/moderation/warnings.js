@@ -5,7 +5,7 @@ const { sendModLog } = require("../../utils/modLogs");
 const { isModerator } = require("./permissions");
 const { config, saveConfig } = require("../../utils/storage");
 const theme = require("../../utils/theme");
-const { applyFooterWithPagination, paginationRow } = require("../../utils/ui");
+const { applyFooterWithPagination, paginationRow } = require("../../ui");
 
 const PAGE_SIZE = 10; // users per page in dashboard
 const MAX_WARNING_LIST = 6; // entries shown inline in user view
@@ -417,7 +417,7 @@ async function handleWarningButtons(client, interaction) {
 			return;
 		}
 	} catch (err) {
-		console.error("[Warnings Interaction Error]", err);
+		try { require('../../utils/logger').error('[Warnings Interaction Error]', { err: err.message }); } catch {}
 		try {
 			if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
 	await interaction.reply({ content: `An error occurred. ${err.message || err}`, flags: 1<<6 });

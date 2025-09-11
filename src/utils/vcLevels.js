@@ -1,15 +1,19 @@
 const fs = require("fs");
 const { enqueueWrite } = require('./writeQueue');
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
+const IS_TEST = process.env.NODE_ENV === 'test';
 
-const VC_LEVELS_FILE = cfgPath('vcLevels.json');
+// Use a separate file during tests to avoid polluting real data (or skip I/O entirely)
+const VC_LEVELS_FILE = IS_TEST ? runtimeFile('testingVcLevels.json') : runtimeFile('vcLevels.json');
 
 // in-memory cache
 let vcLevels = {};
 try {
-	if (fs.existsSync(VC_LEVELS_FILE)) {
+	if (!IS_TEST && fs.existsSync(VC_LEVELS_FILE)) {
 		const raw = fs.readFileSync(VC_LEVELS_FILE, "utf8");
 		vcLevels = JSON.parse(raw || "{}") || {};
+	} else {
+		vcLevels = {};
 	}
 } catch {
 	vcLevels = {};
@@ -19,6 +23,11 @@ let pendingSave = false;
 function saveVCLevels() {
 	if (pendingSave) return;
 	pendingSave = true;
+	if (IS_TEST) {
+		// Skip disk I/O in tests for stability
+		pendingSave = false;
+		return;
+	}
 	enqueueWrite(VC_LEVELS_FILE, () => {
 		pendingSave = false;
 		return JSON.stringify(vcLevels, null, 2);

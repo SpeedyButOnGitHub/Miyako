@@ -1,7 +1,7 @@
 const fs = require("fs");
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
 
-const CASH_FILE = cfgPath('cash.json');
+const CASH_FILE = runtimeFile('cash.json');
 const { enqueueWrite } = require('./writeQueue');
 
 let cash = {};
@@ -14,7 +14,7 @@ try {
 }
 
 // Testing overlay balances (persisted separately)
-const TEST_CASH_FILE = cfgPath('testingCash.json');
+const TEST_CASH_FILE = runtimeFile('testingCash.json');
 let testingCash = {};
 try {
 	if (fs.existsSync(TEST_CASH_FILE)) {

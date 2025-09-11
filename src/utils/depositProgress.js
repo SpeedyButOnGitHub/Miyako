@@ -1,7 +1,7 @@
 const fs = require('fs');
-const { cfgPath } = require('./paths');
+const { runtimeFile } = require('./paths');
 
-const FILE = cfgPath('depositProgress.json');
+const FILE = runtimeFile('depositProgress.json');
 let data = { users: {}, day: null, resetAt: null }; // day = YYYY-MM-DD (UTC)
 
 function load() {

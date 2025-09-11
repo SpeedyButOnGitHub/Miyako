@@ -1,0 +1,317 @@
+[
+  {
+    "ts": 1757448252154,
+    "scope": "warning",
+    "message": "DeprecationWarning: The ready event has been renamed to clientReady to distinguish it from the gateway READY event and will only emit under that name in v15. Please use clientReady instead.\n    at WebSocketManager.triggerClientReady (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketManager.js:389:15)\n    at WebSocketManager.checkShardsReady (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketManager.js:368:10)\n    at WebSocketShard.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketManager.js:198:16)\n    at WebSocketShard.emit (node:events:519:28)\n    at WebSocketShard.checkReady (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketShard.js:184:12)\n    at WebSocketShard.gotGuild (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketShard.js:158:10)\n    at WebSocketManager.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\client\\websocket\\WebSocketManager.js:238:15)\n    at WebSocketManager.emit (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\@vladfrangu\\async_event_emitter\\dist\\index.cjs:287:31)\n    at WebSocketShard.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\@discordjs\\ws\\dist\\index.js:1190:51)\n    at WebSocketShard.emit (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\@vladfrangu\\async_event_emitter\\dist\\index.cjs:287:31)"
+  },
+  {
+    "ts": 1757449148112,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757449230405,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757450127037,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ButtonInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\events\\interactionEvents.js:699:31)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+  },
+  {
+    "ts": 1757450127037,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ButtonInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\events\\interactionEvents.js:699:31)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+  },
+  {
+    "ts": 1757450220165,
+    "scope": "fatal",
+    "message": "signal:SIGINT"
+  },
+  {
+    "ts": 1757450489135,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ButtonInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at handleButton (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\commands\\configMenu\\handlers.js:186:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+  },
+  {
+    "ts": 1757450489135,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ButtonInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at handleButton (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\commands\\configMenu\\handlers.js:186:25)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)"
+  },
+  {
+    "ts": 1757450513369,
+    "scope": "fatal",
+    "message": "signal:SIGINT"
+  },
+  {
+    "ts": 1757451223878,
+    "scope": "fatal",
+    "message": "signal:SIGINT"
+  },
+  {
+    "ts": 1757451387073,
+    "scope": "exit",
+    "message": "signal:SIGINT"
+  },
+  {
+    "ts": 1757451807165,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757452664809,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ModalSubmitInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at C:\\Users\\tevme\\Documents\\Projects\\Miyako\\commands\\test.js:142:23\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Object.processInteraction (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\activeMenus.js:182:3)\n    at async Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\events\\interactionEvents.js:27:21)"
+  },
+  {
+    "ts": 1757452664810,
+    "scope": "warning",
+    "message": "Warning: Supplying \"ephemeral\" for interaction response options is deprecated. Utilize flags instead.\n    at ModalSubmitInteraction.reply (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\node_modules\\discord.js\\src\\structures\\interfaces\\InteractionResponses.js:174:19)\n    at C:\\Users\\tevme\\Documents\\Projects\\Miyako\\commands\\test.js:142:23\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Object.processInteraction (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\activeMenus.js:182:3)\n    at async Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\events\\interactionEvents.js:27:21)"
+  },
+  {
+    "ts": 1757453295781,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757453322200,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757454173605,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757454583834,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757454774134,
+    "scope": "warning",
+    "message": "Warning: Accessing non-existent property 'toTitleCase' of module exports inside circular dependency\n    at emitCircularRequireWarning (node:internal/modules/cjs/loader:936:11)\n    at Object.get (node:internal/modules/cjs/loader:952:5)\n    at Object.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\embeds.js:6:9)\n    at Module._compile (node:internal/modules/cjs/loader:1706:14)\n    at Object..js (node:internal/modules/cjs/loader:1839:10)\n    at Module.load (node:internal/modules/cjs/loader:1441:32)\n    at Function._load (node:internal/modules/cjs/loader:1263:12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)\n    at Module.require (node:internal/modules/cjs/loader:1463:12)"
+  },
+  {
+    "ts": 1757454774134,
+    "scope": "warning",
+    "message": "Warning: Accessing non-existent property 'toTitleCase' of module exports inside circular dependency\n    at emitCircularRequireWarning (node:internal/modules/cjs/loader:936:11)\n    at Object.get (node:internal/modules/cjs/loader:952:5)\n    at Object.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\embeds.js:6:9)\n    at Module._compile (node:internal/modules/cjs/loader:1706:14)\n    at Object..js (node:internal/modules/cjs/loader:1839:10)\n    at Module.load (node:internal/modules/cjs/loader:1441:32)\n    at Function._load (node:internal/modules/cjs/loader:1263:12)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)\n    at Module.require (node:internal/modules/cjs/loader:1463:12)"
+  },
+  {
+    "ts": 1757454774949,
+    "scope": "fatal",
+    "message": "TypeError: toTitleCase is not a function\n    at createEmbed (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\embeds.js:12:29)\n    at sendBotStatusMessage (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\index.js:117:17)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async Client.<anonymous> (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\index.js:198:3)"
+  },
+  {
+    "ts": 1757454775182,
+    "scope": "fatal:shutdown",
+    "message": "TypeError: toTitleCase is not a function\n    at createEmbed (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\embeds.js:12:29)\n    at Object.postShutdown (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\services\\statusService.js:53:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async gracefulShutdown (C:\\Users\\tevme\\Documents\\Projects\\Miyako\\utils\\crashReporter.js:47:7)"
+  },
+  {
+    "ts": 1757455036366,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757455268489,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757455714189,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757456580502,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757457263157,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757458339488,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757490860949,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757491075049,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757491657457,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757491710754,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757491890516,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757492128327,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757493531652,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757494246653,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757496251618,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757498719510,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757502018365,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757502126503,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757502594141,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757503558810,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757504340219,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757504953219,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757505700464,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757506148207,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757507754547,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757523573381,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757565008225,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757565033545,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757573260969,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757575624083,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757577902736,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757599736009,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757601112912,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757605875036,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757606566052,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757606759319,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757606927891,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757607419373,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757607611572,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757608787642,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  },
+  {
+    "ts": 1757610638423,
+    "scope": "exit",
+    "message": "process exiting with code 0"
+  }
+]

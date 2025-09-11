@@ -17,6 +17,28 @@ function findProjectRoot(startDir) {
 const projectRoot = findProjectRoot(__dirname);
 
 function cfgPath(...parts) { return path.join(projectRoot, 'config', ...parts); }
-function dataPath(...parts) { return path.join(projectRoot, ...parts); }
+function dataDir() { return path.join(projectRoot, 'data'); }
+function logsDir() { return path.join(projectRoot, 'logs'); }
+function ensureDir(p) { try { if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); } catch {} }
+function logPath(...parts) { const dir = logsDir(); ensureDir(dir); return path.join(dir, ...parts); }
+function dataPath(...parts) { const dir = dataDir(); ensureDir(dir); return path.join(dir, ...parts); }
 
-module.exports = { projectRoot, cfgPath, dataPath };
+// Runtime (mutable) JSON files historically lived in /config; we remap them to /data with fallback.
+const RUNTIME_JSON = new Set([
+	'bank.json','cash.json','events.json','schedules.json','levels.json','vcLevels.json','depositProgress.json','buttonSessions.json','activeMenus.json','testingBank.json','testingCash.json','changelogSnapshot.json','snipes.json','errorLog.json','crash-latest.json','process-heartbeat.json','lastShutdown.json','settingMeta.json'
+]);
+
+function runtimeFile(name) {
+	if (!RUNTIME_JSON.has(name)) return cfgPath(name); // treat as config or template
+	const newPath = dataPath(name);
+	// Backward compatibility: if new file missing but old exists, read from old location; writes go to new
+	try {
+		if (!fs.existsSync(newPath)) {
+			const oldPath = cfgPath(name);
+			if (fs.existsSync(oldPath)) return oldPath; // let first read come from legacy path until migrated
+		}
+	} catch {}
+	return newPath;
+}
+
+module.exports = { projectRoot, cfgPath, dataPath, logPath, runtimeFile, logsDir, dataDir };
