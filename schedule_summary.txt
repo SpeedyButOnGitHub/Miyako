@@ -1,6 +1,0 @@
-===== AUTO MESSAGES (events.json) =====
-Total events: 1
-- Midnight Bar -> #1232701768832516098 next: n/a
-
-===== SCHEDULES (schedules.json) =====
-Total schedules: 0
