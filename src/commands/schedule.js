@@ -1,2 +1,3 @@
-// Compatibility shim: keep existing imports working by re-exporting the modular API
-module.exports = require('./schedule');
+// Compatibility shim: re-export the modular API from the folder's index.
+// Important: explicitly target index to avoid self-resolving './schedule.js'.
+module.exports = require('./schedule/index.js');
