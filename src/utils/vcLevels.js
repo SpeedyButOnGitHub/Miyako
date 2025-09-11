@@ -33,7 +33,7 @@ function saveVCLevels() {
 	enqueueWrite(VC_LEVELS_FILE, () => {
 		pendingSave = false;
 		return JSON.stringify(vcLevels, null, 2);
-	}, { delay: 250, aggregateBackups: true });
+	}, { delay: 250, backups: false }); // no backups for volatile vcLevels
 }
 
 function getVCXP(userId) {

@@ -23,6 +23,26 @@ data/process-heartbeat.json
 data/backups/vcLevels.json.aggregate.json
 data/backups/process-heartbeat.json.aggregate.json
 
+# Volatile runtime JSON (auto-generated / frequently mutated)
+data/activeMenus.json
+data/bank.json
+data/buttonSessions.json
+data/cash.json
+data/changelogSnapshot.json
+data/depositProgress.json
+data/errorLog.json
+data/events.json
+data/levels.json
+data/schedules.json
+data/snipes.json
+data/testingBank.json
+data/testingCash.json
+data/lastShutdown.json
+data/crash-latest.json
+
+# Entire backups directory (individual .bak rollovers)
+data/backups/
+
 # Aggregate backup bundles (single-file history stores)
 **/backups/*.aggregate.json
 
