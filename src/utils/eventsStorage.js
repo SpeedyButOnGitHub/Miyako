@@ -36,7 +36,7 @@ function loadObj() {
 
 function saveObj(obj) {
 	ensureFile();
-	enqueueWrite(EVENTS_FILE, () => JSON.stringify(obj, null, 2));
+	enqueueWrite(EVENTS_FILE, () => JSON.stringify(obj, null, 2), { aggregateBackups: true });
 }
 
 function mergeRuntime(ev) { if (!ev) return ev; const rt = getRuntime(ev.id) || {}; return { ...ev, ...rt }; }

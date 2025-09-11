@@ -930,11 +930,15 @@ function attachInteractionEvents(client) {
 				const clockKey = '__clockIn';
 				const state = ev[clockKey] && typeof ev[clockKey]==='object' ? { ...ev[clockKey] } : { positions: {}, messageIds: [] };
 				if (!state.positions) state.positions = {};
-				// Remove user from all other positions first
+				// Determine if the user is re-selecting the same slot (toggle off behavior)
+				const wasIn = Object.keys(state.positions).some(pos => Array.isArray(state.positions[pos]) && state.positions[pos].includes(member.id));
+				const wasInSame = wasIn && Array.isArray(state.positions[choice]) && state.positions[choice].includes(member.id);
+				// Always remove user from every position first
 				for (const key of Object.keys(state.positions)) {
-					state.positions[key] = Array.isArray(state.positions[key]) ? state.positions[key].filter(id=>id!==member.id) : [];
+					state.positions[key] = Array.isArray(state.positions[key]) ? state.positions[key].filter(id => id !== member.id) : [];
 				}
-				if (choice !== 'none') {
+				// If selecting 'none' OR re-selecting same position -> act as unregister (skip add)
+				if (choice !== 'none' && !wasInSame) {
 					if (!Array.isArray(state.positions[choice])) state.positions[choice] = [];
 					if (meta.max !== Infinity && state.positions[choice].length >= meta.max) {
 						await interaction.reply({ content:`${meta.label} is full.`, flags:1<<6 }).catch(()=>{}); return;
@@ -956,7 +960,7 @@ function attachInteractionEvents(client) {
 						} catch {}
 					}
 				} catch {}
-				const msgTxt = choice === 'none' ? 'Registration cleared.' : `Registered as ${meta.label}.`;
+				const msgTxt = (choice === 'none' || wasInSame) ? 'Registration cleared.' : `Registered as ${meta.label}.`;
 				await interaction.reply({ content: msgTxt, flags:1<<6 }).catch(()=>{});
 				return;
 			}

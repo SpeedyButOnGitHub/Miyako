@@ -19,6 +19,9 @@ logs_runner.txt
 data/private/
 data/private/**
 
+# Aggregate backup bundles (single-file history stores)
+**/backups/*.aggregate.json
+
 # Generated context summaries
 FULL_CONTEXT.txt
 PROJECT_SUMMARY.txt
