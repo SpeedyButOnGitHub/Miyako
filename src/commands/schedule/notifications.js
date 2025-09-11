@@ -105,27 +105,8 @@ async function refreshTrackedAutoMessages(client, ev) {
       const chId = ev.__clockIn.channelId || ev.channelId;
       const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
       if (channel && channel.messages) {
-        const fmtMentions = (arr=[]) => {
-          if (!Array.isArray(arr) || arr.length === 0) return '*None*';
-          const s = arr.map(id=>`<@${id}>`).join(', ');
-          return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
-        };
-        const nameSafe = ev.name || 'Event';
-        const embed = {
-          title: `🕒 Staff Clock In — ${nameSafe}`,
-          description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
-          color: 3447003,
-          fields: [
-            { name: '📝 Instance Manager (1 slot)', value: `${(ev.__clockIn.positions?.instance_manager||[]).length} / 1\n${fmtMentions(ev.__clockIn.positions?.instance_manager)}`, inline: false },
-            { name: '🛠️ Manager',   value: fmtMentions(ev.__clockIn.positions?.manager),   inline: true },
-            { name: '🛡️ Bouncer',   value: fmtMentions(ev.__clockIn.positions?.bouncer),   inline: true },
-            { name: '🍸 Bartender', value: fmtMentions(ev.__clockIn.positions?.bartender), inline: true },
-            { name: '🎯 Backup',    value: fmtMentions(ev.__clockIn.positions?.backup),    inline: true },
-            { name: '⏳ Maybe / Late', value: fmtMentions(ev.__clockIn.positions?.maybe), inline: false },
-            { name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
-          ],
-          footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
-        };
+        const { buildClockInEmbed } = require('../../utils/clockinTemplate');
+        const embed = buildClockInEmbed(ev);
         for (const mid of ev.__clockIn.messageIds.slice(-3)) {
           try { const msg = await channel.messages.fetch(mid).catch(()=>null); if (msg) await msg.edit({ content:'', embeds:[embed] }).catch(()=>{}); } catch {}
         }

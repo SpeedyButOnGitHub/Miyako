@@ -1,10 +1,12 @@
 const fs = require("fs");
 const { enqueueWrite } = require('./writeQueue');
-const { runtimeFile } = require('./paths');
+const { dataDir } = require('./paths');
+const path = require('path');
 const IS_TEST = process.env.NODE_ENV === 'test';
 
 // Use a separate file during tests to avoid polluting real data (or skip I/O entirely)
-const VC_LEVELS_FILE = IS_TEST ? runtimeFile('testingVcLevels.json') : runtimeFile('vcLevels.json');
+// Treat vcLevels as volatile runtime data: keep under main runtime file but aggregate backups to avoid churn.
+const VC_LEVELS_FILE = IS_TEST ? path.join(dataDir(), 'testingVcLevels.json') : path.join(dataDir(), 'vcLevels.json');
 
 // in-memory cache
 let vcLevels = {};
@@ -31,7 +33,7 @@ function saveVCLevels() {
 	enqueueWrite(VC_LEVELS_FILE, () => {
 		pendingSave = false;
 		return JSON.stringify(vcLevels, null, 2);
-	}, { delay: 250 });
+	}, { delay: 250, backups: false }); // no backups for volatile vcLevels
 }
 
 function getVCXP(userId) {

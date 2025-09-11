@@ -25,8 +25,8 @@ function dataPath(...parts) { const dir = dataDir(); ensureDir(dir); return path
 
 // Runtime (mutable) JSON files historically lived in /config; we remap them to /data with fallback.
 const RUNTIME_JSON = new Set([
-	'bank.json','cash.json','events.json','schedules.json','levels.json','vcLevels.json','depositProgress.json','buttonSessions.json','activeMenus.json','testingBank.json','testingCash.json','changelogSnapshot.json','snipes.json','errorLog.json','crash-latest.json','process-heartbeat.json','lastShutdown.json','settingMeta.json'
-]);
+	'bank.json','cash.json','events.json','schedules.json','levels.json','depositProgress.json','buttonSessions.json','activeMenus.json','testingBank.json','testingCash.json','changelogSnapshot.json','snipes.json','errorLog.json','crash-latest.json','lastShutdown.json','settingMeta.json'
+]); // vcLevels.json & process-heartbeat.json treated as volatile (ignored) and handled separately
 
 function runtimeFile(name) {
 	if (!RUNTIME_JSON.has(name)) return cfgPath(name); // treat as config or template
