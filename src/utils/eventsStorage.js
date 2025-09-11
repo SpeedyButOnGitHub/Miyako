@@ -3,6 +3,7 @@ const path = require("path");
 const { cfgPath } = require('./paths');
 
 const EVENTS_FILE = cfgPath('events.json');
+const { enqueueWrite } = require('./writeQueue');
 
 function ensureFile() {
 	const dir = path.dirname(EVENTS_FILE);
@@ -33,7 +34,7 @@ function loadObj() {
 
 function saveObj(obj) {
 	ensureFile();
-	fs.writeFileSync(EVENTS_FILE, JSON.stringify(obj, null, 2));
+	enqueueWrite(EVENTS_FILE, () => JSON.stringify(obj, null, 2));
 }
 
 function getEvents() { return loadObj().events; }

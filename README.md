@@ -77,3 +77,9 @@ The hook aborts the commit if any `ephemeral:true` remains.
 - `scripts/` — maintenance and export scripts
 
 Note: The old root-level modules have been migrated; the temporary `legacy/` folder is no longer used and can be safely removed.
+
+### Dev mode
+
+- To auto-restart on changes (excluding config JSON), use:
+	- `npm run start:dev`
+	- Nodemon watches `src/` and ignores `config/*.json` to avoid restart storms while state files change.

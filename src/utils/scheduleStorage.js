@@ -3,6 +3,7 @@ const path = require("path");
 const { cfgPath } = require('./paths');
 
 const SCHEDULES_FILE = cfgPath('schedules.json');
+const { enqueueWrite } = require('./writeQueue');
 
 function ensureFile() {
 	const dir = path.dirname(SCHEDULES_FILE);
@@ -28,7 +29,7 @@ function loadObj() {
 
 function saveObj(obj) {
 	ensureFile();
-	fs.writeFileSync(SCHEDULES_FILE, JSON.stringify(obj, null, 2));
+	enqueueWrite(SCHEDULES_FILE, () => JSON.stringify(obj, null, 2));
 }
 
 function getSchedules() { return loadObj().schedules; }

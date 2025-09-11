@@ -1,7 +1,11 @@
 {
+  "engines": {
+    "node": ">=18.17 <23"
+  },
   "scripts": {
     "smoke": "node ./scripts/smoke-load.js",
     "start": "node index.js",
+    "start:dev": "nodemon --watch src --ext js,json --ignore config/*.json index.js",
     "start:bg": "node ./scripts/startBot.js",
     "stop": "node ./scripts/stopBot.js",
     "import-levels": "node ./scripts/import-levels.js",
@@ -11,6 +15,8 @@
   "export:schedule": "node ./scripts/export-schedule-summary.js",
   "test": "jest --runInBand",
   "lint": "eslint \"src/**/*.js\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "migrate:clockin": "node ./scripts/migrate-clockin.js"
   },
   "dependencies": {
@@ -21,6 +27,8 @@
   "devDependencies": {
   "jest": "^29.7.0",
   "eslint": "^8.57.0",
-  "eslint-plugin-unused-imports": "^3.2.0"
+  "eslint-plugin-unused-imports": "^3.2.0",
+  "prettier": "^3.3.3",
+  "nodemon": "^3.1.7"
   }
 }
