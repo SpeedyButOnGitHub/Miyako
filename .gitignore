@@ -1,50 +1,40 @@
 # Node
 node_modules/
 dist/
+coverage/
+.eslintcache
 
 # Env
 .env
 .env.local
 .env.*.local
 
-schedule_summary.txt
-
-# Runtime data (dynamic user/storage files)
-config/activeMenus.json
-config/bank.json
-config/botStatus.json
-config/buttonSessions.json
-config/cash.json
-config/changelogSnapshot.json
-config/crash-latest.json
-config/depositProgress.json
-config/errorLog.json
-config/levels.json
-config/process-heartbeat.json
-config/snipes.json
-config/testingBank.json
-config/testingCash.json
-config/vcLevels.json
 # Logs
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-logs/
+logs_runner.txt
 
 # Generated context summaries
 FULL_CONTEXT.txt
 PROJECT_SUMMARY.txt
+schedule_summary.txt
 
-# OS
+# OS/editor
 .DS_Store
-.env
-
-# Project data (explicitly list known local-only files)
-config/snipes.json
-config/changelogSnapshot.json
-config/buttonSessions.json
-config/botStatus.json
+Thumbs.db
 
 # Runtime singleton lock (changes every run)
 .miyako.lock
+
+# Config: ignore all by default, version only selected files
+config/*
+!config/botConfig.json
+!config/categories.js
+!config/roles.js
+!config/clockInEmbedTemplate.json
+
+# Optional: if a temporary legacy/ folder is recreated locally, keep it untracked
+legacy/
