@@ -14,6 +14,8 @@ try {
 	levels = {};
 }
 
+// (Removed temporary live reload watcher used only for one-time reconstruction script.)
+
 let pendingSave = false;
 function saveLevels() {
 	if (pendingSave) return; // coalesce rapid calls

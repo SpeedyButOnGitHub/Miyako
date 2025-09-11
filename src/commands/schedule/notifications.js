@@ -36,7 +36,8 @@ function buildNotifsEmbed(guild, ev) {
         else if (config.autoMessages?.defaultDeleteMs > 0) ttlDisp = humanizeMs(config.autoMessages.defaultDeleteMs) + '*';
       }
       const ttlLabel = ` [TTL ${ttlDisp}]`;
-      return `${status} [${off}]${clock}${chanNote} ${preview}${ttlLabel}`;
+      const mentionNote = Array.isArray(m.mentions) && m.mentions.length ? ` [@${m.mentions.length}]` : '';
+      return `${status} [${off}]${clock}${chanNote} ${preview}${ttlLabel}${mentionNote}`;
     }).join('\n');
     safeAddField(embed, 'Messages', lines);
   } else {
@@ -95,6 +96,13 @@ async function refreshTrackedAutoMessages(client, ev) {
           content = applyTimestampPlaceholders(content, ev);
           if (config.testingMode) content = sanitizeMentionsForTesting(content);
           payload = { content };
+        }
+        // Handle role mentions if present; ensure allowedMentions to avoid accidental mass pings
+        if (Array.isArray(notif.mentions) && notif.mentions.length) {
+          const mentionLine = notif.mentions.map(r=>`<@&${r}>`).join(' ');
+          if (payload.content) payload.content = `${mentionLine}\n${payload.content}`.slice(0,2000);
+          else payload.content = mentionLine.slice(0,2000);
+          payload.allowedMentions = { roles: notif.mentions.slice(0,20) };
         }
         for (const mid of rec.ids.slice(-3)) {
           try { const msg = await channel.messages.fetch(mid).catch(()=>null); if (msg) await msg.edit(payload).catch(()=>{}); } catch {}

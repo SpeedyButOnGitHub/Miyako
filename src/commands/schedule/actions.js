@@ -223,6 +223,13 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     if (!content) content = `Auto message (${ev.name})`;
     payload = { content };
   }
+  // Prepend role mentions if configured
+  if (Array.isArray(notif.mentions) && notif.mentions.length) {
+    const mentionLine = notif.mentions.map(r=>`<@&${r}>`).join(' ');
+    if (payload.content) payload.content = `${mentionLine}\n${payload.content}`.slice(0,2000);
+    else payload.content = mentionLine.slice(0,2000);
+    payload.allowedMentions = { roles: notif.mentions.slice(0,20) };
+  }
   if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
   const sent = await channel.send(payload).catch(()=>null);
   try {

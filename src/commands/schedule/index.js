@@ -1,8 +1,9 @@
- const { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { getEvents, getEvent, addEvent, updateEvent, removeEvent } = require('../../services/scheduleService');
 const { OWNER_ID } = require('../moderation/permissions');
 const ActiveMenus = require('../../utils/activeMenus');
 const { config } = require('../../utils/storage');
+const { safeReply } = require('../../utils/safeReply');
 
 const { parseOffsetInput, parseDeleteAfterMs, humanizeMs } = require('./helpers');
 const { DAY_NAMES, buildMainEmbed, buildDetailEmbed, mainRows, buildSelectRows, detailRows } = require('./ui');
@@ -30,7 +31,6 @@ async function handleEventCreateModal(interaction) {
   const dayMap = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
   const healJSON = (txt) => txt.replace(/^```(json)?/i,'').replace(/```$/,'').trim().replace(/,\s*([}\]])/g,'$1');
   const clamp = (s,max=1900)=> (s && s.length>max? s.slice(0,max-3)+'...':s);
-  const { safeReply } = require('../../utils/safeReply');
   if (!name) return safeReply(interaction, { content: '❌ Name required.', flags:1<<6 });
   if (!/^\d{1,32}$/.test(channelId)) return safeReply(interaction, { content: '❌ Invalid channel id.', flags:1<<6 });
   const times = timesRaw.split(/[,\s]+/).map(t=>t.trim()).filter(Boolean);
@@ -164,6 +164,8 @@ async function handleEventNotificationModal(interaction) {
     const chanRaw = (interaction.fields.getTextInputValue('channel')||'').trim();
     const deleteAfterRaw = interaction.fields.getTextInputValue('deleteafter');
     const deleteAfterMs = parseDeleteAfterMs(deleteAfterRaw);
+    let mentionsRaw = '';
+    try { mentionsRaw = (interaction.fields.getTextInputValue('mentions')||'').trim(); } catch {}
     const msgChannelId = chanRaw.replace(/[<#>]/g,'');
   if (msgChannelId && !/^\d{1,32}$/.test(msgChannelId)) { return safeReply(interaction, { content:'❌ Invalid channel id.', flags:1<<6 }); }
     let messageJSON = null;
@@ -174,6 +176,10 @@ async function handleEventNotificationModal(interaction) {
     const entry = { id: nextId, offsetMinutes: offset, enabled: true, message: msgRaw, messageJSON };
     if (msgChannelId) entry.channelId = msgChannelId;
     if (Number.isFinite(deleteAfterMs)) entry.deleteAfterMs = deleteAfterMs; // 0 disables, >0 TTL; absence -> fallback default
+    if (mentionsRaw) {
+      const roleIds = Array.from(new Set(mentionsRaw.split(/[\s,]+/).map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/[<@&#>]/g,'')).filter(id=>/^\d{5,32}$/.test(id))));
+      if (roleIds.length) entry.mentions = roleIds;
+    }
     list.push(entry);
     updatedEv = updateEvent(ev.id, { autoMessages: list, nextAutoId: Number(nextId)+1 });
     await interaction.reply({ content:`✅ Auto message #${nextId} created${messageJSON?' (JSON)':''}.`, flags:1<<6 }).catch(()=>{});
@@ -189,6 +195,8 @@ async function handleEventNotificationModal(interaction) {
     const deleteAfterRaw = interaction.fields.getTextInputValue('deleteafter');
     const deleteAfterMs = parseDeleteAfterMs(deleteAfterRaw);
     const msgRaw = interaction.fields.getTextInputValue('message');
+    let mentionsRaw = '';
+    try { mentionsRaw = (interaction.fields.getTextInputValue('mentions')||'').trim(); } catch {}
     let messageJSON = null; const healed = healJSON(msgRaw); if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
     const newList = list.map(entry => {
       const e = { ...entry };
@@ -198,6 +206,12 @@ async function handleEventNotificationModal(interaction) {
         e.messageJSON = messageJSON;
         e.deleteAfterMs = deleteAfterMs;
         if (cleanedChan) e.channelId = cleanedChan; else delete e.channelId;
+        if (mentionsRaw) {
+          const roleIds = Array.from(new Set(mentionsRaw.split(/[\s,]+/).map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/[<@&#>]/g,'')).filter(id=>/^\d{5,32}$/.test(id))));
+          if (roleIds.length) e.mentions = roleIds; else delete e.mentions;
+        } else {
+          delete e.mentions; // allow clearing by leaving field blank
+        }
       }
       return e;
     });
@@ -297,6 +311,7 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder(ev.channelId||'')),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('offset').setLabel('When before start? (e.g. 15m, 1h, 2h30m)').setStyle(TextInputStyle.Short).setRequired(true).setValue('5m')),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deleteafter').setLabel('Delete after (e.g. 10m, 0=disable)').setStyle(TextInputStyle.Short).setRequired(true).setValue('0')),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('mentions').setLabel('Role IDs to ping (comma/space)').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder('123,456 789')),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message / JSON').setStyle(TextInputStyle.Paragraph).setRequired(true))
       );
     await interaction.showModal(modal); return;
@@ -314,6 +329,7 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setValue(notif.channelId||'')),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('offset').setLabel('When before start? (e.g. 10m, 2h)').setStyle(TextInputStyle.Short).setRequired(true).setValue(notif.offsetMinutes? `${notif.offsetMinutes}m` : 'start')),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deleteafter').setLabel('Delete after (e.g. 10m, 2h, 0=disable)').setStyle(TextInputStyle.Short).setRequired(true).setValue(suggestTTL)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('mentions').setLabel('Role IDs to ping (comma/space)').setStyle(TextInputStyle.Short).setRequired(false).setValue((notif.mentions||[]).join(','))),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message / JSON').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(notif.message || (notif.messageJSON? JSON.stringify(notif.messageJSON,null,2):'')))
       );
     await interaction.showModal(modal); return;
