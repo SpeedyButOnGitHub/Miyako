@@ -18,6 +18,10 @@ yarn-error.log*
 logs_runner.txt
 data/private/
 data/private/**
+data/vcLevels.json
+data/process-heartbeat.json
+data/backups/vcLevels.json.aggregate.json
+data/backups/process-heartbeat.json.aggregate.json
 
 # Aggregate backup bundles (single-file history stores)
 **/backups/*.aggregate.json
