@@ -38,7 +38,8 @@ function maybeSpawnDrop(message) {
 	if (existing && !existing.claimedBy && existing.expiresAt > Date.now()) return null;
 
 	const e = config.cashDrops || {};
-	const chance = typeof e.dropChance === 'number' ? e.dropChance : 0.02;
+	// Reduced default spawn probability from 2% -> 0.005 (0.5%) to lessen frequency.
+	const chance = typeof e.dropChance === 'number' ? e.dropChance : 0.005;
 	if (Math.random() > chance) return null;
 
 	const min = Math.max(0, Math.floor(e.minAmount ?? 25));

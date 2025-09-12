@@ -20,6 +20,7 @@
     "migrate:clockin": "node ./scripts/migrate-clockin.js"
   ,"migrate:event-channels": "node ./scripts/migrate-event-channel-ids.js"
   ,"migrate:event-runtime": "node ./scripts/migrate-event-runtime.js"
+  
   },
   "dependencies": {
     "discord.js": "^14.22.1",

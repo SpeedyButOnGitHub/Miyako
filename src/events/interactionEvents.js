@@ -961,7 +961,48 @@ function attachInteractionEvents(client) {
 					}
 				} catch {}
 				const msgTxt = (choice === 'none' || wasInSame) ? 'Registration cleared.' : `Registered as ${meta.label}.`;
-				await interaction.reply({ content: msgTxt, flags:1<<6 }).catch(()=>{});
+				try {
+					const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+					const row = new ActionRowBuilder().addComponents(
+						new ButtonBuilder().setCustomId(`clockin:autoNext:${ev.id}:${choice}`).setLabel('Auto-register next').setStyle(ButtonStyle.Primary).setDisabled(choice==='none' || wasInSame),
+						new ButtonBuilder().setCustomId(`clockin:autoNextCancel:${ev.id}`).setLabel('Cancel auto').setStyle(ButtonStyle.Secondary)
+					);
+					await interaction.reply({ content: msgTxt, components:[row], flags:1<<6 }).catch(()=>{});
+				} catch {
+					await interaction.reply({ content: msgTxt, flags:1<<6 }).catch(()=>{});
+				}
+				return;
+			}
+
+			// Clock-In autoNext register button
+			if (interaction.isButton() && interaction.customId.startsWith('clockin:autoNext:')) {
+				const parts = interaction.customId.split(':'); // clockin autoNext evId roleKey
+				const evId = parts[2];
+				const roleKey = parts[3];
+				const ev = getEvent(evId);
+				if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
+				if (roleKey === 'none') { await interaction.reply({ content:'Select a role first.', flags:1<<6 }).catch(()=>{}); return; }
+				const clock = ev.__clockIn && typeof ev.__clockIn==='object' ? { ...ev.__clockIn } : { positions:{}, messageIds:[] };
+				clock.autoNext = clock.autoNext && typeof clock.autoNext==='object' ? { ...clock.autoNext } : {};
+				clock.autoNext[interaction.user.id] = roleKey;
+				updateEvent(ev.id, { __clockIn: clock });
+				await interaction.reply({ content:`You will be auto-registered as ${roleKey.replace(/_/g,' ')} next clock-in.`, flags:1<<6 }).catch(()=>{});
+				return;
+			}
+			// Clock-In autoNext cancel
+			if (interaction.isButton() && interaction.customId.startsWith('clockin:autoNextCancel:')) {
+				const parts = interaction.customId.split(':');
+				const evId = parts[2];
+				const ev = getEvent(evId);
+				if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
+				const clock = ev.__clockIn && typeof ev.__clockIn==='object' ? { ...ev.__clockIn } : { positions:{}, messageIds:[] };
+				if (clock.autoNext && clock.autoNext[interaction.user.id]) {
+					delete clock.autoNext[interaction.user.id];
+					updateEvent(ev.id, { __clockIn: clock });
+					await interaction.reply({ content:'Auto registration cancelled.', flags:1<<6 }).catch(()=>{});
+				} else {
+					await interaction.reply({ content:'No auto registration found.', flags:1<<6 }).catch(()=>{});
+				}
 				return;
 			}
 		} catch (err) {
