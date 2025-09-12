@@ -64,7 +64,7 @@ function attachInteractionEvents(client) {
 			if (interaction.isButton() && interaction.customId.startsWith('apply_app_')) {
 				const appId = interaction.customId.split('_').pop();
 				try {
-					const { getApplication, canApply, addSubmission, listSubmissions } = require('../utils/applications');
+					const { getApplication, canApply, listSubmissions } = require('../utils/applications');
 					const { startSession, getSession, recordAnswer, abandonSession } = require('../utils/applicationFlow');
 					const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 					const app = getApplication(appId);

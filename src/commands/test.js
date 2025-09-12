@@ -80,7 +80,7 @@ async function handleCashSubcommand(client, message, args) {
 		return replyInfo(message, `Added $${amount.toLocaleString()} (testing) to <@${uid}>. New test cash: $${next.toLocaleString()}.`);
 	}
 	if (action === 'clear') {
-		const scope = (args[2] || '').toLowerCase();
+		// scope not currently used
 		// Only a global clear is supported for now (simple and safe)
 		clearTestingCash();
 		return replyInfo(message, 'Cleared testing cash overlay for all users.');
@@ -135,28 +135,24 @@ async function handleTestCommand(client, message) {
 	// parts[0] === 'test'
 	const sub = (parts[1] || '').toLowerCase();
 	const args = parts; // keep original for positional indexes used above
-	try {
-		if (!sub || sub === 'help') {
-			return replyInfo(message, [
-				'**.test owner utilities**',
-				'• .test mode on|off|toggle',
-				'• .test status',
-				'• .test drop [amount]',
-				'• .test cash add <@user|id> <amount>',
-				'• .test cash clear',
-				'• .test xp add <@user|id> <amount> [vc]',
-				'• .test xp reset <@user|id|all> [vc]'
-			]);
-		}
-		if (sub === 'mode') return handleModeSubcommand(client, message, args);
-		if (sub === 'status') return handleStatusSubcommand(client, message);
-		if (sub === 'drop') return handleDropSubcommand(client, message, args);
-		if (sub === 'cash') return handleCashSubcommand(client, message, args);
-		if (sub === 'xp') return handleXPSubcommand(client, message, args);
-		return replyInfo(message, 'Unknown .test subcommand. Try `.test` for help.');
-	} catch (e) {
-		throw e;
+	if (!sub || sub === 'help') {
+		return replyInfo(message, [
+			'**.test owner utilities**',
+			'• .test mode on|off|toggle',
+			'• .test status',
+			'• .test drop [amount]',
+			'• .test cash add <@user|id> <amount>',
+			'• .test cash clear',
+			'• .test xp add <@user|id> <amount> [vc]',
+			'• .test xp reset <@user|id|all> [vc]'
+		]);
 	}
+	if (sub === 'mode') return handleModeSubcommand(client, message, args);
+	if (sub === 'status') return handleStatusSubcommand(client, message);
+	if (sub === 'drop') return handleDropSubcommand(client, message, args);
+	if (sub === 'cash') return handleCashSubcommand(client, message, args);
+	if (sub === 'xp') return handleXPSubcommand(client, message, args);
+	return replyInfo(message, 'Unknown .test subcommand. Try `.test` for help.');
 }
 
 module.exports = { handleTestCommand };

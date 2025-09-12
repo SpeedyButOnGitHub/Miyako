@@ -5,7 +5,7 @@ const ActiveMenus = require('../../utils/activeMenus');
 const { config } = require('../../utils/storage');
 const { safeReply } = require('../../utils/safeReply');
 
-const { parseOffsetInput, parseDeleteAfterMs, humanizeMs } = require('./helpers');
+const { parseOffsetInput, parseDeleteAfterMs } = require('./helpers');
 const { DAY_NAMES, buildMainEmbed, buildDetailEmbed, mainRows, buildSelectRows, detailRows } = require('./ui');
 const { buildNotifsEmbed, notifManagerRows, notifSelectRows, notifDetailRows, refreshTrackedAutoMessages } = require('./notifications');
 const { ensureAnchor, manualTriggerAutoMessage } = require('./actions');

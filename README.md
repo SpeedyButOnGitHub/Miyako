@@ -83,3 +83,22 @@ Note: The old root-level modules have been migrated; the temporary `legacy/` fol
 - To auto-restart on changes (excluding config JSON), use:
 	- `npm run start:dev`
 	- Nodemon watches `src/` and ignores `config/*.json` to avoid restart storms while state files change.
+
+## Startup summary and tests
+
+When the bot starts it runs a small set of non-blocking startup checks and writes a JSON summary to `config/startup-summary.json`.
+
+- The summary includes: timestamp, individual quick-check results, a small changelog snapshot digest (added/removed/modified counts), and a health-check array from `src/utils/health.js`.
+- The summary is safe to inspect and will not cause the bot to crash when checks fail.
+
+To run the lightweight startup tests manually (node context required):
+
+```powershell
+node -e "require('./src/utils/startupTests').runStartupTests(null).then(r=>console.log(JSON.stringify(r,null,2))).catch(e=>console.error(e))"
+```
+
+The project also includes Jest tests under `tests/` that cover some startup and interaction flows. Run them with:
+
+```powershell
+npm test
+```

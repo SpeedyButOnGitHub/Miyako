@@ -1,6 +1,4 @@
 // Formatting helpers: progress bars, footers, sections
-const theme = require('./theme');
-
 function sectionField(name, value, inline=false) { return { name, value, inline }; }
 function progressBar(current, max, size = 20, { showNumbers = true, allowOverflow = true, style = 'blocks' } = {}) {
   const safeMax = Math.max(1, max);

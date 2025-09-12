@@ -7,7 +7,7 @@ const BOT_PREFIX = "**🌙 Late Night Hours Staff Team**\n\n";
 // Reuse centralized constants for roles and chatbox button; keep channel from roles config
 
 const formatMembersListInline = (membersArray) =>
-	membersArray.length ? membersArray.map(m => `<@${m.id}>`).join(", ") : "*None*";
+	membersArray.length ? membersArray.map(m => `<@${m.id}>`).join(", ") : "*None*"
 
 const generateStaffList = async (guild) => {
 	await guild.members.fetch();
@@ -57,7 +57,10 @@ const updateStaffMessage = async (guild) => {
 			try { await staffMessage.pin(); } catch {}
 		}
 		return staffMessage;
-	} catch (err) { try { require('./logger').error('Failed to update staff message', { err: err.message }); } catch {}; return null; }
+		} catch (err) {
+			try { require('./logger').error('Failed to update staff message', { err: err.message }); } catch {}
+			return null;
+		}
 };
 
 module.exports = {

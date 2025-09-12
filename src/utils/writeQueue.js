@@ -11,44 +11,28 @@ function ensureDir(p) {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 }
 
-<<<<<<< HEAD
 const deferredBackups = new Set(); // paths queued for backup at shutdown when aggregateBackups used
 
 function backupFile(targetPath) {
-=======
-function backupFile(targetPath, aggregate = false) {
->>>>>>> c5d9f6137a13c1c2562d11163d511d5176ecfb83
   try {
     if (!fs.existsSync(targetPath)) return;
     const dir = path.dirname(targetPath);
     const base = path.basename(targetPath);
     const backupDir = path.join(dir, 'backups');
     if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-    if (aggregate) {
-      // Maintain a single JSON array file containing recent versions
-      const aggFile = path.join(backupDir, `${base}.aggregate.json`);
-      let arr = [];
-      if (fs.existsSync(aggFile)) {
-        try { arr = JSON.parse(fs.readFileSync(aggFile,'utf8')); if (!Array.isArray(arr)) arr = []; } catch { arr = []; }
-      }
-      const content = fs.readFileSync(targetPath,'utf8');
-      arr.push({ ts: Date.now(), content });
-      // Keep last 25 versions
-      if (arr.length > 25) arr = arr.slice(-25);
-      try { fs.writeFileSync(aggFile, JSON.stringify(arr, null, 2)); } catch {}
-    } else {
-      const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      const backupPath = path.join(backupDir, `${base}.${ts}.bak`);
-      fs.copyFileSync(targetPath, backupPath);
-      // Prune old individual backups
-      const MAX = 10;
-      const files = fs.readdirSync(backupDir)
-        .filter(f => f.startsWith(base + '.') && !f.endsWith('.aggregate.json'))
-        .map(f => ({ f, t: fs.statSync(path.join(backupDir, f)).mtimeMs }))
-        .sort((a, b) => b.t - a.t);
-      for (let i = MAX; i < files.length; i++) {
-        try { fs.unlinkSync(path.join(backupDir, files[i].f)); } catch {}
-      }
+    // aggregate is not defined in this scope, so use opts.aggregateBackups if needed
+    // For now, only do non-aggregate backups
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = path.join(backupDir, `${base}.${ts}.bak`);
+    fs.copyFileSync(targetPath, backupPath);
+    // Prune old individual backups
+    const MAX = 10;
+    const files = fs.readdirSync(backupDir)
+      .filter(f => f.startsWith(base + '.') && !f.endsWith('.aggregate.json'))
+      .map(f => ({ f, t: fs.statSync(path.join(backupDir, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+    for (let i = MAX; i < files.length; i++) {
+      try { fs.unlinkSync(path.join(backupDir, files[i].f)); } catch {}
     }
   } catch {}
 }
@@ -56,12 +40,8 @@ function backupFile(targetPath, aggregate = false) {
 function doAtomicWrite(targetPath, content, opts = {}) {
   ensureDir(targetPath);
   const tmpPath = `${targetPath}.tmp-${process.pid}-${Date.now()}`;
-<<<<<<< HEAD
   if (opts.backups && !opts.aggregateBackups) backupFile(targetPath);
   if (opts.backups && opts.aggregateBackups) deferredBackups.add(targetPath);
-=======
-  if (opts.backups) backupFile(targetPath, opts.aggregateBackups);
->>>>>>> c5d9f6137a13c1c2562d11163d511d5176ecfb83
   fs.writeFileSync(tmpPath, content, 'utf8');
   // On Windows, rename over existing file is atomic for same volume
   fs.renameSync(tmpPath, targetPath);

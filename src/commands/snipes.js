@@ -3,7 +3,7 @@ const { EmbedBuilder } = require("discord.js");
 const { createEmbed } = require('../utils/embeds');
 const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
 const fs = require("fs/promises");
-const { cfgPath } = require('../utils/paths');
+// cfgPath not needed here
 const SNIPES_FILE = require('../utils/paths').runtimeFile('snipes.json');
 
 const snipes = new Map();

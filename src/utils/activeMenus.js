@@ -194,3 +194,9 @@ module.exports = {
 	// expose standardized timeout row for other ephemeral collectors
 	timeoutRow
 };
+
+// Test helpers (not part of public API but handy for unit tests)
+try {
+  module.exports._getHandler = (type) => handlers.get(type);
+  module.exports._getSessionForMessage = (message) => sessions.get(message.id) ? { ...sessions.get(message.id), id: message.id } : null;
+} catch (e) { /* ignore in constrained environments */ }

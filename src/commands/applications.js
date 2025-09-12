@@ -4,7 +4,7 @@
 const ActiveMenus = require('../utils/activeMenus');
 const theme = require('../utils/theme');
 const { createEmbed, safeAddField } = require('../utils/embeds');
-const { semanticButton, buildNavRow, diffEditMessage } = require('../ui');
+const { semanticButton, buildNavRow, backButton, splitButtonsIntoRows } = require('../ui');
 const {
   listApplications,
   addApplication,
@@ -33,11 +33,10 @@ function buildRootEmbed() {
 }
 
 function buildRootComponents() {
+  // Removed 'New App' and 'New Panel' from root per request. Change Applications emoji to 📝.
   const row1 = buildNavRow([
-    semanticButton('primary', { id: 'appmgr_apps', label: 'Applications', emoji: theme.emojis.edit }),
+    semanticButton('primary', { id: 'appmgr_apps', label: 'Applications', emoji: '📝' }),
     semanticButton('primary', { id: 'appmgr_panels', label: 'Panels', emoji: theme.emojis.settings }),
-    semanticButton('success', { id: 'appmgr_new_app', label: 'New App', emoji: theme.emojis.create }),
-    semanticButton('success', { id: 'appmgr_new_panel', label: 'New Panel', emoji: theme.emojis.create }),
   ]);
   return [row1];
 }
@@ -48,19 +47,33 @@ function buildApplicationsListEmbed(page = 0, pageSize = 5) {
   page = Math.min(Math.max(0, page), totalPages - 1);
   const slice = apps.slice(page * pageSize, page * pageSize + pageSize);
   const e = createEmbed({ title: 'Applications', description: `Page ${page + 1}/${totalPages} • ${apps.length} total` });
-  if (!slice.length) safeAddField(e, 'Empty', 'No applications yet.');
+  if (!apps.length) {
+    safeAddField(e, 'Empty', 'No applications found. Use Create to make a new one.');
+    return { embed: e, page, totalPages, apps: [] };
+  }
   for (const a of slice) {
     safeAddField(e, `#${a.id} ${a.enabled ? '🟢' : '🔴'} ${a.name}`, `${a.questions.length} question(s)`);
   }
-  return { embed: e, page, totalPages };
+  return { embed: e, page, totalPages, apps: slice };
 }
 
-function buildApplicationsListComponents(page, totalPages) {
+function buildApplicationsListComponents(page, totalPages, apps) {
+  // apps may be omitted; compute slice if necessary
+  const allApps = Array.isArray(apps) ? apps : listApplications().slice(page * 5, page * 5 + 5);
   const prev = semanticButton('nav', { id: 'appmgr_apps_prev', label: 'Prev', enabled: page > 0 });
   const next = semanticButton('nav', { id: 'appmgr_apps_next', label: 'Next', enabled: page < totalPages - 1 });
-  const back = semanticButton('secondary', { id: 'appmgr_back_root', label: 'Back' });
-  const row = buildNavRow([prev, next, back]);
-  return [row];
+  const createBtn = semanticButton('success', { id: 'appmgr_apps_create', label: 'Create', emoji: theme.emojis.create });
+  const deleteBtn = semanticButton('danger', { id: 'appmgr_apps_delete', label: 'Delete', emoji: theme.emojis.delete });
+  const back = backButton('appmgr_back_root', 'Back');
+  const appButtons = allApps.map(a => semanticButton('primary', { id: `appmgr_app_select_${a.id}`, label: a.name.slice(0, 20) }));
+  // Build selection rows (max 5 per row). If none, show clear disabled button.
+  const selectionRows = appButtons.length ? splitButtonsIntoRows(appButtons) : [ buildNavRow([semanticButton('secondary', { id: 'noop', label: 'No applications', enabled: false })]) ];
+  // Bottom-most row: navigation + create/delete + back
+  const bottomItems = [];
+  if ((totalPages || 1) > 1 && page > 0) bottomItems.push(prev);
+  if ((totalPages || 1) > 1 && page < (totalPages - 1)) bottomItems.push(next);
+  bottomItems.push(createBtn, deleteBtn, back);
+  return [...selectionRows, ...splitButtonsIntoRows(bottomItems)];
 }
 
 function buildPanelsListEmbed(page = 0, pageSize = 5) {
@@ -69,19 +82,27 @@ function buildPanelsListEmbed(page = 0, pageSize = 5) {
   page = Math.min(Math.max(0, page), totalPages - 1);
   const slice = panels.slice(page * pageSize, page * pageSize + pageSize);
   const e = createEmbed({ title: 'Panels', description: `Page ${page + 1}/${totalPages} • ${panels.length} total` });
-  if (!slice.length) safeAddField(e, 'Empty', 'No panels yet.');
+  if (!panels.length) safeAddField(e, 'Empty', 'No panels found. Use Create to make a new one.');
   for (const p of slice) {
     safeAddField(e, `#${p.id} ${p.name}`, `${p.applicationIds.length} application(s)`);
   }
-  return { embed: e, page, totalPages };
+  return { embed: e, page, totalPages, panels: slice };
 }
 
-function buildPanelsListComponents(page, totalPages) {
+function buildPanelsListComponents(page, totalPages, panels) {
+  const allPanels = Array.isArray(panels) ? panels : listPanels().slice(page * 5, page * 5 + 5);
   const prev = semanticButton('nav', { id: 'appmgr_panels_prev', label: 'Prev', enabled: page > 0 });
   const next = semanticButton('nav', { id: 'appmgr_panels_next', label: 'Next', enabled: page < totalPages - 1 });
-  const back = semanticButton('secondary', { id: 'appmgr_back_root', label: 'Back' });
-  const row = buildNavRow([prev, next, back]);
-  return [row];
+  const createBtn = semanticButton('success', { id: 'appmgr_panels_create', label: 'Create', emoji: theme.emojis.create });
+  const deleteBtn = semanticButton('danger', { id: 'appmgr_panels_delete', label: 'Delete', emoji: theme.emojis.delete });
+  const back = backButton('appmgr_back_root', 'Back');
+  const panelButtons = allPanels.map(p => semanticButton('primary', { id: `appmgr_panel_select_${p.id}`, label: p.name.slice(0, 20) }));
+  const selectionRows = panelButtons.length ? splitButtonsIntoRows(panelButtons) : [ buildNavRow([semanticButton('secondary', { id: 'noop', label: 'No panels', enabled: false })]) ];
+  const bottomItems = [];
+  if ((totalPages || 1) > 1 && page > 0) bottomItems.push(prev);
+  if ((totalPages || 1) > 1 && page < (totalPages - 1)) bottomItems.push(next);
+  bottomItems.push(createBtn, deleteBtn, back);
+  return [...selectionRows, ...splitButtonsIntoRows(bottomItems)];
 }
 
 function buildAppDetailEmbed(appId) {
@@ -102,7 +123,7 @@ function buildAppDetailEmbed(appId) {
 
 function buildAppDetailComponents(appId) {
   const app = getApplication(appId);
-  const back = semanticButton('secondary', { id: 'appmgr_back_apps', label: 'Back' });
+  const back = backButton('appmgr_back_apps', 'Back');
   if (!app) return [buildNavRow([back])];
   const toggle = semanticButton('toggle', { id: `appmgr_app_toggle_${app.id}`, label: app.enabled ? 'Disable' : 'Enable', active: app.enabled });
   const rename = semanticButton('primary', { id: `appmgr_app_rename_${app.id}`, label: 'Rename', emoji: theme.emojis.edit });
@@ -111,9 +132,9 @@ function buildAppDetailComponents(appId) {
   const msgBtn = semanticButton('primary', { id: `appmgr_app_msgs_${app.id}`, label: 'Messages' });
   const propsBtn = semanticButton('primary', { id: `appmgr_app_props_${app.id}`, label: 'Props' });
   const rolesBtn = semanticButton('primary', { id: `appmgr_app_roles_${app.id}`, label: 'Roles' });
-  const row1 = buildNavRow([toggle, qBtn, msgBtn, propsBtn, rolesBtn]);
-  const row2 = buildNavRow([rename, del, back]);
-  return [row1, row2].filter(r=>r && r.components && r.components.length);
+  const rows1 = splitButtonsIntoRows([toggle, qBtn, msgBtn, propsBtn, rolesBtn, back]);
+  const row2 = buildNavRow([rename, del]);
+  return [...rows1, row2].filter(r=>r && r.components && r.components.length);
 }
 
 function buildQuestionListEmbed(appId, page=0) {
@@ -132,18 +153,17 @@ function buildQuestionListEmbed(appId, page=0) {
 }
 
 function buildQuestionListComponents(appId, page, totalPages) {
-  const nav = buildNavRow([
+  const navButtons = [
     semanticButton('nav', { id: `appq_prev_${appId}`, label: 'Prev', enabled: page>0 }),
     semanticButton('nav', { id: `appq_next_${appId}`, label: 'Next', enabled: page < totalPages-1 }),
     semanticButton('success', { id: `appq_add_${appId}`, label: 'Add' }),
     semanticButton('primary', { id: `appq_edit_${appId}`, label: 'Edit' }),
     semanticButton('danger', { id: `appq_del_${appId}`, label: 'Delete' }),
-  ]);
-  const nav2 = buildNavRow([
-    semanticButton('primary', { id: `appq_reorder_${appId}`, label: 'Reorder' }),
-    semanticButton('secondary', { id: `appq_back_${appId}`, label: 'Back' })
-  ]);
-  return [nav, nav2];
+    backButton(`appq_back_${appId}`, 'Back')
+  ];
+  const navRows = splitButtonsIntoRows(navButtons);
+  const nav2 = buildNavRow([ semanticButton('primary', { id: `appq_reorder_${appId}`, label: 'Reorder' }) ]);
+  return [...navRows, nav2];
 }
 
 function buildPanelDetailEmbed(panelId) {
@@ -158,7 +178,7 @@ function buildPanelDetailEmbed(panelId) {
 
 function buildPanelDetailComponents(panelId) {
   const panel = getPanel(panelId);
-  const back = semanticButton('secondary', { id: 'appmgr_back_panels', label: 'Back' });
+  const back = backButton('appmgr_back_panels', 'Back');
   if (!panel) return [buildNavRow([back])];
   const rename = semanticButton('primary', { id: `appmgr_panel_rename_${panel.id}`, label: 'Rename', emoji: theme.emojis.edit });
   const desc = semanticButton('primary', { id: `appmgr_panel_desc_${panel.id}`, label: 'Desc' });
@@ -166,9 +186,9 @@ function buildPanelDetailComponents(panelId) {
   const appsManage = semanticButton('primary', { id: `appmgr_panel_apps_${panel.id}`, label: 'Apps' });
   const deploy = semanticButton('success', { id: `appmgr_panel_deploy_${panel.id}`, label: 'Deploy' });
   const del = semanticButton('danger', { id: `appmgr_panel_delete_${panel.id}`, label: 'Delete', emoji: theme.emojis.delete });
-  const row1 = buildNavRow([rename, desc, chan, appsManage, deploy]);
-  const row2 = buildNavRow([del, back]);
-  return [row1, row2];
+  const rows1 = splitButtonsIntoRows([rename, desc, chan, appsManage, deploy, back]);
+  const row2 = buildNavRow([del]);
+  return [...rows1, row2];
 }
 
 // --- Public Command Entry ----------------------------------------------------
@@ -208,23 +228,44 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
     }
     if (id === 'appmgr_apps') {
       session.data.view = 'apps'; session.data.page = 0;
-      const { embed, page, totalPages } = buildApplicationsListEmbed(0);
-      return interaction.update({ embeds: [embed], components: buildApplicationsListComponents(page, totalPages) });
+      const { embed, page, totalPages, apps } = buildApplicationsListEmbed(0);
+      return interaction.update({ embeds: [embed], components: buildApplicationsListComponents(page, totalPages, apps) });
     }
     if (id === 'appmgr_panels') {
       session.data.view = 'panels'; session.data.page = 0;
-      const { embed, page, totalPages } = buildPanelsListEmbed(0);
-      return interaction.update({ embeds: [embed], components: buildPanelsListComponents(page, totalPages) });
+      const { embed, page, totalPages, panels } = buildPanelsListEmbed(0);
+      return interaction.update({ embeds: [embed], components: buildPanelsListComponents(page, totalPages, panels) });
     }
     if (id === 'appmgr_new_app') {
       const created = addApplication({});
       session.data.view = 'appDetail'; session.data.appId = created.id;
       return interaction.update({ embeds: [buildAppDetailEmbed(created.id)], components: buildAppDetailComponents(created.id) });
     }
+    // Create from list
+    if (id === 'appmgr_apps_create') {
+      const created = addApplication({});
+      session.data.view = 'appDetail'; session.data.appId = created.id;
+      try {
+        return interaction.update({ embeds: [buildAppDetailEmbed(created.id)], components: buildAppDetailComponents(created.id) });
+      } catch (e) {
+        try { require('../utils/logger').error('[applications] create app failed', { err: e.message, stack: e.stack }); } catch {}
+        return interaction.reply({ content: 'Failed to create application.', flags: 1<<6 }).catch(()=>{});
+      }
+    }
     if (id === 'appmgr_new_panel') {
       const created = addPanel({});
       session.data.view = 'panelDetail'; session.data.panelId = created.id;
       return interaction.update({ embeds: [buildPanelDetailEmbed(created.id)], components: buildPanelDetailComponents(created.id) });
+    }
+    if (id === 'appmgr_panels_create') {
+      const created = addPanel({});
+      session.data.view = 'panelDetail'; session.data.panelId = created.id;
+      try {
+        return interaction.update({ embeds: [buildPanelDetailEmbed(created.id)], components: buildPanelDetailComponents(created.id) });
+      } catch (e) {
+        try { require('../utils/logger').error('[applications] create panel failed', { err: e.message, stack: e.stack }); } catch {}
+        return interaction.reply({ content: 'Failed to create panel.', flags: 1<<6 }).catch(()=>{});
+      }
     }
     // Pagination (apps)
     if (id === 'appmgr_apps_prev' || id === 'appmgr_apps_next') {
@@ -235,8 +276,8 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       const pageSize = 5; const totalPages = Math.max(1, Math.ceil(apps.length / pageSize));
       let newPage = Math.min(Math.max(0, curPage + delta), totalPages - 1);
       session.data.page = newPage;
-      const { embed, page, totalPages: tp } = buildApplicationsListEmbed(newPage);
-      return interaction.update({ embeds: [embed], components: buildApplicationsListComponents(page, tp) });
+      const { embed, page, totalPages: tp, apps: pageApps } = buildApplicationsListEmbed(newPage);
+      return interaction.update({ embeds: [embed], components: buildApplicationsListComponents(page, tp, pageApps) });
     }
     // Pagination (panels)
     if (id === 'appmgr_panels_prev' || id === 'appmgr_panels_next') {
@@ -247,25 +288,81 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       const pageSize = 5; const totalPages = Math.max(1, Math.ceil(panels.length / pageSize));
       let newPage = Math.min(Math.max(0, curPage + delta), totalPages - 1);
       session.data.page = newPage;
-      const { embed, page, totalPages: tp } = buildPanelsListEmbed(newPage);
-      return interaction.update({ embeds: [embed], components: buildPanelsListComponents(page, tp) });
+      const { embed, page, totalPages: tp, panels: pagePanels } = buildPanelsListEmbed(newPage);
+      return interaction.update({ embeds: [embed], components: buildPanelsListComponents(page, tp, pagePanels) });
+    }
+    // Select application from list to edit/delete
+    if (id.startsWith('appmgr_app_select_')) {
+      const appId = id.split('_').pop();
+      // guard: ensure exists
+      const app = getApplication(appId);
+      if (!app) {
+        try { require('../utils/logger').warn('[applications] selected missing app', { appId }); } catch {}
+        session.data.view = 'apps'; session.data.appId = null;
+        const { embed, page, totalPages, apps } = buildApplicationsListEmbed(session.data.page || 0);
+        return interaction.update({ embeds: [embed], components: buildApplicationsListComponents(page, totalPages, apps) });
+      }
+      session.data.view = 'appDetail'; session.data.appId = appId;
+      return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId) });
+    }
+    // Select panel from list to edit/delete
+    if (id.startsWith('appmgr_panel_select_')) {
+      const panelId = id.split('_').pop();
+      const panel = getPanel(panelId);
+      if (!panel) {
+        try { require('../utils/logger').warn('[applications] selected missing panel', { panelId }); } catch {}
+        session.data.view = 'panels'; session.data.panelId = null;
+        const { embed, page, totalPages, panels } = buildPanelsListEmbed(session.data.page || 0);
+        return interaction.update({ embeds: [embed], components: buildPanelsListComponents(page, totalPages, panels) });
+      }
+      session.data.view = 'panelDetail'; session.data.panelId = panelId;
+      return interaction.update({ embeds: [buildPanelDetailEmbed(panelId)], components: buildPanelDetailComponents(panelId) });
     }
     // App detail buttons dynamic patterns
     if (id.startsWith('appmgr_app_toggle_')) {
       const appId = id.split('_').pop();
       const app = getApplication(appId);
-      if (app) updateApplication(app.id, { enabled: !app.enabled });
-      return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId) });
+      if (app) {
+        updateApplication(app.id, { enabled: !app.enabled });
+        try {
+          return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId) });
+        } catch (e) {
+          try { require('../utils/logger').error('[applications] toggle failed', { err: e.message, stack: e.stack }); } catch {}
+        }
+      }
+      return interaction.reply({ content: 'Application not found.', flags: 1<<6 }).catch(()=>{});
     }
-    if (id.startsWith('appmgr_app_delete_')) {
+    if (id === 'appmgr_apps_delete') {
+      // Delete currently selected app from list context
+      const appId = session.data.appId || null;
+      if (!appId) return interaction.reply({ content: 'No application selected to delete.', flags: 1<<6 }).catch(()=>{});
+      if (!getApplication(appId)) return interaction.reply({ content: 'Application not found.', flags: 1<<6 }).catch(()=>{});
+      // fall through to existing deletion flow by setting id to specific
+    }
+    if (id.startsWith('appmgr_app_delete_') || id === 'appmgr_apps_delete') {
       const appId = id.split('_').pop();
+      const app = getApplication(appId);
+      if (!app) return interaction.reply({ content:'App missing.', flags:1<<6 }).catch(()=>{});
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const modalId = `appdel_${appId}_${Date.now()}`;
+      const m = new ModalBuilder().setCustomId(modalId).setTitle('Delete Application')
+        .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('confirm').setLabel('Type DELETE to confirm').setStyle(TextInputStyle.Short).setRequired(true)));
+      await interaction.showModal(m);
+      const submitted = await interaction.awaitModalSubmit({ time:60000, filter:i=>i.customId===modalId && i.user.id===interaction.user.id }).catch(()=>null);
+      if (!submitted) return;
+      const val = submitted.fields.getTextInputValue('confirm').trim();
+      if (val !== 'DELETE') return submitted.reply({ content:'Cancelled. Type DELETE to confirm.', flags:1<<6 }).catch(()=>{});
       removeApplication(appId);
       session.data.view = 'apps'; session.data.appId = null;
-      const { embed, page, totalPages } = buildApplicationsListEmbed(0);
-      return interaction.update({ embeds: [embed], components: buildApplicationsListComponents(page, totalPages) });
+      const { embed, page, totalPages, apps } = buildApplicationsListEmbed(session.data.page || 0);
+      try {
+        return submitted.update({ embeds: [embed], components: buildApplicationsListComponents(page, totalPages, apps), content: 'Application deleted.' });
+      } catch (e) {
+        try { require('../utils/logger').error('[applications] update after delete failed', { err: e.message, stack: e.stack }); } catch {}
+        return submitted.reply({ content: 'Application deleted.', flags: 1<<6 }).catch(()=>{});
+      }
     }
     if (id.startsWith('appmgr_app_rename_')) {
-      // Placeholder: next phase will open a modal. For now toggle name for quick visual.
       const appId = id.split('_').pop();
       const app = getApplication(appId);
       if (!app) return interaction.reply({ content:'App missing.', flags:1<<6 }).catch(()=>{});
@@ -278,7 +375,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       if (!submitted) return;
       const val = submitted.fields.getTextInputValue('name').trim().slice(0,100) || 'App';
       updateApplication(app.id, { name: val });
-      return submitted.reply({ content:'Renamed.', flags:1<<6 }).catch(()=>{});
+      return submitted.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId), content: 'Renamed.' });
     }
     if (id.startsWith('appmgr_app_props_')) {
       const appId = id.split('_').pop();
@@ -294,7 +391,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         semanticButton('primary', { id:`appprops_setchan_${appId}`, label:'SetChan' }),
         semanticButton('danger', { id:`appprops_clearchan_${appId}`, label:'ClrChan', enabled: !!app.submissionChannelId }),
         semanticButton('primary', { id:`appprops_toggledm_${appId}`, label:'DMs' }),
-        semanticButton('secondary', { id:`appprops_back_${appId}`, label:'Back' })
+  backButton(`appprops_back_${appId}`, 'Back')
       ]);
       return interaction.update({ embeds:[e], components:[row] });
     }
@@ -348,7 +445,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         semanticButton('primary', { id:`approles_required_${appId}`, label:'Required' }),
         semanticButton('primary', { id:`approles_accepted_${appId}`, label:'Accepted' }),
         semanticButton('primary', { id:`approles_pending_${appId}`, label:'Pending' }),
-        semanticButton('secondary', { id:`approles_back_${appId}`, label:'Back' })
+  backButton(`approles_back_${appId}`, 'Back')
       ]);
       const row2 = buildNavRow([
         semanticButton('primary', { id:`approles_restricted_${appId}`, label:'Restrict' }),
@@ -409,7 +506,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         semanticButton('primary', { id:`appmsg_edit_deny_${appId}`, label:'Deny' }),
         semanticButton('primary', { id:`appmsg_edit_confirm_${appId}`, label:'Confirm' }),
         semanticButton('primary', { id:`appmsg_edit_completion_${appId}`, label:'Completion' }),
-        semanticButton('secondary', { id:`appmsg_back_${appId}`, label:'Back' })
+  backButton(`appmsg_back_${appId}`, 'Back')
       ]);
       return interaction.update({ embeds:[e], components:[row] });
     }
@@ -481,7 +578,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         const required = /^y(es)?$/i.test(submitted.fields.getTextInputValue('required'));
         const qid = `q${Date.now().toString(36)}`;
         updateApplication(app.id, { questions: [...app.questions, { id: qid, type, label, required }] });
-        const { embed, page:np, totalPages } = buildQuestionListEmbed(appId, session.data.qPage||0);
+  buildQuestionListEmbed(appId, session.data.qPage||0);
         return submitted.reply({ content:'Added question.', flags:1<<6 }).catch(()=>{});
       }
       if (action === 'del') {
@@ -519,12 +616,34 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       }
     }
     // Panel detail operations
-    if (id.startsWith('appmgr_panel_delete_')) {
+    if (id === 'appmgr_panels_delete') {
+      const panelId = session.data.panelId || null;
+      if (!panelId) return interaction.reply({ content: 'No panel selected to delete.', flags: 1<<6 }).catch(()=>{});
+      if (!getPanel(panelId)) return interaction.reply({ content: 'Panel not found.', flags: 1<<6 }).catch(()=>{});
+      // continue to deletion below by normalizing id
+    }
+    if (id.startsWith('appmgr_panel_delete_') || id === 'appmgr_panels_delete') {
       const panelId = id.split('_').pop();
+      const panel = getPanel(panelId);
+      if (!panel) return interaction.reply({ content:'Panel missing.', flags:1<<6 }).catch(()=>{});
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const modalId = `paneldel_${panelId}_${Date.now()}`;
+      const m = new ModalBuilder().setCustomId(modalId).setTitle('Delete Panel')
+        .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('confirm').setLabel('Type DELETE to confirm').setStyle(TextInputStyle.Short).setRequired(true)));
+      await interaction.showModal(m);
+      const submitted = await interaction.awaitModalSubmit({ time:60000, filter:i=>i.customId===modalId && i.user.id===interaction.user.id }).catch(()=>null);
+      if (!submitted) return;
+      const val = submitted.fields.getTextInputValue('confirm').trim();
+      if (val !== 'DELETE') return submitted.reply({ content:'Cancelled. Type DELETE to confirm.', flags:1<<6 }).catch(()=>{});
       removePanel(panelId);
       session.data.view = 'panels'; session.data.panelId = null;
-      const { embed, page, totalPages } = buildPanelsListEmbed(0);
-      return interaction.update({ embeds: [embed], components: buildPanelsListComponents(page, totalPages) });
+      const { embed, page, totalPages, panels } = buildPanelsListEmbed(session.data.page || 0);
+      try {
+        return submitted.update({ embeds: [embed], components: buildPanelsListComponents(page, totalPages, panels), content: 'Panel deleted.' });
+      } catch (e) {
+        try { require('../utils/logger').error('[applications] update after panel delete failed', { err: e.message, stack: e.stack }); } catch {}
+        return submitted.reply({ content: 'Panel deleted.', flags: 1<<6 }).catch(()=>{});
+      }
     }
     if (id.startsWith('appmgr_panel_rename_')) {
       const panelId = id.split('_').pop();
@@ -571,7 +690,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       const row = buildNavRow([
         semanticButton('primary', { id:`panelapps_add_${panelId}`, label:'AddApp' }),
         semanticButton('danger', { id:`panelapps_remove_${panelId}`, label:'RemApp' }),
-        semanticButton('secondary', { id:`panelapps_back_${panelId}`, label:'Back' })
+  backButton(`panelapps_back_${panelId}`, 'Back')
       ]);
       return interaction.update({ embeds:[e], components:[row] });
     }
@@ -638,12 +757,23 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       return interaction.update({ embeds: [embed], components: buildPanelsListComponents(page, totalPages) });
     }
   } catch (err) {
-    try { require('../utils/logger').error('[applications] handler error', { err: err.message }); } catch {}
-    if (interaction.isRepliable() && !interaction.replied) {
+    try {
+      require('../utils/logger').error('[applications] handler error', { err: err.message, stack: err.stack });
+      if (err.data && err.data.components) {
+        require('../utils/logger').error('[applications] Discord API error', { data: err.data });
+      }
+    } catch {}
+    if (interaction.isRepliable && typeof interaction.isRepliable === 'function' && interaction.isRepliable() && !interaction.replied) {
       interaction.reply({ content: 'Error handling interaction.', flags: 1 << 6 }).catch(()=>{});
     }
   }
 });
 
 // Legacy style export similar to other command modules
-module.exports = { handleApplicationsCommand };
+// Export internals for testing and reuse (non-breaking addition)
+module.exports = { handleApplicationsCommand, _test: {
+  buildApplicationsListComponents,
+  buildApplicationsListEmbed,
+  buildPanelsListComponents,
+  buildPanelsListEmbed
+} };

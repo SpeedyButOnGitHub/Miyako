@@ -1,5 +1,4 @@
 const fs = require('fs');
-const path = require('path');
 const { logPath } = require('./paths');
 const { config } = require('./storage');
 
