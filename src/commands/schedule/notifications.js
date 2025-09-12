@@ -36,7 +36,8 @@ function buildNotifsEmbed(guild, ev) {
         else if (config.autoMessages?.defaultDeleteMs > 0) ttlDisp = humanizeMs(config.autoMessages.defaultDeleteMs) + '*';
       }
       const ttlLabel = ` [TTL ${ttlDisp}]`;
-      return `${status} [${off}]${clock}${chanNote} ${preview}${ttlLabel}`;
+      const mentionNote = Array.isArray(m.mentions) && m.mentions.length ? ` [@${m.mentions.length}]` : '';
+      return `${status} [${off}]${clock}${chanNote} ${preview}${ttlLabel}${mentionNote}`;
     }).join('\n');
     safeAddField(embed, 'Messages', lines);
   } else {
@@ -96,6 +97,42 @@ async function refreshTrackedAutoMessages(client, ev) {
           if (config.testingMode) content = sanitizeMentionsForTesting(content);
           payload = { content };
         }
+        // Handle role mentions if present; ensure allowedMentions to avoid accidental mass pings
+        if (Array.isArray(notif.mentions) && notif.mentions.length) {
+          const mentionLine = notif.mentions.map(r=>`<@&${r}>`).join(' ');
+          if (payload.content) payload.content = `${mentionLine}\n${payload.content}`.slice(0,2000);
+          else payload.content = mentionLine.slice(0,2000);
+          payload.allowedMentions = { roles: notif.mentions.slice(0,20) };
+        }
+        // Canonical live-content preservation: if the most recent existing message differs from the freshly built
+        // payload (indicating a manual/live edit or drift), prefer the live snapshot to avoid reverting on restart.
+        try {
+          const latestId = rec.ids[rec.ids.length - 1];
+          const latestMsg = await channel.messages.fetch(latestId).catch(()=>null);
+          if (latestMsg) {
+            const liveSig = JSON.stringify({
+              c: latestMsg.content || '',
+              e: (latestMsg.embeds||[]).map(e=>({ t:e.title, d:e.description, f:(e.fields||[]).map(f=>({n:f.name,v:f.value})) }))
+            });
+            const newSig = JSON.stringify({
+              c: payload.content || '',
+              e: (payload.embeds||[]).map(e=>({ t:e.title, d:e.description, f:(e.fields||[]).map(f=>({n:f.name,v:f.value})) }))
+            });
+            if (liveSig !== newSig) {
+              // Adopt live content/embeds (but keep allowedMentions we computed if any)
+              payload.content = latestMsg.content || payload.content;
+              if ((latestMsg.embeds||[]).length) {
+                payload.embeds = latestMsg.embeds.map(e=>({
+                  title: e.title,
+                  description: e.description,
+                  color: e.color,
+                  footer: e.footer ? { text: e.footer.text } : undefined,
+                  fields: (e.fields||[]).map(f=>({ name: f.name, value: f.value, inline: f.inline }))
+                })).slice(0,10);
+              }
+            }
+          }
+        } catch {}
         for (const mid of rec.ids.slice(-3)) {
           try { const msg = await channel.messages.fetch(mid).catch(()=>null); if (msg) await msg.edit(payload).catch(()=>{}); } catch {}
         }
@@ -105,10 +142,77 @@ async function refreshTrackedAutoMessages(client, ev) {
       const chId = ev.__clockIn.channelId || ev.channelId;
       const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
       if (channel && channel.messages) {
+        // Hydrate runtime clock-in state explicitly. In some restart scenarios the in-memory
+        // merged event passed into this function may not yet include the latest persisted
+        // runtime overlay (positions), causing the embed to show *None* for all roles until
+        // a user interacts again. We defensively re-load the runtime record and prefer any
+        // populated positions from there before rendering.
+        let hydrated = ev;
+        try {
+          const { getRuntime } = require('../../utils/eventsRuntimeLog');
+            const rt = getRuntime(ev.id) || {};
+            if (rt.__clockIn && rt.__clockIn.positions) {
+              // Only overwrite if we actually have at least one registered user recorded.
+              const hasAny = Object.values(rt.__clockIn.positions).some(arr => Array.isArray(arr) && arr.length);
+              if (hasAny) {
+                // Optionally prune users who have left the guild to prevent stale pings.
+                try {
+                  const guild = channel.guild;
+                  if (guild) {
+                    const prunedPositions = {};
+                    for (const [role, list] of Object.entries(rt.__clockIn.positions)) {
+                      if (!Array.isArray(list)) continue;
+                      const filtered = [];
+                      for (const uid of list) {
+                        const member = guild.members.cache.get(uid);
+                        if (member) filtered.push(uid);
+                      }
+                      prunedPositions[role] = filtered;
+                    }
+                    rt.__clockIn.positions = prunedPositions;
+                    // If pruning changed anything, persist runtime patch
+                    const changed = Object.entries(prunedPositions).some(([k,v]) => {
+                      const orig = (ev.__clockIn && ev.__clockIn.positions && ev.__clockIn.positions[k]) || [];
+                      return Array.isArray(v) && v.length !== orig.length;
+                    });
+                    if (changed) {
+                      try { const { updateEvent } = require('../../utils/eventsStorage'); updateEvent(ev.id, { __clockIn: { ...rt.__clockIn } }); } catch {}
+                    }
+                  }
+                } catch {}
+                hydrated = { ...ev, __clockIn: { ...ev.__clockIn, ...rt.__clockIn } };
+                try { require('../../utils/logger').debug('[ClockIn Hydrate]', { eventId: ev.id, updated: true }); } catch {}
+              } else {
+                try { require('../../utils/logger').debug('[ClockIn Hydrate]', { eventId: ev.id, updated: false }); } catch {}
+              }
+            }
+        } catch {}
         const { buildClockInEmbed } = require('../../utils/clockinTemplate');
-        const embed = buildClockInEmbed(ev);
+        const embed = buildClockInEmbed(hydrated);
         for (const mid of ev.__clockIn.messageIds.slice(-3)) {
-          try { const msg = await channel.messages.fetch(mid).catch(()=>null); if (msg) await msg.edit({ content:'', embeds:[embed] }).catch(()=>{}); } catch {}
+          try {
+            const msg = await channel.messages.fetch(mid).catch(()=>null);
+            if (msg) {
+              // Rate-limit guard: only edit if embed content changed (compare serialized fields)
+              let existingSig = '';
+              try {
+                const e0 = msg.embeds && msg.embeds[0];
+                if (e0) {
+                  existingSig = JSON.stringify({
+                    title: e0.title,
+                    desc: e0.description,
+                    fields: (e0.fields||[]).map(f=>({n:f.name,v:f.value})),
+                    footer: e0.footer?.text
+                  });
+                }
+              } catch {}
+              let nextSig = '';
+              try { nextSig = JSON.stringify({ title: embed.title, desc: embed.description, fields: embed.fields, footer: embed.footer?.text }); } catch {}
+              if (existingSig !== nextSig) {
+                await msg.edit({ content:'', embeds:[embed] }).catch(()=>{});
+              }
+            }
+          } catch {}
         }
       }
     }
