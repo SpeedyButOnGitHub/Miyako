@@ -225,22 +225,79 @@ function buildAppDetailEmbed(appId) {
   return e;
 }
 
-function buildAppDetailComponents(appId) {
+function buildAppDetailComponents(appId, expanded = false) {
   const app = getApplication(appId);
   const back = backButton('appmgr_back_apps', 'Back');
   if (!app) return [buildNavRow([back])];
+  // Primary actions ordering and prioritization
+  const actions = [
+    { id: `appmgr_app_rename_${app.id}`, label: 'Rename', kind: 'primary', emoji: theme.emojis.edit },
+    { id: `appmgr_app_questions_${app.id}`, label: 'Questions', kind: 'primary' },
+    { id: `appmgr_app_msgs_${app.id}`, label: 'Messages', kind: 'primary' },
+    { id: `appmgr_app_deployed_${app.id}`, label: 'Deployed', kind: 'nav' },
+    { id: `appmgr_app_editmsg_${app.id}`, label: 'Edit Msg', kind: 'nav' },
+    { id: `appmgr_app_props_${app.id}`, label: 'Props', kind: 'nav' },
+    { id: `appmgr_app_roles_${app.id}`, label: 'Roles', kind: 'nav' }
+  ];
+
+  // Helper to compact labels
+  const compact = (text, max=12) => (typeof text==='string' && text.length>max) ? text.slice(0, max-1) + '…' : text;
+
+  // Build rows: if expanded show all actions; otherwise show top 3-4 and a compact overflow select
+  const rows = [];
+  let row = buildNavRow([]);
+  const visibleCount = expanded ? actions.length : Math.min(4, actions.length);
+  for (let i = 0; i < visibleCount; i++) {
+    const a = actions[i];
+    const kind = a.kind === 'primary' ? 'primary' : 'nav';
+    const lbl = compact(a.label, 14);
+    const b = semanticButton(kind, { id: a.id, label: lbl, emoji: a.emoji });
+    if (row.components.length >= 5) { rows.push(row); row = buildNavRow([]); }
+    if (b) row.addComponents(b);
+  }
+  if (!expanded && actions.length > visibleCount) {
+    // Add a compact select menu with overflow actions instead of a separate More button
+    try {
+      const { StringSelectMenuBuilder, ActionRowBuilder: ARB } = require('discord.js');
+      const sel = new StringSelectMenuBuilder().setCustomId(`appmgr_app_menu_${app.id}`).setPlaceholder('More…').setMinValues(1).setMaxValues(1);
+      const opts = actions.slice(visibleCount).map(a => ({ label: a.label, value: a.id }));
+      for (const o of opts) sel.addOptions({ label: o.label.slice(0,100), value: o.value });
+      const selRow = new ARB(); selRow.addComponents(sel);
+      // If current row full, push it first
+      if (row.components.length >=5) { rows.push(row); row = buildNavRow([]); }
+      // Append select row separately (can't mix select and buttons on same row reliably)
+      if (row.components.length) rows.push(row);
+      rows.push(selRow);
+      row = buildNavRow([]);
+    } catch (e) {
+      const more = semanticButton('nav', { id: `appmgr_app_more_${app.id}`, label: 'More…' });
+      if (row.components.length >=5) { rows.push(row); row = buildNavRow([]); }
+      row.addComponents(more);
+    }
+  }
+  if (row.components.length) rows.push(row);
+
+  if (expanded) {
+    // Add remaining actions in an extra row if present
+    const rem = actions.slice(visibleCount);
+    if (rem.length) {
+      const r2 = buildNavRow([]);
+      for (const a of rem) {
+        const lbl = compact(a.label, 14);
+        const b = semanticButton(a.kind === 'primary' ? 'primary' : 'nav', { id: a.id, label: lbl, emoji: a.emoji });
+        if (r2.components.length >=5) { rows.push(r2); r2 = buildNavRow([]); }
+        if (b) r2.addComponents(b);
+      }
+      if (r2.components.length) rows.push(r2);
+    }
+  }
+
+  // Bottom row: toggle (Enable/Disable), Back, Delete — separate for clarity
   const toggle = semanticButton('toggle', { id: `appmgr_app_toggle_${app.id}`, label: app.enabled ? 'Disable' : 'Enable', active: app.enabled });
-  const rename = semanticButton('primary', { id: `appmgr_app_rename_${app.id}`, label: 'Rename', emoji: theme.emojis.edit });
   const del = semanticButton('danger', { id: `appmgr_app_delete_${app.id}`, label: 'Delete', emoji: theme.emojis.delete });
-  const qBtn = semanticButton('primary', { id: `appmgr_app_questions_${app.id}`, label: 'Questions' });
-  const msgBtn = semanticButton('primary', { id: `appmgr_app_msgs_${app.id}`, label: 'Messages' });
-  const deployedBtn = semanticButton('primary', { id: `appmgr_app_deployed_${app.id}`, label: 'Deployed' });
-  const editMsgBtn = semanticButton('primary', { id: `appmgr_app_editmsg_${app.id}`, label: 'EditMsg' });
-  const propsBtn = semanticButton('primary', { id: `appmgr_app_props_${app.id}`, label: 'Props' });
-  const rolesBtn = semanticButton('primary', { id: `appmgr_app_roles_${app.id}`, label: 'Roles' });
-  const rows1 = splitButtonsIntoRows([toggle, qBtn, msgBtn, deployedBtn, editMsgBtn, propsBtn, rolesBtn, back]);
-  const row2 = buildNavRow([rename, del]);
-  return [...rows1, row2].filter(r=>r && r.components && r.components.length);
+  const bottomRow = buildNavRow([toggle, back, del, ...(expanded ? [semanticButton('nav', { id: `appmgr_app_less_${app.id}`, label: 'Less' })] : [])]);
+
+  return [...rows, bottomRow].filter(r=>r && r.components && r.components.length);
 }
 
 function buildQuestionListEmbed(appId, page=0) {
@@ -321,7 +378,8 @@ async function handleApplicationsCommand(client, message) {
 // --- Interaction Handler -----------------------------------------------------
 
 ActiveMenus.registerHandler('applications', async (interaction, session) => {
-  if (!interaction.isButton()) return;
+  // Accept buttons and select menus for the applications UI
+  if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
   if (interaction.user.id !== session.userId) {
     return interaction.reply({ content: 'Not your session.', flags: 1 << 6 }).catch(() => {});
   }
@@ -411,6 +469,125 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       }
       session.data.view = 'appDetail'; session.data.appId = appId;
       return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId) });
+    }
+    // Overflow select menu handling (More… -> select)
+    if (id.startsWith('appmgr_app_menu_')) {
+      const appId = id.split('_').pop();
+      const app = getApplication(appId);
+      if (!app) return interaction.reply({ content:'App missing.', flags:1<<6 }).catch(()=>{});
+      // Grab selection (single)
+      const sel = interaction.values && interaction.values[0];
+      if (!sel) return interaction.reply({ content: 'No selection.', flags:1<<6 }).catch(()=>{});
+      // Map to existing handlers by invoking equivalent button flows where possible
+      // Known values: appmgr_app_rename_<id>, appmgr_app_questions_<id>, appmgr_app_msgs_<id>, appmgr_app_deployed_<id>, appmgr_app_editmsg_<id>, appmgr_app_props_<id>, appmgr_app_roles_<id>
+      // For simplicity reuse the same update routes already implemented
+      // Set the view appropriately before delegating
+      if (sel.includes('appmgr_app_questions_')) {
+        session.data.view = 'questions'; session.data.qPage = 0; session.data.appId = appId;
+        const { embed, page, totalPages } = buildQuestionListEmbed(appId, 0);
+        return interaction.update({ embeds:[embed], components: buildQuestionListComponents(appId, page, totalPages) });
+      }
+      if (sel.includes('appmgr_app_msgs_')) {
+        session.data.view = 'appMsgs'; session.data.appId = appId;
+        const e = createEmbed({ title:`Messages • App #${appId}`, description:'Edit the various lifecycle messages.' });
+        const a = getApplication(appId);
+        safeAddField(e, 'Accept', a.acceptMessage || '(none)');
+        safeAddField(e, 'Deny', a.denyMessage || '(none)');
+        safeAddField(e, 'Confirm', a.confirmMessage || '(none)');
+        safeAddField(e, 'Completion', a.completionMessage || '(none)');
+        const row = buildNavRow([
+          semanticButton('primary', { id:`appmsg_edit_accept_${appId}`, label:'Accept' }),
+          semanticButton('primary', { id:`appmsg_edit_deny_${appId}`, label:'Deny' }),
+          semanticButton('primary', { id:`appmsg_edit_confirm_${appId}`, label:'Confirm' }),
+  backButton(`appmsg_back_${appId}`, 'Back')
+        ]);
+        return interaction.update({ embeds:[e], components:[row] });
+      }
+      if (sel.includes('appmgr_app_deployed_')) {
+        // reuse deployed handler logic
+        return (async () => {
+          const fakeId = `appmgr_app_deployed_${appId}`;
+          // call into same branch by fabricating an update
+          session.data.view = 'appDetail'; session.data.appId = appId;
+          return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId, session.data.appExpanded) });
+        })();
+      }
+      if (sel.includes('appmgr_app_editmsg_')) {
+        // open the edit modal path — reuse existing code path by triggering the modal branch
+        // We can't directly call showModal from here without duplicating code — replicate minimal flow
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+        const modalId = `appeditmsg_${appId}_${Date.now()}`;
+        const fullJSON = JSON.stringify(app.messageJSON || {}, null, 2);
+        if (fullJSON.length > 3800) {
+          const buffer = Buffer.from(fullJSON, 'utf8');
+          return interaction.reply({ content: 'Stored payload is too large to edit in a modal. See attached file.', files: [{ attachment: buffer, name: `app_${appId}_messageJSON.json` }], flags: 1<<6 });
+        }
+        const m = new ModalBuilder().setCustomId(modalId).setTitle('Edit Stored Message JSON')
+          .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('json').setLabel('JSON payload').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(fullJSON.slice(0,4000))));
+        await interaction.showModal(m);
+        return null;
+      }
+      if (sel.includes('appmgr_app_rename_')) {
+        // open rename modal
+        const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+        const modalId = `appname_${appId}_${Date.now()}`;
+        const m = new ModalBuilder().setCustomId(modalId).setTitle('Rename Application')
+          .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('name').setLabel('Name').setStyle(TextInputStyle.Short).setRequired(true).setValue((app.name||'').slice(0,90))));
+        await interaction.showModal(m);
+        return null;
+      }
+      if (sel.includes('appmgr_app_props_')) {
+        session.data.view = 'appProps'; session.data.appId = appId;
+        const a = getApplication(appId);
+        const e = createEmbed({ title:`Properties • App #${appId}`, description: a.name });
+        safeAddField(e, 'Name', a.name);
+        safeAddField(e, 'Submission Channel', a.submissionChannelId?`<#${a.submissionChannelId}>`:'*none*');
+        safeAddField(e, 'DM Responses', a.dmResponses ? 'Enabled' : 'Disabled');
+        const row = buildNavRow([
+          semanticButton('primary', { id:`appprops_setname_${appId}`, label:'Name' }),
+          semanticButton('primary', { id:`appprops_setchan_${appId}`, label:'SetChan' }),
+          semanticButton('danger', { id:`appprops_clearchan_${appId}`, label:'ClrChan', enabled: !!a.submissionChannelId }),
+          semanticButton('primary', { id:`appprops_toggledm_${appId}`, label:'DMs' }),
+  backButton(`appprops_back_${appId}`, 'Back')
+        ]);
+        return interaction.update({ embeds:[e], components:[row] });
+      }
+      if (sel.includes('appmgr_app_roles_')) {
+        session.data.view = 'appRoles'; session.data.appId = appId;
+        const a = getApplication(appId);
+        const e = createEmbed({ title:`Roles • App #${appId}`, description: a.name });
+        const show = (arr) => (arr && arr.length) ? arr.map(r=>`<@&${r}>`).join(' ') : '*none*';
+        safeAddField(e, 'Manager', show(a.managerRoles));
+        safeAddField(e, 'Required', show(a.requiredRoles));
+        safeAddField(e, 'Accepted', show(a.acceptedRoles));
+        safeAddField(e, 'Pending', a.pendingRole?`<@&${a.pendingRole}>`:'*none*');
+        safeAddField(e, 'Restricted', show(a.restrictedRoles));
+        safeAddField(e, 'Denied', show(a.deniedRoles));
+        const row1 = buildNavRow([
+          semanticButton('primary', { id:`approles_manager_${appId}`, label:'Manager' }),
+          semanticButton('primary', { id:`approles_required_${appId}`, label:'Required' }),
+          semanticButton('primary', { id:`approles_accepted_${appId}`, label:'Accepted' }),
+          semanticButton('primary', { id:`approles_pending_${appId}`, label:'Pending' }),
+  backButton(`approles_back_${appId}`, 'Back')
+        ]);
+        const row2 = buildNavRow([
+          semanticButton('primary', { id:`approles_restricted_${appId}`, label:'Restrict' }),
+          semanticButton('primary', { id:`approles_denied_${appId}`, label:'Denied' })
+        ]);
+        return interaction.update({ embeds:[e], components:[row1, row2] });
+      }
+      // Unknown selection fallback
+      return interaction.reply({ content:'Unhandled selection.', flags:1<<6 }).catch(()=>{});
+    }
+    // Expand/collapse More… overflow for app detail actions
+    if (id.startsWith('appmgr_app_more_') || id.startsWith('appmgr_app_less_')) {
+      const appId = id.split('_').pop();
+      const app = getApplication(appId);
+      if (!app) return interaction.reply({ content: 'App missing.', flags: 1<<6 }).catch(()=>{});
+      // toggle expanded state on session
+      session.data.appExpanded = !!id.startsWith('appmgr_app_more_');
+      session.data.view = 'appDetail'; session.data.appId = appId;
+      return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId, session.data.appExpanded) });
     }
     // Select panel from list to edit/delete
     if (id.startsWith('appmgr_panel_select_')) {
