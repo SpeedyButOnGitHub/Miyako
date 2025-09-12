@@ -10,7 +10,23 @@ const theme = require('./theme');
 function createEmbed({ title = null, description = null, color = 'primary', fields = [], footer = null, timestamp = true } = {}) {
 	const embed = new EmbedBuilder();
 	if (title) embed.setTitle(toTitleCase(title));
-	if (description) embed.setDescription(description);
+	// Normalize description to a string when possible to avoid invalid types reaching
+	// the discord.js EmbedBuilder (helps guard against unexpected shapes during
+	// tests or runtime). Preserve null/undefined semantics.
+	if (description !== null && description !== undefined) {
+		let desc = description;
+		if (Array.isArray(desc)) desc = desc.join('\n');
+		else if (typeof desc !== 'string') desc = String(desc);
+		// Cap to Discord's embed description limit (4096 chars) to avoid validator errors
+		try {
+			if (typeof desc === 'string' && desc.length > 4096) {
+				const preview = desc.slice(0, 200);
+				try { require('./logger').info('[createEmbed] description truncated', { length: desc.length, preview }); } catch {}
+				desc = desc.slice(0, 4096);
+			}
+		} catch (e) {}
+		if (desc) embed.setDescription(desc);
+	}
 	// Allow passing numeric color or theme key
 	const resolvedColor = typeof color === 'number' ? color : theme.color(color, theme.colors.neutral);
 	embed.setColor(resolvedColor);

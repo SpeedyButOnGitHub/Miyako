@@ -38,7 +38,14 @@ function baseWrite(level, msg, meta) {
   // Mirror to console for non-debug or if debug enabled
   if (level !== 'debug' || config.debugMode) {
     const out = `[${level.toUpperCase()}] ${msg}`;
-    if (level === 'error') console.error(out); else console.log(out);
+    try {
+      // In test environments (Jest) writing to console after suites complete
+      // can cause Jest to treat this as an error. Skip mirroring when running tests.
+      const isTest = !!process.env.JEST_WORKER_ID || process.env.NODE_ENV === 'test';
+      if (!isTest) {
+        if (level === 'error') console.error(out); else console.log(out);
+      }
+    } catch {};
   }
 }
 

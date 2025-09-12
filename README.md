@@ -102,3 +102,34 @@ The project also includes Jest tests under `tests/` that cover some startup and 
 ```powershell
 npm test
 ```
+
+## Running as a background service
+
+Recommended: use pm2 for cross-platform background running and log rotation.
+
+- Install pm2 globally:
+
+```powershell
+npm i -g pm2
+pm2 install pm2-logrotate
+```
+
+- Start with the provided ecosystem file:
+
+```powershell
+pm2 start ecosystem.config.js --env production
+```
+
+- Useful pm2 commands:
+
+```powershell
+pm2 status
+pm2 logs miyako-bot
+pm2 restart miyako-bot
+pm2 stop miyako-bot
+```
+
+Windows alternative: if you prefer a Windows service, use NSSM (Non-Sucking Service Manager) or a Scheduled Task to run `node index.js` at startup. Configure log rotation by pointing logs to a folder and using a scheduled PowerShell script to rotate or compress them periodically.
+
+If you'd like, I can add a sample PowerShell script and NSSM instructions for installing the bot as a service.
+

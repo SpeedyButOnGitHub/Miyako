@@ -74,7 +74,10 @@ ActiveMenus.registerHandler("scripts", async (interaction, session) => {
 	if (!interaction.isButton()) return;
 	if (interaction.user.id !== session.userId) { try { await interaction.reply({ content: "Not your session.", flags: 1<<6 }); } catch {} return; }
 	if (interaction.customId === "scripts_close") {
-		try { await interaction.update({ components: [] }); } catch {}
+		try {
+			const closed = createEmbed({ title: 'Closed', description: 'This scripts leaderboard was closed.', color: theme.colors.danger });
+			await interaction.update({ embeds: [closed], components: [] });
+		} catch {}
 		return;
 	}
 	let { page, totalPages, files, totalFiles, totalLines } = session.data;

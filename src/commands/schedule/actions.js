@@ -82,9 +82,20 @@ async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
 }
 
 async function manualTriggerAutoMessage(interaction, ev, notif) {
+  try {
+    const { getEvent } = require('../../utils/eventsStorage');
+    const fresh = getEvent(ev.id) || null;
+    if (fresh) {
+      // merge channelId from original in-memory event if storage sanitized it out
+      if (!fresh.channelId && ev.channelId) fresh.channelId = ev.channelId;
+      ev = fresh;
+    }
+  } catch {}
   const { CONFIG_LOG_CHANNEL } = require('../../utils/logChannels');
   const { applyTimestampPlaceholders } = require('../../utils/timestampPlaceholders');
-  const targetChannelId = config.testingMode ? CONFIG_LOG_CHANNEL : (notif.channelId || ev.channelId);
+  let targetChannelId = config.testingMode ? CONFIG_LOG_CHANNEL : (notif.channelId || ev.channelId);
+  // Fallback to interaction's channel when notif/ev lack a channel (useful for tests and some interactions)
+  if (!targetChannelId && interaction) targetChannelId = interaction.channelId || (interaction.channel && interaction.channel.id) || null;
   if (!targetChannelId) throw new Error('No channel');
   const channel = await interaction.client.channels.fetch(targetChannelId).catch(()=>null);
   if (!channel) throw new Error('Channel not found');
@@ -167,26 +178,51 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
       }
     } catch {}
 
-    // One-time autoNext signup application (users who opted to auto register for the NEXT clock-in)
+    // Apply any autoNext entries into the display-only positions so the preview shows those
+    // but DO NOT consume or persist them here; consumption/persistence happens below when we prepare
+    // the fresh persisted positions for the new clock-in.
     try {
-      ev.__clockIn.autoNext = ev.__clockIn.autoNext && typeof ev.__clockIn.autoNext === 'object' ? ev.__clockIn.autoNext : {};
-      const autoNextEntries = Object.entries(ev.__clockIn.autoNext);
-      if (autoNextEntries.length) {
-        for (const [userId, roleKey] of autoNextEntries) {
-          if (!roleKey || !displayPositions[roleKey]) { delete ev.__clockIn.autoNext[userId]; continue; }
-          // Capacity check (instance_manager has cap 1 already tracked; others effectively large)
+      try {
+        ev.__clockIn = ev.__clockIn || { positions: {}, messageIds: [], autoNext: {} };
+        ev.__clockIn.autoNext = ev.__clockIn.autoNext && typeof ev.__clockIn.autoNext === 'object' ? ev.__clockIn.autoNext : {};
+        const autoNextEntries = Object.entries(ev.__clockIn.autoNext);
+        if (autoNextEntries.length) {
+          for (const [userId, roleKey] of autoNextEntries) {
+            if (!roleKey || !displayPositions[roleKey]) continue;
             const meta = POSITIONS.find(p=>p.key===roleKey);
             const cap = meta ? meta.cap : 9999;
             const arr = displayPositions[roleKey];
-            if (!arr.includes(userId) && arr.length < cap) {
-              arr.push(userId);
-            }
-          // Clear after one use (one-shot behavior)
-          delete ev.__clockIn.autoNext[userId];
+            if (!arr.includes(userId) && arr.length < cap) arr.push(userId);
+          }
         }
-        // Persist modified positions & cleared autoNext
-        try { updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn }); } catch {}
-      }
+      } catch {}
+    } catch {}
+
+    // Prepare fresh persisted positions for this new clock-in: clear existing persisted positions first
+    try {
+      ev.__clockIn = ev.__clockIn || { positions: {}, messageIds: [], autoNext: {} };
+      if (!ev.__clockIn.positions || typeof ev.__clockIn.positions !== 'object') ev.__clockIn.positions = {};
+  // Ensure keys exist for all POSITIONS and clear existing persisted selections
+  for (const p of POSITIONS) { ev.__clockIn.positions[p.key] = []; }
+      // Now apply any existing autoNext entries into the fresh positions so they become persisted registrations
+      try {
+        ev.__clockIn.autoNext = ev.__clockIn.autoNext && typeof ev.__clockIn.autoNext === 'object' ? ev.__clockIn.autoNext : {};
+        const entries = Object.entries(ev.__clockIn.autoNext);
+        if (entries.length) {
+          for (const [userId, roleKeyRaw] of entries) {
+            const roleKey = typeof roleKeyRaw === 'string' ? roleKeyRaw : (roleKeyRaw && roleKeyRaw.role) || null;
+            if (!roleKey || !ev.__clockIn.positions[roleKey]) { delete ev.__clockIn.autoNext[userId]; continue; }
+            const meta = POSITIONS.find(p=>p.key===roleKey);
+            const cap = meta ? meta.cap : 9999;
+            const arr = ev.__clockIn.positions[roleKey];
+            if (!arr.includes(userId) && arr.length < cap) arr.push(userId);
+            // consume the autoNext entry (one-shot)
+            delete ev.__clockIn.autoNext[userId];
+          }
+          // persist the newly populated positions and cleared autoNext
+          try { updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn }); } catch {}
+        }
+      } catch {}
     } catch {}
 
     const embedJson = {
@@ -227,25 +263,45 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
       // Track the message ID so interaction fallback can resolve the event by message
       if (!Array.isArray(ev.__clockIn.messageIds)) ev.__clockIn.messageIds = [];
       ev.__clockIn.messageIds.push(sent.id);
-      if (ev.__clockIn.messageIds.length > 10) ev.__clockIn.messageIds = ev.__clockIn.messageIds.slice(-10);
+      // Keep only the latest message id in persisted record; delete previous ones (best-effort)
+      if (ev.__clockIn.messageIds.length > 1) {
+        const older = ev.__clockIn.messageIds.slice(0, -1);
+        ev.__clockIn.messageIds = ev.__clockIn.messageIds.slice(-1);
+        (async () => {
+          try {
+            const ch = channel;
+            const { retry } = require('../../utils/retry');
+            for (const mid of older) {
+              try {
+                const m = await ch.messages.fetch(mid).catch(()=>null);
+                if (m) await retry(() => m.delete(), { attempts: 3, baseMs: 50, maxMs: 300 }).catch(()=>{});
+              } catch (e) {
+                try { require('../../utils/logger').warn('[clockin] delete older message failed', { err: e.message, mid, evId: ev.id }); } catch {}
+              }
+            }
+          } catch (err) {
+            try { require('../../utils/logger').warn('[clockin] older message deletion loop failed', { err: err.message, evId: ev.id }); } catch {}
+          }
+        })();
+      }
       updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn });
       // Schedule auto deletion & role reset if deleteAfterMs configured on notif (or default) for clock-in
       try {
         const delMs = Number(notif.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
         if (delMs > 0) {
-          setTimeout(() => {
-            (async () => {
-              try { await sent.delete().catch(()=>{}); } catch {}
-              try {
-                // Reset positions for next clock-in
-                if (ev.__clockIn) {
-                  ev.__clockIn.positions = {};
-                  updateEvent(ev.id, { __clockIn: ev.__clockIn });
-                }
-              } catch {}
-            })();
-          }, delMs);
-        }
+            setTimeout(() => {
+              (async () => {
+                try {
+                  const { retry } = require('../../utils/retry');
+                  await retry(() => sent.delete(), { attempts: 3, baseMs: 50, maxMs: 300 }).catch(()=>{});
+                } catch (e) { try { require('../../utils/logger').warn('[clockin] scheduled delete failed', { err: e.message, evId: ev.id }); } catch {} }
+                try {
+                  // Prune positions and clear consumed autoNext entries
+                  try { const { pruneClockInForEvent } = require('../../utils/clockinPrune'); pruneClockInForEvent(ev.id, { clearConsumedAutoNext: true }); } catch {}
+                } catch {}
+              })();
+            }, delMs);
+          }
       } catch {}
     }
     return !!sent;

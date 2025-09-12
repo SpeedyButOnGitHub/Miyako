@@ -63,11 +63,54 @@ function mainRows(events) {
 
 function buildSelectRows(kind, events) {
   const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-  const options = events.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(' ').slice(0,100), emoji: kind === 'delete' ? theme.emojis.delete : (e.enabled?theme.emojis.enable:theme.emojis.disable) }));
-  const rows = [
-    new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`events_${kind === 'delete' ? 'delete' : 'select'}`).setPlaceholder(kind==='delete'? 'Select event to delete' : 'Select event...').addOptions(options))
-  ];
-  return rows;
+  const slice = Array.isArray(events) ? events.slice(0, 25) : [];
+  const options = slice.map((e, idx) => {
+    try {
+      const rawLabel = e && typeof e.name === 'string' ? e.name : `Event ${idx + 1}`;
+      const label = rawLabel.slice(0, 100);
+      const value = (e && (e.id !== undefined && e.id !== null)) ? String(e.id) : `evt-${idx}`;
+      let description = '';
+      if (Array.isArray(e && e.times)) description = (e.times || []).join(' ').slice(0, 100);
+      else if (typeof e?.times === 'string') description = e.times.slice(0, 100);
+      // Convert emoji to builder-friendly object where possible
+      const rawEmoji = kind === 'delete' ? theme.emojis.delete : (e && e.enabled ? theme.emojis.enable : theme.emojis.disable);
+      let emoji = undefined;
+      if (rawEmoji) {
+        if (typeof rawEmoji === 'string') {
+          const m = rawEmoji.match(/^<a?:([^:>]+):(\d+)>$/);
+          if (m) emoji = { id: m[2], name: m[1] };
+          else emoji = { name: rawEmoji };
+        } else if (typeof rawEmoji === 'object' && rawEmoji.id) {
+          emoji = { id: String(rawEmoji.id), name: rawEmoji.name || undefined };
+        }
+      }
+      return { label, value, description: description || undefined, emoji };
+    } catch (err) {
+      return { label: `Event ${idx + 1}`, value: `evt-${idx}` };
+    }
+  });
+
+  try {
+    return [
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`events_${kind === 'delete' ? 'delete' : 'select'}`)
+          .setPlaceholder(kind === 'delete' ? 'Select event to delete' : 'Select event...')
+          .addOptions(options)
+      )
+    ];
+  } catch (e) {
+    // Fallback: minimal safe options
+    const fallbackOpts = slice.map((e, idx) => ({ label: e && e.name ? String(e.name).slice(0, 100) : `Event ${idx + 1}`, value: e && e.id ? String(e.id) : `evt-${idx}` }));
+    return [
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`events_${kind === 'delete' ? 'delete' : 'select'}`)
+          .setPlaceholder(kind === 'delete' ? 'Select event to delete' : 'Select event...')
+          .addOptions(fallbackOpts)
+      )
+    ];
+  }
 }
 
 function detailRows(ev) {

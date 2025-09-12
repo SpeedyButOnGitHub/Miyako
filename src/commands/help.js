@@ -1,6 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder } = require("discord.js");
 const { isModerator } = require("./moderation/index");
-const { OWNER_ID } = require("./moderation/permissions");
+const { getOwnerId } = require("./moderation/permissions");
 const ActiveMenus = require("../utils/activeMenus");
 const theme = require("../utils/theme");
 const { applyStandardFooter, semanticButton } = require("../ui");
@@ -41,7 +41,7 @@ function buildHelpCategories(member) {
 		config: { id: 'config', label: 'Config', emoji: '🛠️', ownerOnly: true, commands: [] }
 	};
 	for (const meta of COMMAND_META) {
-		if (meta.ownerOnly && String(member.id) !== String(OWNER_ID)) continue;
+		if (meta.ownerOnly && String(member.id) !== String(getOwnerId())) continue;
 		if (meta.modOnly && !isModerator(member)) continue;
 		if (!cats[meta.cat]) continue;
 		cats[meta.cat].commands.push(`${meta.cmd} - ${meta.desc}`);

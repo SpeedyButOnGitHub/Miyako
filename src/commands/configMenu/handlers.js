@@ -177,7 +177,8 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
 
 	// Testing Warnings utilities
 	if (categoryName === 'Testing' && settingName === 'TestingWarnings') {
-		if (String(interaction.user.id) !== String(process.env.OWNER_ID || '')) {
+		const { getOwnerId } = require('../moderation/permissions');
+		if (String(interaction.user.id) !== String(getOwnerId() || '')) {
 			// owner-only by environment guard; fall back to admin
 			if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
 	return interaction.reply({ content: 'Owner/Admin only.', flags: 1<<6 });

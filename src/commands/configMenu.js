@@ -1,1 +1,1 @@
-module.exports = require('./configMenu');
+module.exports = require('./configMenu/index.js');

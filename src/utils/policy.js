@@ -1,6 +1,6 @@
 // Declarative permission policies for commands
-const { isModerator } = require('../commands/moderation/permissions');
-function isOwnerId(id) { return String(id) === String(process.env.OWNER_ID); }
+const { isModerator, getOwnerId } = require('../commands/moderation/permissions');
+function isOwnerId(id) { return String(id) === String(getOwnerId()); }
 const policies = {
 	config: (ctx) => isOwnerId(ctx.author?.id || ctx.user?.id),
 	test: (ctx) => isOwnerId(ctx.author?.id || ctx.user?.id),
