@@ -92,3 +92,96 @@ All embeds originate via `utils/embeds.js` (`createEmbed`, `successEmbed`, etc.)
 
 ---
 This file will evolve as new services or caching layers are added.
+
+---
+
+## Staff Applications System (2025-09)
+
+### Overview
+Interactive staff application subsystem providing:
+* Application definitions (questions, gating roles, manager roles, accepted/pending roles, enabled toggle).
+* Panels that bundle multiple applications into a deployable message with Apply buttons.
+* Sequential modal-driven question flow with preview + confirmation before submit.
+* Manager review buttons (Accept / Deny) with concurrency guard and automatic role assignment/removal.
+
+### Data Files (JSON, gitignored under `data/`)
+`applications.json`:
+```
+{
+	nextAppId: number,
+	applications: [
+		{
+			id: string,
+			name: string,
+			enabled: boolean,
+			submissionChannelId: string|null,
+			dmResponses: boolean,
+			acceptMessage: string,
+			denyMessage: string,
+			confirmMessage: string,
+			completionMessage: string,
+			restrictedRoles: string[],
+			requiredRoles: string[],
+			deniedRoles: string[],
+			managerRoles: string[],
+			acceptedRoles: string[],
+			pendingRole: string|null,
+			questions: [{ id:string, type:'short'|'long', label:string, required:boolean }]
+		}
+	],
+	submissions: [
+		{ id:string, appId:string, userId:string, answers:[{ qid, answer }], status:'pending'|'accepted'|'denied', createdAt, decidedAt?, decidedBy? }
+	]
+}
+```
+`applicationPanels.json`:
+```
+{
+	nextPanelId: number,
+	panels: [ { id:string, name:string, description:string, channelId:string|null, messageId:string|null, messageJSON:any, applicationIds:string[] } ]
+}
+```
+
+### Modules
+`utils/applications.js` – CRUD for applications, panels, submissions + permission checks.
+`utils/applicationFlow.js` – In-memory session tracker for question progression (auto-cleans stale sessions).
+`commands/applications.js` – Owner-gated (phase 1) management UI via ActiveMenus (create/list/edit/deploy).
+Integration points in `events/interactionEvents.js`:
+* `apply_app_<id>` button starts or resumes a modal question flow.
+* `appconfirm_submit_<id>` / `appconfirm_cancel_<id>` finalize or abandon flow.
+* `appreview_accept_<appId>_<submissionId>` / `appreview_deny_...` process manager decisions with role updates.
+
+### Flow
+1. User clicks Apply button on a deployed panel → session starts.
+2. Each press triggers next question modal until all answered.
+3. Preview embed (ephemeral) shows collected answers with Submit / Cancel.
+4. On submit: submission persisted, manager review message posted to `submissionChannelId` if configured.
+5. Manager Accept/Deny updates submission, prevents double-processing, adjusts roles:
+	 * Accept: remove pendingRole (if present), add each `acceptedRoles` if missing.
+	 * Deny: remove pendingRole (leave other roles unchanged).
+
+### Concurrency & Safety
+* Accept/Deny guarded: immediate status re-check to avoid race double decisions.
+* Session inactivity timeout: 15 minutes (cleaned by interval).
+* Role operations wrapped in try/catch to avoid unhandled permission errors.
+
+### Testing
+`tests/applications.test.js` covers basic CRUD & submission persistence.
+Further tests (future): end-to-end modal flow simulation (requires interaction harness) and permission edge cases.
+
+### Implemented Enhancements (Post Initial Release)
+* Question editor UI (add / edit / delete / simple rotate reorder) via management menu.
+* Lifecycle message editing (accept / deny / confirm / completion) through modals.
+* Rate limiting: prevents starting a new application if a pending submission exists within last 24h.
+* Decision DMs: applicants receive a DM with templated accept / deny message (supports `{user}`, `{application}` / `{app}` placeholders).
+* Submission history command: `.myapps` lists a user's 10 most recent submissions with relative timestamps and decision metadata.
+* UI cleanup: Removed redundant Close buttons; navigation relies solely on contextual Back buttons.
+* Additional tests: question editor persistence + rate-limit storage semantics (`tests/applicationsExtra.test.js`).
+
+### Remaining Roadmap
+* Analytics: aggregate submission counts, acceptance rate, average decision latency.
+* More granular reorder UI (drag-like or index-based reposition instead of rotate).
+* Per-application submission cap or cooldown configuration (beyond fixed 24h pending rule).
+* Optional user-facing command to view detailed answers of own past submissions (privacy-reviewed).
+* Manager dashboard summary (pending / accepted / denied counts + quick filters).
+

@@ -22,6 +22,9 @@ const { handleCashCommand } = require("../commands/cash");
 const { handleBalanceCommand } = require("../commands/balance");
 const { handleMetricsCommand } = require("../commands/metrics");
 const { handleClockInStateCommand } = require("../commands/clockin");
+const { handleApplicationsCommand } = require('../commands/applications');
+const { handleMyAppsCommand } = require('../commands/myapps');
+const { handleAppStatsCommand } = require('../commands/appstats');
 const { markCommand } = require('../services/metricsService');
 const { checkPolicy } = require('../utils/policy');
 const theme = require("../utils/theme");
@@ -192,6 +195,15 @@ function attachMessageEvents(client) {
 			} else if (command === 'clockinstate') {
 				_logCtx = logStart({ name: 'clockinstate', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
 				_sentMsg = await handleClockInStateCommand(client, message); markCommand();
+			} else if (command === 'applications' || command === 'apps') {
+				_logCtx = logStart({ name: 'applications', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
+				_sentMsg = await handleApplicationsCommand(client, message); markCommand();
+			} else if (command === 'myapps' || command === 'myapp') {
+				_logCtx = logStart({ name: 'myapps', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
+				_sentMsg = await handleMyAppsCommand(client, message); markCommand();
+			} else if (command === 'appstats' || command === 'appstat') {
+				_logCtx = logStart({ name: 'appstats', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
+				_sentMsg = await handleAppStatsCommand(client, message); markCommand();
 			} else if (command === 'errors' || command === 'err') {
 				if (message.author.id !== process.env.OWNER_ID) return;
 				_logCtx = logStart({ name: 'errors', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });

@@ -38,3 +38,6 @@ config/*
 
 # Optional: if a temporary legacy/ folder is recreated locally, keep it untracked
 legacy/
+
+# Data runtime: ignore everything under data (all JSON runtime state)
+data/

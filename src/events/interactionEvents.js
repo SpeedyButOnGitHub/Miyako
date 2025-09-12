@@ -60,6 +60,186 @@ function attachInteractionEvents(client) {
 				return;
 			}
 
+			// --- Application Apply Buttons & Flow ---
+			if (interaction.isButton() && interaction.customId.startsWith('apply_app_')) {
+				const appId = interaction.customId.split('_').pop();
+				try {
+					const { getApplication, canApply, addSubmission, listSubmissions } = require('../utils/applications');
+					const { startSession, getSession, recordAnswer, abandonSession } = require('../utils/applicationFlow');
+					const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+					const app = getApplication(appId);
+					if (!app) return interaction.reply({ content: 'Application not found.', flags:1<<6 }).catch(()=>{});
+					if (!Array.isArray(app.questions) || app.questions.length === 0) return interaction.reply({ content: 'This application has no questions configured.', flags:1<<6 }).catch(()=>{});
+					const member = interaction.member; if (!member) return interaction.reply({ content:'Member not resolved.', flags:1<<6 }).catch(()=>{});
+					const gate = canApply(member, app); if (!gate.ok) return interaction.reply({ content: gate.reason, flags:1<<6 }).catch(()=>{});
+					// Rate limit: if a pending submission for this app exists in last 24h for this user
+					const recent = listSubmissions({}).filter(s => s.appId === String(app.id) && s.userId === member.id && s.status === 'pending' && (Date.now() - s.createdAt) < 24*60*60*1000);
+					if (recent.length) {
+						return interaction.reply({ content:'You already have a pending application for this in the last 24h. Please wait for a decision.', flags:1<<6 }).catch(()=>{});
+					}
+					// Start or resume session
+					let sess = getSession(member.id, app.id) || startSession(member.id, app.id);
+					// If already answered all, show confirmation
+					if (sess.index >= app.questions.length) {
+						const confirmRow = new ActionRowBuilder().addComponents(
+							new ButtonBuilder().setCustomId(`appconfirm_submit_${app.id}`).setLabel('Submit').setStyle(ButtonStyle.Success),
+							new ButtonBuilder().setCustomId(`appconfirm_cancel_${app.id}`).setLabel('Cancel').setStyle(ButtonStyle.Danger)
+						);
+						return interaction.reply({ content: app.confirmMessage || 'Submit application?', components:[confirmRow], flags:1<<6 }).catch(()=>{});
+					}
+					// Ask next question via modal
+					const q = app.questions[sess.index];
+					const modalId = `appq_${app.id}_${q.id}_${Date.now()}`;
+					const modal = new ModalBuilder().setCustomId(modalId).setTitle(`Q${sess.index+1}/${app.questions.length}`);
+					const ti = new TextInputBuilder()
+						.setCustomId('answer')
+						.setLabel(q.label?.slice(0,45) || `Question ${sess.index+1}`)
+						.setStyle(q.type === 'long' ? TextInputStyle.Paragraph : TextInputStyle.Short)
+						.setRequired(!!q.required);
+					modal.addComponents(new ActionRowBuilder().addComponents(ti));
+					await interaction.showModal(modal);
+					const submitted = await interaction.awaitModalSubmit({ time: 5 * 60 * 1000, filter: i => i.customId === modalId && i.user.id === member.id }).catch(()=>null);
+					if (!submitted) { return; }
+					const ans = submitted.fields.getTextInputValue('answer') || '';
+					if (q.required && !ans.trim()) {
+						await submitted.reply({ content:'Answer required.', flags:1<<6 }).catch(()=>{});
+						abandonSession(member.id, app.id);
+						return;
+					}
+					sess = recordAnswer(member.id, app.id, q.id, ans.trim());
+					if (sess.index >= app.questions.length) {
+						// Show preview summary embed ephemeral
+						const embed = new EmbedBuilder().setTitle(`${app.name} — Preview`).setDescription('Review your answers then submit.')
+							.setColor(0x5865F2);
+						for (const qa of sess.answers.slice(0, 15)) {
+							const qq = app.questions.find(x => String(x.id) === String(qa.qid));
+							if (!qq) continue;
+							embed.addFields({ name: qq.label.slice(0, 256), value: qa.answer.slice(0, 1024) || '*blank*' });
+						}
+						const row = new ActionRowBuilder().addComponents(
+							new ButtonBuilder().setCustomId(`appconfirm_submit_${app.id}`).setLabel('Submit').setStyle(ButtonStyle.Success),
+							new ButtonBuilder().setCustomId(`appconfirm_cancel_${app.id}`).setLabel('Cancel').setStyle(ButtonStyle.Danger)
+						);
+						await submitted.reply({ embeds:[embed], components:[row], flags:1<<6 }).catch(()=>{});
+					} else {
+						await submitted.reply({ content:`Saved answer (${sess.index}/${app.questions.length}). Use the Apply button again for next question.`, flags:1<<6 }).catch(()=>{});
+					}
+				} catch (e) {
+					try { require('../utils/logger').error('[apply_app_flow] error', { err: e.message }); } catch {}
+					return interaction.reply({ content:'Error starting flow.', flags:1<<6 }).catch(()=>{});
+				}
+			}
+
+			// Confirmation buttons: submit or cancel
+			if (interaction.isButton() && (interaction.customId.startsWith('appconfirm_submit_') || interaction.customId.startsWith('appconfirm_cancel_'))) {
+				const parts = interaction.customId.split('_');
+				const action = parts[1]; // submit or cancel
+				const appId = parts.pop();
+				const { getApplication, addSubmission } = require('../utils/applications');
+				const { getSession, abandonSession } = require('../utils/applicationFlow');
+				const app = getApplication(appId);
+				if (!app) return interaction.reply({ content:'Application missing.', flags:1<<6 }).catch(()=>{});
+				const sess = getSession(interaction.user.id, appId);
+				if (!sess) return interaction.reply({ content:'Session expired. Start again.', flags:1<<6 }).catch(()=>{});
+				if (action === 'cancel') {
+					abandonSession(interaction.user.id, appId);
+					return interaction.reply({ content:'Application cancelled.', flags:1<<6 }).catch(()=>{});
+				}
+				// Build answers array matching order
+				const answers = sess.answers.map(a => ({ qid: a.qid, answer: a.answer }));
+				const submission = addSubmission(app.id, interaction.user.id, answers);
+				abandonSession(interaction.user.id, appId);
+				// Notify managers (placeholder: send to submissionChannelId if set)
+				if (app.submissionChannelId) {
+					try {
+						const ch = await interaction.client.channels.fetch(app.submissionChannelId).catch(()=>null);
+						if (ch) {
+							const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+							const emb = new EmbedBuilder().setTitle(`${app.name} Submission #${submission.id}`)
+								.setDescription(`Applicant: <@${interaction.user.id}>`)
+								.setColor(0x2f3136)
+								.setTimestamp();
+							for (const qa of answers.slice(0, 23)) {
+								const qq = app.questions.find(q => String(q.id) === String(qa.qid));
+								if (!qq) continue;
+								emb.addFields({ name: qq.label.slice(0, 256), value: qa.answer.slice(0, 1024) || '*blank*' });
+							}
+							const row = new ActionRowBuilder().addComponents(
+								new ButtonBuilder().setCustomId(`appreview_accept_${app.id}_${submission.id}`).setLabel('Accept').setStyle(ButtonStyle.Success),
+								new ButtonBuilder().setCustomId(`appreview_deny_${app.id}_${submission.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger)
+							);
+							await ch.send({ embeds:[emb], components:[row] }).catch(()=>{});
+						}
+					} catch {}
+				}
+				return interaction.reply({ content: app.completionMessage || 'Application submitted.', flags:1<<6 }).catch(()=>{});
+			}
+
+			// Manager accept / deny buttons (placeholder status update)
+			if (interaction.isButton() && interaction.customId.startsWith('appreview_')) {
+				const parts = interaction.customId.split('_'); // appreview,action,appId,submissionId
+				const action = parts[1];
+				const appId = parts[2];
+				const submissionId = parts[3];
+				try {
+					const { getApplication, updateSubmission, listSubmissions } = require('../utils/applications');
+					const app = getApplication(appId);
+					if (!app) return interaction.reply({ content:'App missing.', flags:1<<6 }).catch(()=>{});
+					// Authorization: must have one of managerRoles
+					const member = interaction.member;
+					if (!member || !app.managerRoles.some(r => member.roles.cache.has(r))) {
+						return interaction.reply({ content:'Not authorized.', flags:1<<6 }).catch(()=>{});
+					}
+					// Concurrency guard: if already decided, block
+					const current = listSubmissions({}).find(s => String(s.id) === String(submissionId));
+					if (!current) return interaction.reply({ content:'Submission missing.', flags:1<<6 }).catch(()=>{});
+					if (current.status !== 'pending') {
+						return interaction.reply({ content:`Already ${current.status}.`, flags:1<<6 }).catch(()=>{});
+					}
+					const newStatus = action === 'accept' ? 'accepted' : 'denied';
+					const updated = updateSubmission(submissionId, { status: newStatus, decidedAt: Date.now(), decidedBy: interaction.user.id });
+					if (!updated) return interaction.reply({ content:'Update failed.', flags:1<<6 }).catch(()=>{});
+					// Role assignment logic on accept / cleanup on deny
+					try {
+						const guildMember = await interaction.guild.members.fetch(updated.userId).catch(()=>null);
+						if (guildMember) {
+							if (newStatus === 'accepted') {
+								// Remove pending role if present
+								if (app.pendingRole && guildMember.roles.cache.has(app.pendingRole)) {
+									await guildMember.roles.remove(app.pendingRole).catch(()=>{});
+								}
+								for (const r of app.acceptedRoles || []) {
+									if (!guildMember.roles.cache.has(r)) await guildMember.roles.add(r).catch(()=>{});
+								}
+							} else if (newStatus === 'denied') {
+								// Remove pending role if any; do not grant accepted roles
+								if (app.pendingRole && guildMember.roles.cache.has(app.pendingRole)) {
+									await guildMember.roles.remove(app.pendingRole).catch(()=>{});
+								}
+							}
+						}
+					} catch {}
+					// DM applicant with decision (best-effort, template supports {user}, {application}/{app})
+					try {
+						const template = newStatus === 'accepted'
+							? (app.acceptMessage || 'Your application has been accepted!')
+							: (app.denyMessage || 'Your application has been denied.');
+						const content = template
+							.replace(/\{user\}/gi, `<@${updated.userId}>`)
+							.replace(/\{application\}/gi, app.name || 'Application')
+							.replace(/\{app\}/gi, app.name || 'Application');
+						const userObj = await interaction.client.users.fetch(updated.userId).catch(()=>null);
+						if (userObj) {
+							await userObj.send({ content }).catch(()=>{});
+						}
+					} catch {}
+					try { await interaction.update({ content: `Submission ${newStatus.toUpperCase()}.`, embeds: interaction.message.embeds, components: [] }); } catch {}
+				} catch (e) {
+					try { require('../utils/logger').error('[appreview] error', { err: e.message }); } catch {}
+					return interaction.reply({ content:'Error processing.', flags:1<<6 }).catch(()=>{});
+				}
+			}
+
 			// --- New Balance Menu System ---
 			if (interaction.isButton() && interaction.customId === "bank:menu:deposit") {
 				await interaction.deferUpdate().catch(() => {});

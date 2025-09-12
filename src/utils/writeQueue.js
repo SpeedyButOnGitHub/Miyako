@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Simple per-path write queue to serialize writes and make them atomic
-// Usage: enqueueWrite(filePath, () => JSON.stringify(data), { delay: 200, backups: true })
+// Usage: enqueueWrite(filePath, () => JSON.stringify(data), { delay: 200, backups: true, aggregateBackups: false })
 
 const queues = new Map(); // filePath -> { writing: false, pending: [], timer: null }
 
@@ -10,6 +10,8 @@ function ensureDir(p) {
   const d = path.dirname(p);
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 }
+
+const deferredBackups = new Set(); // paths queued for backup at shutdown when aggregateBackups used
 
 function backupFile(targetPath) {
   try {
@@ -36,7 +38,8 @@ function backupFile(targetPath) {
 function doAtomicWrite(targetPath, content, opts = {}) {
   ensureDir(targetPath);
   const tmpPath = `${targetPath}.tmp-${process.pid}-${Date.now()}`;
-  if (opts.backups) backupFile(targetPath);
+  if (opts.backups && !opts.aggregateBackups) backupFile(targetPath);
+  if (opts.backups && opts.aggregateBackups) deferredBackups.add(targetPath);
   fs.writeFileSync(tmpPath, content, 'utf8');
   // On Windows, rename over existing file is atomic for same volume
   fs.renameSync(tmpPath, targetPath);
@@ -61,7 +64,7 @@ function processQueue(state, filePath) {
 }
 
 function enqueueWrite(filePath, serialize, opts = {}) {
-  const { delay = 0, backups = true } = opts;
+  const { delay = 0, backups = true, aggregateBackups = false } = opts;
   let state = queues.get(filePath);
   if (!state) {
     state = { writing: false, pending: [], timer: null };
@@ -70,7 +73,7 @@ function enqueueWrite(filePath, serialize, opts = {}) {
 
   const schedule = () => {
     state.timer = null;
-    state.pending.push({ serialize, opts: { backups } });
+    state.pending.push({ serialize, opts: { backups, aggregateBackups } });
     processQueue(state, filePath);
   };
 
@@ -82,5 +85,12 @@ function enqueueWrite(filePath, serialize, opts = {}) {
   }
 }
 
-module.exports = { enqueueWrite };
+function flushDeferredBackups() {
+  for (const p of deferredBackups) {
+    try { backupFile(p); } catch {}
+  }
+  deferredBackups.clear();
+}
+
+module.exports = { enqueueWrite, flushDeferredBackups };
 

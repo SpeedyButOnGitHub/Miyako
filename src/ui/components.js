@@ -50,7 +50,6 @@ function paginationRow(prefix, page, totalPages) {
   return row;
 }
 
-function closeRow(id='close_menu', label='Close') { return new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(ButtonStyle.Danger).setEmoji(theme.emojis.close || '✖')); }
 
 async function diffEditMessage(target, { embeds, components, content }) {
   try {
@@ -66,4 +65,4 @@ async function diffEditMessage(target, { embeds, components, content }) {
   } catch { return false; }
 }
 
-module.exports = { semanticButton, btn, navBtn, toggleModeBtn, backButton, buildNavRow, buildToggleRow, buildDestructiveRow, paginationLabel, paginationRow, closeRow, diffEditMessage };
+module.exports = { semanticButton, btn, navBtn, toggleModeBtn, backButton, buildNavRow, buildToggleRow, buildDestructiveRow, paginationLabel, paginationRow, diffEditMessage };

@@ -40,6 +40,8 @@ async function gracefulShutdown(reason, err, graceful = false) {
 
 	// Attempt polite shutdown tasks only if we have a client and it's ready
 	try {
+		// Flush deferred backups first so data snapshots are captured once per shutdown
+		try { require('./writeQueue').flushDeferredBackups(); } catch {}
 		if (clientRef && clientRef.isReady && clientRef.isReady()) {
 			const { setStatusChannelName, sendBotShutdownMessage } = require('./botStatus');
 			await setStatusChannelName(clientRef, false);
