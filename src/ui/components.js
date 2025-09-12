@@ -39,6 +39,18 @@ function buildNavRow(buttons) { const row = new ActionRowBuilder(); for (const b
 const buildToggleRow = (toggles) => buildNavRow(toggles);
 const buildDestructiveRow = (buttons) => buildNavRow(buttons);
 
+function splitButtonsIntoRows(buttons) {
+  // Returns an array of ActionRowBuilder each with up to 5 components
+  const out = [];
+  const comps = (buttons || []).filter(Boolean);
+  for (let i = 0; i < comps.length; i += 5) {
+    const r = new ActionRowBuilder();
+    r.addComponents(...comps.slice(i, i + 5));
+    out.push(r);
+  }
+  return out;
+}
+
 function paginationLabel(page, totalPages) { return `Page ${page}/${totalPages}`; }
 function paginationRow(prefix, page, totalPages) {
   const row = new ActionRowBuilder();
@@ -65,4 +77,4 @@ async function diffEditMessage(target, { embeds, components, content }) {
   } catch { return false; }
 }
 
-module.exports = { semanticButton, btn, navBtn, toggleModeBtn, backButton, buildNavRow, buildToggleRow, buildDestructiveRow, paginationLabel, paginationRow, diffEditMessage };
+module.exports = { semanticButton, btn, navBtn, toggleModeBtn, backButton, buildNavRow, buildToggleRow, buildDestructiveRow, splitButtonsIntoRows, paginationLabel, paginationRow, diffEditMessage };

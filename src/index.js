@@ -172,6 +172,40 @@ async function sendBotStatusMessage() {
       safeAddField(embed, 'Health', '✖️ Health checks failed: ' + e.message.slice(0, 200));
     }
 
+      // Run lightweight startup tests and persist a summary (non-blocking)
+      try {
+        const { runStartupTests } = require('./utils/startupTests');
+        const summary = await runStartupTests(client).catch((e) => ({ ok: false, err: String(e) }));
+        // If we have a config log channel, attempt to send a tiny summary embed
+        try {
+          if (CONFIG_LOG_CHANNEL) {
+            const ch = await client.channels.fetch(CONFIG_LOG_CHANNEL).catch(() => null);
+            if (ch) {
+              const sEm = createEmbed({ title: 'Startup Tests', description: summary.ok ? 'All quick checks passed ✅' : 'Some quick checks failed ⚠️', color: summary.ok ? 0x2ECC71 : 0xE67E22 });
+              sEm.addFields({ name: 'Checks', value: `${summary.checks.length} quick checks` });
+              // Add changelog snapshot summary if present
+              if (summary.checks) {
+                const cs = summary.checks.find(c => c.name === 'changelog_snapshot');
+                if (cs && cs.ok && cs.info) {
+                  sEm.addFields({ name: 'Changelog', value: `➕ ${cs.info.added}  ✖️ ${cs.info.removed}  🔧 ${cs.info.modified}` });
+                }
+              }
+              // Add small health digest if available
+              if (summary.health && Array.isArray(summary.health)) {
+                const nonOk = summary.health.filter(h => !h.ok).slice(0, 5);
+                if (nonOk.length) {
+                  const lines = nonOk.map(n => `• ${n.name || n.kind}: ${n.error || 'unknown'}`).join('\n');
+                  sEm.addFields({ name: 'Health issues', value: lines });
+                } else {
+                  sEm.addFields({ name: 'Health', value: 'All health checks OK' });
+                }
+              }
+              ch.send({ embeds: [sEm] }).catch(() => {});
+            }
+          }
+        } catch (e) { logger.warn('[StartupTests] could not send summary', { err: e && e.message }); }
+      } catch (e) { logger.warn('[StartupTests] runner failed', { err: e && e.message }); }
+
     // Components: Details button only if we have detail lines
     let components = [];
     if (changelogSession && changelogSession.detailLines && changelogSession.detailLines.length) {
