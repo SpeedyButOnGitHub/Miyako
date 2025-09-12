@@ -1,3 +1,4 @@
+
 const { createEmbed } = require('../utils/embeds');
 const theme = require('../utils/theme');
 const { config, saveConfig } = require('../utils/storage');
@@ -46,9 +47,10 @@ async function handleStatusSubcommand(client, message) {
 }
 
 async function handleDropSubcommand(client, message, args) {
-	const amtArg = Number(args[1]);
+	// args structure: [ 'test', 'drop', '<amount>' ]
+	const amtArg = Number(args[2]);
 	const amount = Number.isFinite(amtArg) && amtArg > 0 ? Math.floor(amtArg) : null;
-	const drop = spawnTestDrop(amount || undefined);
+	const drop = spawnTestDrop(amount ?? undefined);
 	// Announce in the test log channel so users can claim it there
 	const channel = await client.channels.fetch(TEST_LOG_CHANNEL).catch(() => null);
 	if (channel && channel.send) {
@@ -58,10 +60,44 @@ async function handleDropSubcommand(client, message, args) {
 			.setColor(theme.colors.warning)
 			.setDescription(`Type this word in this channel to claim first:\n\n→ \`${drop.word}\``)
 			.addFields(
-				{ name: 'Reward', value: `**$${drop.amount.toLocaleString()}**`, inline: true },
-				{ name: 'Lifetime', value: `~${Math.round((drop.expiresAt - Date.now())/1000)}s`, inline: true }
+				{ name: 'Reward', value: `**$${drop.amount.toLocaleString()}**`, inline: true }
 			);
-		try { await channel.send({ embeds: [embed] }); } catch {}
+		try {
+			const sent = await channel.send({ embeds: [embed] }).catch(() => null);
+			if (sent) {
+				// Attach the sent message id to the active drop so claim handler can delete it
+				try {
+					const { activeDrops } = require('../utils/cashDrops');
+					const dropNow = activeDrops.get(channel.id) || drop;
+					dropNow.messageId = sent.id;
+					activeDrops.set(channel.id, dropNow);
+				} catch {}
+
+				// Schedule a check for expiry to update the message if still unclaimed
+				const { activeDrops } = require('../utils/cashDrops');
+				const expiresAt = drop.expiresAt;
+				const now = Date.now();
+				const delay = Math.max(0, expiresAt - now);
+				setTimeout(async () => {
+					try {
+						const dropNow = activeDrops.get(channel.id);
+						// If drop exists and is unclaimed and expired, replace embed with small red expired embed
+						if (dropNow && !dropNow.claimedBy && dropNow.expiresAt <= Date.now()) {
+							const expiredEmbed = new EmbedBuilder()
+								.setTitle('❌ Cash Drop Expired')
+								.setColor(theme.colors.danger || 0xff0000)
+								.setDescription('This drop has expired. Keep chatting to spawn more drops!')
+								.setFooter({ text: 'This message will be removed in a few seconds.' });
+							try { await sent.edit({ embeds: [expiredEmbed], components: [] }).catch(() => {}); } catch {}
+							// Remove the drop from active store
+							try { activeDrops.delete(channel.id); } catch {}
+							// Delete message after 5s
+							setTimeout(() => { try { sent.delete().catch(() => {}); } catch {} }, 5 * 1000);
+						}
+					} catch {}
+				}, delay);
+			}
+		} catch {}
 	}
 	const jump = channel ? `https://discord.com/channels/${message.guildId}/${channel.id}` : null;
 	return replyInfo(message, [

@@ -272,7 +272,16 @@ function instrumentInteractionLogging(interaction) {
 	const makeStart = (name) => start({ name, userId: meta.userId, channelId: meta.channelId, guildId: meta.guildId, input: safeInput() });
 	const wrap = (methodName) => {
 		if (typeof interaction[methodName] !== 'function') return;
-		const original = interaction[methodName].bind(interaction);
+		const fn = interaction[methodName];
+		// Try to capture any existing mock implementation to avoid recursive mock calls
+		let existingImpl = null;
+		try {
+			if (fn && fn.mock && typeof fn.getMockImplementation === 'function') existingImpl = fn.getMockImplementation();
+		} catch (e) {}
+		try {
+			if (!existingImpl && fn && fn.mock && typeof fn._getMockImplementation === 'function') existingImpl = fn._getMockImplementation();
+		} catch (e) {}
+		const original = fn.bind(interaction);
 		interaction[methodName] = async function wrapped(options, ...rest) {
 			let ctx = null;
 			try {

@@ -1,0 +1,38 @@
+const { InteractionType } = require("discord.js");
+const { handleScheduleModal, handleEventCreateModal, handleEventEditModal, handleEventNotificationModal } = require("../commands/schedule");
+
+function attachInteractionEvents(client) {
+	if (client.__interactionListenerAttached) return;
+	client.__interactionListenerAttached = true;
+
+	client.on("interactionCreate", async (interaction) => {
+		try {
+			// Delegate modal handling to schedule module when applicable
+			if (interaction.type === InteractionType.ModalSubmit) {
+				if (interaction.customId && interaction.customId.startsWith("schedule_create_modal")) {
+					await handleScheduleModal(interaction);
+					return;
+				}
+				if (interaction.customId && interaction.customId.startsWith("event_create_modal")) {
+					await handleEventCreateModal(interaction);
+					return;
+				}
+				if (interaction.customId && /^event_(times|days|msg|edit)_modal_/.test(interaction.customId)) {
+					await handleEventEditModal(interaction);
+					return;
+				}
+				if (interaction.customId && /^(notif_(add|offset|msg|channel|edit)_modal_)/.test(interaction.customId)) {
+					await handleEventNotificationModal(interaction);
+					return;
+				}
+			}
+		} catch (err) {
+			try { require('../utils/logger').error('[Interaction Error]', { err: err && err.message }); } catch {}
+			if (interaction.isRepliable && interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+				await interaction.reply({ content: `An error occurred.\n${err && err.message || err}`, flags: 1<<6 }).catch(() => {});
+			}
+		}
+	});
+}
+
+module.exports = { attachInteractionEvents };

@@ -1,7 +1,7 @@
 const { createEmbed, safeAddField } = require('../utils/embeds');
 const theme = require('../utils/theme');
 const { getEvents } = require('../utils/eventsStorage');
-const { OWNER_ID } = require('./moderation/permissions');
+const { getOwnerId } = require('./moderation/permissions');
 
 function buildClockInStateEmbed() {
 	const events = getEvents();
@@ -48,7 +48,8 @@ function buildClockInStateEmbed() {
 }
 
 async function handleClockInStateCommand(client, message) {
-	if (message.author.id !== OWNER_ID) return; // restrict
+	const ownerId = getOwnerId();
+	if (message.author.id !== ownerId) return; // restrict
 	try {
 		const embed = buildClockInStateEmbed();
 		await message.reply({ embeds:[embed], allowedMentions:{ repliedUser:false } });

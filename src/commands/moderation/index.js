@@ -1,4 +1,4 @@
-const { isModerator, OWNER_ID } = require("./permissions");
+const { isModerator, OWNER_ID, getOwnerId } = require("./permissions");
 const { replySuccess, replyError } = require("./replies");
 const { sendUserDM } = require("./dm");
 const { showWarnings, handleWarningButtons, cleanWarnings } = require("./warnings");
@@ -7,6 +7,7 @@ const { handleModerationCommands } = require("./moderationCommands");
 module.exports = {
 	isModerator,
 	OWNER_ID,
+	getOwnerId,
 	replySuccess,
 	replyError,
 	sendUserDM,

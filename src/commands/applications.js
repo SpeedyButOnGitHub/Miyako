@@ -195,7 +195,8 @@ function buildPanelDetailComponents(panelId) {
 
 async function handleApplicationsCommand(client, message) {
   // Owner-gated for Phase 1; will expand with role-based gating later.
-  if (message.author.id !== process.env.OWNER_ID) {
+  const { getOwnerId } = require('./moderation/permissions');
+  if (message.author.id !== getOwnerId()) {
     return message.reply({ content: 'This command is currently restricted.', allowedMentions: { repliedUser: false } });
   }
   const embed = buildRootEmbed();

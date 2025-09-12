@@ -2,7 +2,11 @@ const { PermissionFlagsBits } = require('discord.js');
 const { config } = require('../../utils/storage');
 const { getCached, setCached } = require('../../utils/permissionsCache');
 
-const OWNER_ID = process.env.OWNER_ID || '349282473085239298';
+const OWNER_ID = process.env.OWNER_ID || '349282473085239298'; // Keep for backward compatibility
+
+function getOwnerId() {
+	return process.env.OWNER_ID || OWNER_ID;
+}
 
 // Staff roles
 const STAFF_MANAGER_ROLE = '1380277718091829368';
@@ -25,7 +29,8 @@ function isModerator(member) {
 	if (!member) return false;
 	const cached = getCached(member.guild?.id || 'global', member.id);
 	if (cached !== null) return cached;
-	if (String(member.id) === String(OWNER_ID)) {
+	// prefer runtime lookup so tests and dynamic env setups work
+	if (String(member.id) === String(getOwnerId())) {
 		setCached(member.guild?.id || 'global', member.id, true);
 		return true;
 	}
@@ -48,6 +53,7 @@ function isModerator(member) {
 
 module.exports = {
 	OWNER_ID,
+	getOwnerId,
 	STAFF_MANAGER_ROLE,
 	STAFF_SECURITY_ROLE,
 	STAFF_MODERATOR_ROLE,

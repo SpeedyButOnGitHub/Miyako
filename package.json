@@ -7,6 +7,8 @@
     "start": "node index.js",
     "start:dev": "nodemon --watch src --ext js,json --ignore config/*.json index.js",
     "start:bg": "node ./scripts/startBot.js",
+  "start:pm2": "pm2 start ecosystem.config.js --env production",
+  "start:pm2:dev": "pm2 start ecosystem.config.js --env development --watch",
     "stop": "node ./scripts/stopBot.js",
     "import-levels": "node ./scripts/import-levels.js",
     "export:text": "node ./scripts/export-text.js",
