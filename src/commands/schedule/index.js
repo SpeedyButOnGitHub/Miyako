@@ -1,8 +1,9 @@
- const { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { getEvents, getEvent, addEvent, updateEvent, removeEvent } = require('../../services/scheduleService');
 const { OWNER_ID } = require('../moderation/permissions');
 const ActiveMenus = require('../../utils/activeMenus');
 const { config } = require('../../utils/storage');
+const { safeReply } = require('../../utils/safeReply');
 
 const { parseOffsetInput, parseDeleteAfterMs, humanizeMs } = require('./helpers');
 const { DAY_NAMES, buildMainEmbed, buildDetailEmbed, mainRows, buildSelectRows, detailRows } = require('./ui');
@@ -30,13 +31,13 @@ async function handleEventCreateModal(interaction) {
   const dayMap = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
   const healJSON = (txt) => txt.replace(/^```(json)?/i,'').replace(/```$/,'').trim().replace(/,\s*([}\]])/g,'$1');
   const clamp = (s,max=1900)=> (s && s.length>max? s.slice(0,max-3)+'...':s);
-  if (!name) return interaction.reply({ content: '❌ Name required.', flags:1<<6 }).catch(()=>{});
-  if (!/^\d{1,32}$/.test(channelId)) return interaction.reply({ content: '❌ Invalid channel id.', flags:1<<6 }).catch(()=>{});
+  if (!name) return safeReply(interaction, { content: '❌ Name required.', flags:1<<6 });
+  if (!/^\d{1,32}$/.test(channelId)) return safeReply(interaction, { content: '❌ Invalid channel id.', flags:1<<6 });
   const times = timesRaw.split(/[,\s]+/).map(t=>t.trim()).filter(Boolean);
-  if (!times.length) return interaction.reply({ content: '❌ Provide times.', flags:1<<6 }).catch(()=>{});
+  if (!times.length) return safeReply(interaction, { content: '❌ Provide times.', flags:1<<6 });
   const ranges = times.map(t => t.includes('-') ? (()=>{ const [s,e]=t.split('-').map(x=>x.trim()); return { start:s, end:e };})() : null).filter(Boolean);
   const days = daysRaw.split(/[,\s]+/).map(d=>d.trim().toLowerCase()).filter(Boolean).map(d=>dayMap[d]).filter(d=>d!==undefined);
-  if (!days.length) return interaction.reply({ content: '❌ Invalid days.', flags:1<<6 }).catch(()=>{});
+  if (!days.length) return safeReply(interaction, { content: '❌ Invalid days.', flags:1<<6 });
   let messageJSON = null;
   const healed = healJSON(messageContent);
   if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
@@ -116,10 +117,10 @@ async function handleEventEditModal(interaction) {
     const ranges = times.map(t => t.includes('-') ? (()=>{ const [s,e]=t.split('-').map(x=>x.trim()); return { start:s, end:e };})() : null).filter(Boolean);
     const dayMap = { sun:0, sunday:0, mon:1, monday:1, tue:2, tuesday:2, wed:3, wednesday:3, thu:4, thursday:4, fri:5, friday:5, sat:6, saturday:6 };
   const days = daysRaw.split(/[,\s]+/).map(d=>d.trim().toLowerCase()).filter(Boolean).map(d=>dayMap[d]).filter(d=>d!==undefined);
-    if (!name) return interaction.reply({ content:'❌ Name required.', flags:1<<6 }).catch(()=>{});
-    if (!/^\d{1,32}$/.test(channelId)) return interaction.reply({ content:'❌ Invalid channel id.', flags:1<<6 }).catch(()=>{});
-    if (!times.length) return interaction.reply({ content:'❌ Provide times.', flags:1<<6 }).catch(()=>{});
-    if (!days.length) return interaction.reply({ content:'❌ Invalid days.', flags:1<<6 }).catch(()=>{});
+  if (!name) return safeReply(interaction, { content:'❌ Name required.', flags:1<<6 });
+  if (!/^\d{1,32}$/.test(channelId)) return safeReply(interaction, { content:'❌ Invalid channel id.', flags:1<<6 });
+  if (!times.length) return safeReply(interaction, { content:'❌ Provide times.', flags:1<<6 });
+  if (!days.length) return safeReply(interaction, { content:'❌ Invalid days.', flags:1<<6 });
     let messageJSON = null;
     const cleaned = messageContent.replace(/^```(json)?/i,'').replace(/```$/,'').trim();
     if (cleaned.startsWith('{') && cleaned.endsWith('}')) { try { const parsed = JSON.parse(cleaned); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
@@ -145,7 +146,8 @@ async function handleEventEditModal(interaction) {
 
 async function handleEventNotificationModal(interaction) {
   if (!interaction.isModalSubmit()) return;
-  if (!/^(notif_(add|offset|msg|channel|edit|deleteafter)_modal_)/.test(interaction.customId)) return;
+  // Consolidated handling: only 'add' and unified 'edit' modals remain
+  if (!/^(notif_(add|edit)_modal_)/.test(interaction.customId)) return;
   const parts = interaction.customId.split('_');
   const kind = parts[1];
   const evId = parts[3];
@@ -160,8 +162,12 @@ async function handleEventNotificationModal(interaction) {
     const offset = parseOffsetInput(offsetRaw);
     const msgRaw = interaction.fields.getTextInputValue('message');
     const chanRaw = (interaction.fields.getTextInputValue('channel')||'').trim();
+    const deleteAfterRaw = interaction.fields.getTextInputValue('deleteafter');
+    const deleteAfterMs = parseDeleteAfterMs(deleteAfterRaw);
+    let mentionsRaw = '';
+    try { mentionsRaw = (interaction.fields.getTextInputValue('mentions')||'').trim(); } catch {}
     const msgChannelId = chanRaw.replace(/[<#>]/g,'');
-    if (msgChannelId && !/^\d{1,32}$/.test(msgChannelId)) { return interaction.reply({ content:'❌ Invalid channel id.', flags:1<<6 }).catch(()=>{}); }
+  if (msgChannelId && !/^\d{1,32}$/.test(msgChannelId)) { return safeReply(interaction, { content:'❌ Invalid channel id.', flags:1<<6 }); }
     let messageJSON = null;
     const healed = healJSON(msgRaw);
     if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
@@ -169,49 +175,28 @@ async function handleEventNotificationModal(interaction) {
     const nextId = String(ev.nextAutoId || 1);
     const entry = { id: nextId, offsetMinutes: offset, enabled: true, message: msgRaw, messageJSON };
     if (msgChannelId) entry.channelId = msgChannelId;
+    if (Number.isFinite(deleteAfterMs)) entry.deleteAfterMs = deleteAfterMs; // 0 disables, >0 TTL; absence -> fallback default
+    if (mentionsRaw) {
+      const roleIds = Array.from(new Set(mentionsRaw.split(/[\s,]+/).map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/[<@&#>]/g,'')).filter(id=>/^\d{5,32}$/.test(id))));
+      if (roleIds.length) entry.mentions = roleIds;
+    }
     list.push(entry);
     updatedEv = updateEvent(ev.id, { autoMessages: list, nextAutoId: Number(nextId)+1 });
     await interaction.reply({ content:`✅ Auto message #${nextId} created${messageJSON?' (JSON)':''}.`, flags:1<<6 }).catch(()=>{});
-  } else if (kind==='offset') {
-    const offsetRaw = interaction.fields.getTextInputValue('offset');
-    const offset = parseOffsetInput(offsetRaw);
-    const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
-    const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
-    list[idx].offsetMinutes = offset;
-    updatedEv = updateEvent(ev.id, { autoMessages: list });
-    await interaction.reply({ content:'✅ Offset updated.', flags:1<<6 }).catch(()=>{});
-  } else if (kind==='msg') {
-    const msgRaw = interaction.fields.getTextInputValue('message');
-    const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
-    const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
-    let messageJSON = null; const healed = healJSON(msgRaw); if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
-    list[idx].message = msgRaw; list[idx].messageJSON = messageJSON;
-    updatedEv = updateEvent(ev.id, { autoMessages: list });
-    await interaction.reply({ content:`✅ Message updated${messageJSON?' (JSON)':''}.`, flags:1<<6 }).catch(()=>{});
-  } else if (kind==='channel') {
-    const chanRaw = (interaction.fields.getTextInputValue('channel')||'').trim();
-    const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
-    const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
-    const cleaned = chanRaw.replace(/[<#>]/g,'');
-    if (cleaned && !/^\d{1,32}$/.test(cleaned)) return interaction.reply({ content:'❌ Invalid channel id.', flags:1<<6 });
-    if (cleaned) list[idx].channelId = cleaned; else delete list[idx].channelId;
-    updatedEv = updateEvent(ev.id, { autoMessages: list });
-    await interaction.reply({ content:`✅ Channel ${cleaned? 'updated':'reset to event channel'}.`, flags:1<<6 }).catch(()=>{});
   } else if (kind==='edit') {
     const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
     const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
+  if (idx===-1) return safeReply(interaction, { content:'Not found.', flags:1<<6 });
     const chanRaw = (interaction.fields.getTextInputValue('channel')||'').trim();
     const cleanedChan = chanRaw.replace(/[<#>]/g,'');
-    if (cleanedChan && !/^\d{1,32}$/.test(cleanedChan)) return interaction.reply({ content:'❌ Invalid channel id.', flags:1<<6 });
+  if (cleanedChan && !/^\d{1,32}$/.test(cleanedChan)) return safeReply(interaction, { content:'❌ Invalid channel id.', flags:1<<6 });
     const offsetRaw = interaction.fields.getTextInputValue('offset');
     const offset = parseOffsetInput(offsetRaw);
     const deleteAfterRaw = interaction.fields.getTextInputValue('deleteafter');
     const deleteAfterMs = parseDeleteAfterMs(deleteAfterRaw);
     const msgRaw = interaction.fields.getTextInputValue('message');
+    let mentionsRaw = '';
+    try { mentionsRaw = (interaction.fields.getTextInputValue('mentions')||'').trim(); } catch {}
     let messageJSON = null; const healed = healJSON(msgRaw); if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
     const newList = list.map(entry => {
       const e = { ...entry };
@@ -221,27 +206,18 @@ async function handleEventNotificationModal(interaction) {
         e.messageJSON = messageJSON;
         e.deleteAfterMs = deleteAfterMs;
         if (cleanedChan) e.channelId = cleanedChan; else delete e.channelId;
+        if (mentionsRaw) {
+          const roleIds = Array.from(new Set(mentionsRaw.split(/[\s,]+/).map(s=>s.trim()).filter(Boolean).map(s=>s.replace(/[<@&#>]/g,'')).filter(id=>/^\d{5,32}$/.test(id))));
+          if (roleIds.length) e.mentions = roleIds; else delete e.mentions;
+        } else {
+          delete e.mentions; // allow clearing by leaving field blank
+        }
       }
       return e;
     });
     updatedEv = updateEvent(ev.id, { autoMessages: newList });
     await interaction.reply({ content:'✅ Auto messages updated for this event.', flags:1<<6 }).catch(()=>{});
     try { await refreshTrackedAutoMessages(interaction.client, updatedEv); } catch {}
-  } else if (kind==='deleteafter') {
-    const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
-    const idx = list.findIndex(n=>String(n.id)===String(notifId));
-    if (idx===-1) return interaction.reply({ content:'Not found.', flags:1<<6 });
-    const raw = interaction.fields.getTextInputValue('deleteafter');
-    const msVal = parseDeleteAfterMs(raw);
-    list[idx].deleteAfterMs = msVal;
-    const updated = updateEvent(ev.id, { autoMessages: list });
-    await interaction.reply({ content:`✅ Delete-after ${msVal>0? 'set to '+humanizeMs(msVal):'disabled'}.`, flags:1<<6 }).catch(()=>{});
-    if (managerMessageId) {
-      try {
-        const mgrMsg = await interaction.channel.messages.fetch(managerMessageId).catch(()=>null);
-        if (mgrMsg) await mgrMsg.edit({ embeds:[buildNotifsEmbed(interaction.guild, updated)], components: notifDetailRows(updated, list[idx]) }).catch(()=>{});
-      } catch {}
-    }
   }
   if (managerMessageId && updatedEv) {
     try {
@@ -334,6 +310,8 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
       .addComponents(
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder(ev.channelId||'')),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('offset').setLabel('When before start? (e.g. 15m, 1h, 2h30m)').setStyle(TextInputStyle.Short).setRequired(true).setValue('5m')),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deleteafter').setLabel('Delete after (e.g. 10m, 0=disable)').setStyle(TextInputStyle.Short).setRequired(true).setValue('0')),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('mentions').setLabel('Role IDs to ping (comma/space)').setStyle(TextInputStyle.Short).setRequired(false).setPlaceholder('123,456 789')),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message / JSON').setStyle(TextInputStyle.Paragraph).setRequired(true))
       );
     await interaction.showModal(modal); return;
@@ -351,18 +329,9 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setValue(notif.channelId||'')),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('offset').setLabel('When before start? (e.g. 10m, 2h)').setStyle(TextInputStyle.Short).setRequired(true).setValue(notif.offsetMinutes? `${notif.offsetMinutes}m` : 'start')),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('deleteafter').setLabel('Delete after (e.g. 10m, 2h, 0=disable)').setStyle(TextInputStyle.Short).setRequired(true).setValue(suggestTTL)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('mentions').setLabel('Role IDs to ping (comma/space)').setStyle(TextInputStyle.Short).setRequired(false).setValue((notif.mentions||[]).join(','))),
         new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('message').setLabel('Message / JSON').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(notif.message || (notif.messageJSON? JSON.stringify(notif.messageJSON,null,2):'')))
       );
-    await interaction.showModal(modal); return;
-  }
-  if (customId.startsWith('event_notif_edit_channel_')) {
-    const parts = customId.split('_');
-    const evId = parts[4]; const notifId = parts[5];
-    const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
-    const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
-    if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
-    const modal = new ModalBuilder().setCustomId(`notif_channel_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Channel')
-      .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('channel').setLabel('Channel ID (blank=event)').setStyle(TextInputStyle.Short).setRequired(false).setValue(notif.channelId||'')));
     await interaction.showModal(modal); return;
   }
   if (customId.startsWith('event_notif_selectmode_')) {

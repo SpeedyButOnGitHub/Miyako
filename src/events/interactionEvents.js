@@ -1110,11 +1110,15 @@ function attachInteractionEvents(client) {
 				const clockKey = '__clockIn';
 				const state = ev[clockKey] && typeof ev[clockKey]==='object' ? { ...ev[clockKey] } : { positions: {}, messageIds: [] };
 				if (!state.positions) state.positions = {};
-				// Remove user from all other positions first
+				// Determine if the user is re-selecting the same slot (toggle off behavior)
+				const wasIn = Object.keys(state.positions).some(pos => Array.isArray(state.positions[pos]) && state.positions[pos].includes(member.id));
+				const wasInSame = wasIn && Array.isArray(state.positions[choice]) && state.positions[choice].includes(member.id);
+				// Always remove user from every position first
 				for (const key of Object.keys(state.positions)) {
-					state.positions[key] = Array.isArray(state.positions[key]) ? state.positions[key].filter(id=>id!==member.id) : [];
+					state.positions[key] = Array.isArray(state.positions[key]) ? state.positions[key].filter(id => id !== member.id) : [];
 				}
-				if (choice !== 'none') {
+				// If selecting 'none' OR re-selecting same position -> act as unregister (skip add)
+				if (choice !== 'none' && !wasInSame) {
 					if (!Array.isArray(state.positions[choice])) state.positions[choice] = [];
 					if (meta.max !== Infinity && state.positions[choice].length >= meta.max) {
 						await interaction.reply({ content:`${meta.label} is full.`, flags:1<<6 }).catch(()=>{}); return;
@@ -1124,28 +1128,8 @@ function attachInteractionEvents(client) {
 				updateEvent(ev.id, { [clockKey]: state });
 				// Re-render all clock-in messages for this event
 				try {
-					// Build embed JSON per the required template (keeps IM limited, others unlimited)
-					const fmtMentions = (arr=[]) => {
-						if (!Array.isArray(arr) || arr.length === 0) return '*None*';
-						const s = arr.map(id=>`<@${id}>`).join(', ');
-						return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
-					};
-					const nameSafe = ev.name || 'Event';
-					const embed = {
-						title: `🕒 Staff Clock In — ${nameSafe}`,
-						description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
-						color: 3447003,
-						fields: [
-							{ name: '📝 Instance Manager (1 slot)', value: `${(state.positions.instance_manager||[]).length} / 1\n${fmtMentions(state.positions.instance_manager)}`, inline: false },
-							{ name: '🛠️ Manager',   value: fmtMentions(state.positions.manager),   inline: true },
-							{ name: '🛡️ Bouncer',   value: fmtMentions(state.positions.bouncer),   inline: true },
-							{ name: '🍸 Bartender', value: fmtMentions(state.positions.bartender), inline: true },
-							{ name: '🎯 Backup',    value: fmtMentions(state.positions.backup),    inline: true },
-							{ name: '⏳ Maybe / Late', value: fmtMentions(state.positions.maybe), inline: false },
-							{ name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
-						],
-						footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
-					};
+					const { buildClockInEmbed } = require('../utils/clockinTemplate');
+					const embed = buildClockInEmbed(ev);
 					// Choose a channel: prefer stored clock-in channel, then event channel, finally current interaction channel
 					const chId = (ev.__clockIn && ev.__clockIn.channelId) || ev.channelId || interaction.channelId;
 					const channel = chId ? (await interaction.client.channels.fetch(chId).catch(()=>null)) : null;
@@ -1156,8 +1140,49 @@ function attachInteractionEvents(client) {
 						} catch {}
 					}
 				} catch {}
-				const msgTxt = choice === 'none' ? 'Registration cleared.' : `Registered as ${meta.label}.`;
-				await interaction.reply({ content: msgTxt, flags:1<<6 }).catch(()=>{});
+				const msgTxt = (choice === 'none' || wasInSame) ? 'Registration cleared.' : `Registered as ${meta.label}.`;
+				try {
+					const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+					const row = new ActionRowBuilder().addComponents(
+						new ButtonBuilder().setCustomId(`clockin:autoNext:${ev.id}:${choice}`).setLabel('Auto-register next').setStyle(ButtonStyle.Primary).setDisabled(choice==='none' || wasInSame),
+						new ButtonBuilder().setCustomId(`clockin:autoNextCancel:${ev.id}`).setLabel('Cancel auto').setStyle(ButtonStyle.Secondary)
+					);
+					await interaction.reply({ content: msgTxt, components:[row], flags:1<<6 }).catch(()=>{});
+				} catch {
+					await interaction.reply({ content: msgTxt, flags:1<<6 }).catch(()=>{});
+				}
+				return;
+			}
+
+			// Clock-In autoNext register button
+			if (interaction.isButton() && interaction.customId.startsWith('clockin:autoNext:')) {
+				const parts = interaction.customId.split(':'); // clockin autoNext evId roleKey
+				const evId = parts[2];
+				const roleKey = parts[3];
+				const ev = getEvent(evId);
+				if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
+				if (roleKey === 'none') { await interaction.reply({ content:'Select a role first.', flags:1<<6 }).catch(()=>{}); return; }
+				const clock = ev.__clockIn && typeof ev.__clockIn==='object' ? { ...ev.__clockIn } : { positions:{}, messageIds:[] };
+				clock.autoNext = clock.autoNext && typeof clock.autoNext==='object' ? { ...clock.autoNext } : {};
+				clock.autoNext[interaction.user.id] = roleKey;
+				updateEvent(ev.id, { __clockIn: clock });
+				await interaction.reply({ content:`You will be auto-registered as ${roleKey.replace(/_/g,' ')} next clock-in.`, flags:1<<6 }).catch(()=>{});
+				return;
+			}
+			// Clock-In autoNext cancel
+			if (interaction.isButton() && interaction.customId.startsWith('clockin:autoNextCancel:')) {
+				const parts = interaction.customId.split(':');
+				const evId = parts[2];
+				const ev = getEvent(evId);
+				if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
+				const clock = ev.__clockIn && typeof ev.__clockIn==='object' ? { ...ev.__clockIn } : { positions:{}, messageIds:[] };
+				if (clock.autoNext && clock.autoNext[interaction.user.id]) {
+					delete clock.autoNext[interaction.user.id];
+					updateEvent(ev.id, { __clockIn: clock });
+					await interaction.reply({ content:'Auto registration cancelled.', flags:1<<6 }).catch(()=>{});
+				} else {
+					await interaction.reply({ content:'No auto registration found.', flags:1<<6 }).catch(()=>{});
+				}
 				return;
 			}
 		} catch (err) {
