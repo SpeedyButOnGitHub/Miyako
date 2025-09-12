@@ -163,4 +163,7 @@ module.exports = {
 	createSnapshot,
 	compareSnapshots,
 	buildChangelogEmbed,
+	// Expose snapshot load/save helpers for callers that want to reuse same runtime file
+	loadSnapshot,
+	saveSnapshot,
 };

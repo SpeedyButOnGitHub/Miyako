@@ -18,6 +18,105 @@ const {
   getPanel
 } = require('../utils/applications');
 
+// Helper: attempt to update any deployed application message for an app
+async function tryEditDeployedApplication(appId, client) {
+  try {
+    const { getApplication, updateApplication } = require('../utils/applications');
+    const app = getApplication(appId);
+    if (!app) return 'no-op';
+    if (!app.messageId || !app.channelId) return 'no-op';
+    const ch = await client.channels.fetch(app.channelId).catch(()=>null);
+    if (!ch || !ch.messages) {
+      // clear stale refs
+      updateApplication(app.id, { messageId: null, channelId: null, messageJSON: null });
+      return 'cleared';
+    }
+    const msg = await ch.messages.fetch(app.messageId).catch(()=>null);
+    if (!msg) {
+      updateApplication(app.id, { messageId: null, channelId: null, messageJSON: null });
+      return 'cleared';
+    }
+    // build embed payload from current app settings or use saved JSON
+    let payload = null;
+    try {
+      if (app.messageJSON) {
+        // reuse saved payload (embed, components, content) when possible
+        payload = {};
+        if (app.messageJSON.embed) payload.embeds = [app.messageJSON.embed];
+        if (Array.isArray(app.messageJSON.components) && app.messageJSON.components.length) payload.components = app.messageJSON.components;
+        if (typeof app.messageJSON.content === 'string') payload.content = app.messageJSON.content;
+        // fallback to embed-only if embed missing
+        if (!payload.embeds || !payload.embeds.length) payload = null;
+      }
+      if (!payload) {
+        const emb = createEmbed({ title: app.name || `Application #${app.id}`, description: app.name || '' });
+        safeAddField(emb, 'Questions', String((app.questions||[]).length), true);
+        if (app.submissionChannelId) safeAddField(emb, 'Submission Channel', app.submissionChannelId ? `<#${app.submissionChannelId}>` : '*none*');
+        payload = { embeds: [emb] };
+      }
+    } catch (e) {
+      payload = null;
+    }
+    if (!payload) {
+      // nothing to edit with; clear refs to be safe
+      updateApplication(app.id, { messageId: null, channelId: null, messageJSON: null });
+      return 'cleared';
+    }
+    // attempt edit
+    try {
+      await msg.edit(payload);
+      return 'ok';
+    } catch (e) {
+      try { require('../utils/logger').warn('[applications] edit deployed message failed', { err: e && e.message }); } catch {}
+      // clear refs if edit failed
+      updateApplication(app.id, { messageId: null, channelId: null, messageJSON: null });
+      return 'cleared';
+    }
+  } catch (e) {
+    try { require('../utils/logger').error('[applications] tryEditDeployedApplication error', { err: e && e.message }); } catch {}
+    return 'failed';
+  }
+}
+
+// Lightweight validator for stored message payloads (embed/components/content)
+function validateMessageJSON(obj) {
+  const errors = [];
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+    errors.push('Payload must be a JSON object.');
+    return { ok: false, errors };
+  }
+  const emb = obj.embed;
+  if (emb !== undefined) {
+    if (!emb || typeof emb !== 'object') errors.push('embed must be an object');
+    else {
+      if (typeof emb.title === 'string' && emb.title.length > 256) errors.push('embed.title too long (max 256)');
+      if (typeof emb.description === 'string' && emb.description.length > 4096) errors.push('embed.description too long (max 4096)');
+      if (Array.isArray(emb.fields) && emb.fields.length > 25) errors.push('embed.fields too many (max 25)');
+    }
+  }
+  const comps = obj.components;
+  if (comps !== undefined) {
+    if (!Array.isArray(comps)) errors.push('components must be an array');
+    else {
+      if (comps.length > 5) errors.push('too many top-level component rows (max 5)');
+      for (const row of comps) {
+        if (!row || typeof row !== 'object') { errors.push('component row must be an object'); continue; }
+        const children = row.components || row['components'];
+        if (!Array.isArray(children)) { errors.push('component row must have components array'); continue; }
+        if (children.length > 5) errors.push('too many components in a row (max 5)');
+        for (const child of children) {
+          if (!child || typeof child !== 'object') { errors.push('component must be object'); continue; }
+          if (child.type === 2 || child.style) { // button-like
+            if (child.custom_id && String(child.custom_id).length > 100) errors.push('button custom_id too long (max 100)');
+            if (child.label && String(child.label).length > 80) errors.push('button label too long (max 80)');
+          }
+        }
+      }
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 // --- Helpers -----------------------------------------------------------------
 
 function buildRootEmbed() {
@@ -76,6 +175,11 @@ function buildApplicationsListComponents(page, totalPages, apps) {
   return [...selectionRows, ...splitButtonsIntoRows(bottomItems)];
 }
 
+// Small helper to add a Deploy button next to app entries (used on panel deploy rows)
+function buildAppDeployButton(appId) {
+  return semanticButton('success', { id: `appmgr_app_deploy_${appId}`, label: 'Deploy' });
+}
+
 function buildPanelsListEmbed(page = 0, pageSize = 5) {
   const panels = listPanels();
   const totalPages = Math.max(1, Math.ceil(panels.length / pageSize));
@@ -130,9 +234,11 @@ function buildAppDetailComponents(appId) {
   const del = semanticButton('danger', { id: `appmgr_app_delete_${app.id}`, label: 'Delete', emoji: theme.emojis.delete });
   const qBtn = semanticButton('primary', { id: `appmgr_app_questions_${app.id}`, label: 'Questions' });
   const msgBtn = semanticButton('primary', { id: `appmgr_app_msgs_${app.id}`, label: 'Messages' });
+  const deployedBtn = semanticButton('primary', { id: `appmgr_app_deployed_${app.id}`, label: 'Deployed' });
+  const editMsgBtn = semanticButton('primary', { id: `appmgr_app_editmsg_${app.id}`, label: 'EditMsg' });
   const propsBtn = semanticButton('primary', { id: `appmgr_app_props_${app.id}`, label: 'Props' });
   const rolesBtn = semanticButton('primary', { id: `appmgr_app_roles_${app.id}`, label: 'Roles' });
-  const rows1 = splitButtonsIntoRows([toggle, qBtn, msgBtn, propsBtn, rolesBtn, back]);
+  const rows1 = splitButtonsIntoRows([toggle, qBtn, msgBtn, deployedBtn, editMsgBtn, propsBtn, rolesBtn, back]);
   const row2 = buildNavRow([rename, del]);
   return [...rows1, row2].filter(r=>r && r.components && r.components.length);
 }
@@ -333,6 +439,110 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       }
       return interaction.reply({ content: 'Application not found.', flags: 1<<6 }).catch(()=>{});
     }
+    // Show deployed refs/status for an application (nicer ephemeral embed)
+    if (id.startsWith('appmgr_app_deployed_')) {
+      const appId = id.split('_').pop();
+      const app = getApplication(appId);
+      if (!app) return interaction.reply({ content: 'Application missing.', flags: 1<<6 }).catch(()=>{});
+      const { EmbedBuilder } = require('discord.js');
+      const e = new EmbedBuilder().setTitle(`Deployed • App #${app.id}`).setColor(0x2f3136).setTimestamp();
+      const hasRef = !!(app.channelId && app.messageId);
+      if (hasRef) {
+        safeAddField(e, 'Channel', app.channelId ? `<#${app.channelId}>` : '*none*');
+        safeAddField(e, 'Message', app.messageId ? `ID: ${app.messageId}` : '*none*');
+      } else {
+        safeAddField(e, 'Deployed', '*none*');
+      }
+      safeAddField(e, 'Saved payload', app.messageJSON ? 'present' : '*none*');
+      // saved payload size
+      try {
+        const size = app.messageJSON ? Buffer.byteLength(JSON.stringify(app.messageJSON), 'utf8') : 0;
+        safeAddField(e, 'Payload size', size ? `${size} bytes` : '0 bytes', true);
+      } catch (e) {}
+      // Attempt a light fetch to verify message exists if refs present
+      if (hasRef) {
+        try {
+          const ch = await interaction.client.channels.fetch(app.channelId).catch(()=>null);
+          const msg = ch && ch.messages ? await ch.messages.fetch(app.messageId).catch(()=>null) : null;
+          safeAddField(e, 'Live status', msg ? 'Present' : 'Missing', true);
+        } catch (e) {
+          safeAddField(e, 'Live status', 'Unknown', true);
+        }
+      }
+      return interaction.reply({ embeds: [e], flags: 1<<6 }).catch(()=>{});
+    }
+    // Edit stored message payload JSON for an application (open modal)
+    if (id.startsWith('appmgr_app_editmsg_')) {
+      const appId = id.split('_').pop();
+      const app = getApplication(appId);
+      if (!app) return interaction.reply({ content: 'Application missing.', flags: 1<<6 }).catch(()=>{});
+      const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+      const modalId = `appeditmsg_${appId}_${Date.now()}`;
+      const fullJSON = JSON.stringify(app.messageJSON || {}, null, 2);
+      // If payload too large for modal, provide a fallback: attach to ephemeral reply and instruct admin
+      if (fullJSON.length > 3800) {
+        // Attach as file in an ephemeral message with instructions
+        try {
+          const buffer = Buffer.from(fullJSON, 'utf8');
+          return interaction.reply({ content: 'Stored payload is too large to edit in a modal. See attached file. To update, copy the JSON, edit locally, then use the `EditMsg` action again with a smaller payload.', files: [{ attachment: buffer, name: `app_${appId}_messageJSON.json` }], flags: 1<<6 });
+        } catch (e) {
+          return interaction.reply({ content: 'Stored payload is too large and could not be attached. Please retrieve the JSON from the filesystem.', flags: 1<<6 }).catch(()=>{});
+        }
+      }
+      const initial = fullJSON.slice(0, 4000);
+      const m = new ModalBuilder().setCustomId(modalId).setTitle('Edit Stored Message JSON')
+        .addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('json').setLabel('JSON payload (embed/components/content)').setStyle(TextInputStyle.Paragraph).setRequired(true).setValue(initial)));
+      await interaction.showModal(m);
+      const submitted = await interaction.awaitModalSubmit({ time:120000, filter:i=>i.customId===modalId && i.user.id===interaction.user.id }).catch(()=>null);
+      if (!submitted) return;
+      const raw = submitted.fields.getTextInputValue('json').trim();
+      let parsed = null;
+      try {
+        parsed = JSON.parse(raw || '{}');
+      } catch (e) {
+        return submitted.reply({ content: 'Invalid JSON. No changes applied.', flags: 1<<6 }).catch(()=>{});
+      }
+      // Validate payload using lightweight validator
+      const v = validateMessageJSON(parsed);
+      if (!v.ok) {
+        return submitted.reply({ content: `Validation failed: ${v.errors.slice(0,5).join('; ')}${v.errors.length>5?` (+${v.errors.length-5} more)`:''}`, flags:1<<6 }).catch(()=>{});
+      }
+      // Persist
+      updateApplication(app.id, { messageJSON: parsed });
+      // Attempt to apply to deployed message if present
+      const _res_editmsg = await tryEditDeployedApplication(app.id, interaction.client);
+      if (_res_editmsg === 'ok') {
+        return submitted.reply({ content: 'Stored payload updated and deployed message edited successfully.', flags: 1<<6 }).catch(()=>{});
+      }
+      if (_res_editmsg === 'cleared') {
+        return submitted.reply({ content: 'Stored payload updated but deployed message was missing/edited and references were cleared.', flags: 1<<6 }).catch(()=>{});
+      }
+      if (_res_editmsg === 'failed' || _res_editmsg === 'no-op') {
+        return submitted.reply({ content: 'Stored payload updated. Could not apply to deployed message (no-op or error).', flags: 1<<6 }).catch(()=>{});
+      }
+    }
+    // Deploy single application message
+    if (id.startsWith('appmgr_app_deploy_')) {
+      const appId = id.split('_').pop();
+      const app = getApplication(appId);
+      if (!app) return interaction.reply({ content: 'Application missing.', flags: 1<<6 }).catch(()=>{});
+      const channel = interaction.channel;
+      const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+      const emb = new EmbedBuilder().setTitle(app.name || `Application #${app.id}`).setDescription(app.name || 'Apply using the button below.').setColor(0x2f3136);
+      safeAddField(emb, 'Questions', String((app.questions||[]).length));
+      if (app.submissionChannelId) safeAddField(emb, 'Submission Channel', `<#${app.submissionChannelId}>`);
+      const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`apply_app_${app.id}`).setLabel('Apply').setStyle(ButtonStyle.Primary));
+      try {
+        const sent = await channel.send({ embeds: [emb], components: [row] });
+  // persist refs and full message JSON (embed + components) so edits can reuse the same structure
+  const compsJSON = (sent.components || rows.slice(0,5)).map(r => r.toJSON ? r.toJSON() : r);
+  updateApplication(app.id, { channelId: channel.id, messageId: sent.id, messageJSON: { embed: emb.data, components: compsJSON } });
+        return interaction.reply({ content: 'Application posted.', flags: 1<<6 }).catch(()=>{});
+      } catch (e) {
+        try { require('../utils/logger').error('[applications] app deploy failed', { err: e && e.message }); } catch {}
+        return interaction.reply({ content: 'Failed to post application.', flags: 1<<6 }).catch(()=>{});
+      }
+    }
     if (id === 'appmgr_apps_delete') {
       // Delete currently selected app from list context
       const appId = session.data.appId || null;
@@ -376,6 +586,10 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       if (!submitted) return;
       const val = submitted.fields.getTextInputValue('name').trim().slice(0,100) || 'App';
       updateApplication(app.id, { name: val });
+      const _res = await tryEditDeployedApplication(app.id, interaction.client);
+      if (_res === 'cleared' || _res === 'failed') {
+        await submitted.reply({ content: 'Note: deployed application message could not be updated and was deregistered (check bot permissions / message availability).', flags: 1<<6 }).catch(()=>{});
+      }
       return submitted.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId), content: 'Renamed.' });
     }
     if (id.startsWith('appmgr_app_props_')) {
@@ -414,18 +628,26 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         if (!sub) return;
         const val = sub.fields.getTextInputValue('name').trim().slice(0,100)||'App';
         updateApplication(app.id, { name: val });
+        const _res = await tryEditDeployedApplication(app.id, interaction.client);
+        if (_res === 'cleared' || _res === 'failed') await sub.reply({ content: 'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
         return sub.reply({ content:'Updated name.', flags:1<<6 }).catch(()=>{});
       }
       if (action === 'setchan') {
         updateApplication(app.id, { submissionChannelId: interaction.channelId });
+        const _res_chan = await tryEditDeployedApplication(app.id, interaction.client);
+        if (_res_chan === 'cleared' || _res_chan === 'failed') await interaction.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
         return interaction.reply({ content:'Submission channel set to this channel.', flags:1<<6 }).catch(()=>{});
       }
       if (action === 'clearchan') {
         updateApplication(app.id, { submissionChannelId: null });
+        const _res_c = await tryEditDeployedApplication(app.id, interaction.client);
+        if (_res_c === 'cleared' || _res_c === 'failed') await interaction.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
         return interaction.reply({ content:'Submission channel cleared.', flags:1<<6 }).catch(()=>{});
       }
       if (action === 'toggledm') {
         updateApplication(app.id, { dmResponses: !app.dmResponses });
+        const _res_dm = await tryEditDeployedApplication(app.id, interaction.client);
+        if (_res_dm === 'cleared' || _res_dm === 'failed') await interaction.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
         return interaction.reply({ content:`DM responses now ${!app.dmResponses ? 'enabled':'disabled'}.`, flags:1<<6 }).catch(()=>{});
       }
     }
@@ -487,9 +709,13 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       if (field === 'pending') {
         const first = parseRoles(raw)[0] || null;
         updateApplication(app.id, { pendingRole: first });
+        const _res_pr = await tryEditDeployedApplication(app.id, interaction.client);
+        if (_res_pr === 'cleared' || _res_pr === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
       } else {
         const roles = parseRoles(raw);
         updateApplication(app.id, { [key]: roles });
+        const _res_roles = await tryEditDeployedApplication(app.id, interaction.client);
+        if (_res_roles === 'cleared' || _res_roles === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
       }
       return submitted.reply({ content:'Updated roles.', flags:1<<6 }).catch(()=>{});
     }
@@ -533,8 +759,10 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       const submitted = await interaction.awaitModalSubmit({ time:120000, filter:i=>i.customId===modalId && i.user.id===interaction.user.id }).catch(()=>null);
       if (!submitted) return;
       const val = submitted.fields.getTextInputValue('content').slice(0,4000);
-      updateApplication(app.id, { [key]: val });
-      return submitted.reply({ content:'Updated message.', flags:1<<6 }).catch(()=>{});
+        updateApplication(app.id, { [key]: val });
+        const _res_msg = await tryEditDeployedApplication(app.id, interaction.client);
+        if (_res_msg === 'cleared' || _res_msg === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
+        return submitted.reply({ content:'Updated message.', flags:1<<6 }).catch(()=>{});
     }
     if (id.startsWith('appmgr_app_questions_')) {
       const appId = id.split('_').pop();
@@ -578,13 +806,17 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         const type = /long/i.test(submitted.fields.getTextInputValue('type')) ? 'long':'short';
         const required = /^y(es)?$/i.test(submitted.fields.getTextInputValue('required'));
         const qid = `q${Date.now().toString(36)}`;
-        updateApplication(app.id, { questions: [...app.questions, { id: qid, type, label, required }] });
+    updateApplication(app.id, { questions: [...app.questions, { id: qid, type, label, required }] });
+    const _res_addq = await tryEditDeployedApplication(app.id, interaction.client);
+    if (_res_addq === 'cleared' || _res_addq === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
   buildQuestionListEmbed(appId, session.data.qPage||0);
         return submitted.reply({ content:'Added question.', flags:1<<6 }).catch(()=>{});
       }
       if (action === 'del') {
         if (!app.questions.length) return interaction.reply({ content:'No questions.', flags:1<<6 }).catch(()=>{});
-        updateApplication(app.id, { questions: app.questions.slice(0,-1) });
+  updateApplication(app.id, { questions: app.questions.slice(0,-1) });
+  const _res_delq = await tryEditDeployedApplication(app.id, interaction.client);
+  if (_res_delq === 'cleared' || _res_delq === 'failed') await interaction.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
         const { embed, page:p, totalPages:tp } = buildQuestionListEmbed(appId, Math.min(session.data.qPage||0, Math.max(0, Math.ceil((app.questions.length-1)/6)-1)) );
         return interaction.update({ embeds:[embed], components: buildQuestionListComponents(appId, p, tp) });
       }
@@ -603,15 +835,19 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         const type = /long/i.test(submitted.fields.getTextInputValue('type')) ? 'long':'short';
         const required = /^y(es)?$/i.test(submitted.fields.getTextInputValue('required'));
         const newQs = app.questions.map(q => q.id===target.id ? { ...q, label, type, required } : q);
-        updateApplication(app.id, { questions: newQs });
-        return submitted.reply({ content:'Updated question.', flags:1<<6 }).catch(()=>{});
+  updateApplication(app.id, { questions: newQs });
+  const _res_editq = await tryEditDeployedApplication(app.id, interaction.client);
+  if (_res_editq === 'cleared' || _res_editq === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
+  return submitted.reply({ content:'Updated question.', flags:1<<6 }).catch(()=>{});
       }
       if (action === 'reorder') {
         if (app.questions.length < 2) return interaction.reply({ content:'Need at least 2 questions.', flags:1<<6 }).catch(()=>{});
         // Simple rotate: move last to first as placeholder reorder method.
         const copy = [...app.questions];
         copy.unshift(copy.pop());
-        updateApplication(app.id, { questions: copy });
+  updateApplication(app.id, { questions: copy });
+  const _res_reorder = await tryEditDeployedApplication(app.id, interaction.client);
+  if (_res_reorder === 'cleared' || _res_reorder === 'failed') await interaction.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
         const { embed, page:p, totalPages:tp } = buildQuestionListEmbed(appId, session.data.qPage||0);
         return interaction.update({ embeds:[embed], components: buildQuestionListComponents(appId, p, tp) });
       }
@@ -744,8 +980,9 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       }
       if (current.components.length) rows.push(current);
       try {
-        const sent = await channel.send({ embeds: [panelEmbed], components: rows.slice(0,5) });
-        updatePanel(panel.id, { channelId: channel.id, messageId: sent.id, messageJSON: { embed: panelEmbed.data } });
+  const sent = await channel.send({ embeds: [panelEmbed], components: rows.slice(0,5) });
+  const compsJSON = (sent.components || rows.slice(0,5)).map(r => r.toJSON ? r.toJSON() : r);
+  updatePanel(panel.id, { channelId: channel.id, messageId: sent.id, messageJSON: { embed: panelEmbed.data, components: compsJSON } });
         return interaction.reply({ content: 'Panel deployed.', flags: 1<<6 }).catch(()=>{});
       } catch (e) {
         try { require('../utils/logger').error('[applications] panel deploy failed', { err: e.message }); } catch {}
