@@ -109,6 +109,8 @@ function computeNextRun(schedule) {
 	return null;
 }
 
+let _started = false; // idempotent guard to prevent multiple scheduler loops
+
 async function runScheduleOnce(client, schedule) {
 	try {
 		const chId = config.testingMode ? (schedule.logChannelId || CONFIG_LOG_CHANNEL || schedule.channelId) : schedule.channelId;
@@ -158,6 +160,10 @@ function computeAfterRun(schedule) {
 }
 
 function startScheduler(client, opts = {}) {
+	if (_started) {
+		return { alreadyStarted: true };
+	}
+	_started = true;
 	const tickInterval = opts.intervalMs || 15 * 1000;
 	// const CLOCKIN_DEDUP_MS = Number(process.env.CLOCKIN_DEDUP_MS) || opts.clockInDedupMs || (5 * 60 * 1000);
 	// const CLOCKIN_ORPHAN_MAX = Number(process.env.CLOCKIN_ORPHAN_MAX) || 10;

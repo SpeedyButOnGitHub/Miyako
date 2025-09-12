@@ -167,6 +167,28 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
       }
     } catch {}
 
+    // One-time autoNext signup application (users who opted to auto register for the NEXT clock-in)
+    try {
+      ev.__clockIn.autoNext = ev.__clockIn.autoNext && typeof ev.__clockIn.autoNext === 'object' ? ev.__clockIn.autoNext : {};
+      const autoNextEntries = Object.entries(ev.__clockIn.autoNext);
+      if (autoNextEntries.length) {
+        for (const [userId, roleKey] of autoNextEntries) {
+          if (!roleKey || !displayPositions[roleKey]) { delete ev.__clockIn.autoNext[userId]; continue; }
+          // Capacity check (instance_manager has cap 1 already tracked; others effectively large)
+            const meta = POSITIONS.find(p=>p.key===roleKey);
+            const cap = meta ? meta.cap : 9999;
+            const arr = displayPositions[roleKey];
+            if (!arr.includes(userId) && arr.length < cap) {
+              arr.push(userId);
+            }
+          // Clear after one use (one-shot behavior)
+          delete ev.__clockIn.autoNext[userId];
+        }
+        // Persist modified positions & cleared autoNext
+        try { updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn }); } catch {}
+      }
+    } catch {}
+
     const embedJson = {
       title: `🕒 Staff Clock In — ${nameSafe}`,
       description: "Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.",
@@ -207,6 +229,24 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
       ev.__clockIn.messageIds.push(sent.id);
       if (ev.__clockIn.messageIds.length > 10) ev.__clockIn.messageIds = ev.__clockIn.messageIds.slice(-10);
       updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn });
+      // Schedule auto deletion & role reset if deleteAfterMs configured on notif (or default) for clock-in
+      try {
+        const delMs = Number(notif.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
+        if (delMs > 0) {
+          setTimeout(() => {
+            (async () => {
+              try { await sent.delete().catch(()=>{}); } catch {}
+              try {
+                // Reset positions for next clock-in
+                if (ev.__clockIn) {
+                  ev.__clockIn.positions = {};
+                  updateEvent(ev.id, { __clockIn: ev.__clockIn });
+                }
+              } catch {}
+            })();
+          }, delMs);
+        }
+      } catch {}
     }
     return !!sent;
   }
@@ -222,6 +262,13 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     if (config.testingMode) content = sanitizeMentionsForTesting(content);
     if (!content) content = `Auto message (${ev.name})`;
     payload = { content };
+  }
+  // Prepend role mentions if configured
+  if (Array.isArray(notif.mentions) && notif.mentions.length) {
+    const mentionLine = notif.mentions.map(r=>`<@&${r}>`).join(' ');
+    if (payload.content) payload.content = `${mentionLine}\n${payload.content}`.slice(0,2000);
+    else payload.content = mentionLine.slice(0,2000);
+    payload.allowedMentions = { roles: notif.mentions.slice(0,20) };
   }
   if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
   const sent = await channel.send(payload).catch(()=>null);

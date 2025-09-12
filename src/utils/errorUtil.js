@@ -82,13 +82,7 @@ function clearErrorLog() {
 	persist();
 }
 
-function safeReply(target, content, opts = {}) {
-	if (!target) return;
-	try {
-		if (typeof target.reply === 'function') {
-			return target.reply({ content, ...opts }).catch(()=>{});
-		}
-	} catch {}
-}
+// Deprecated inline safeReply; use unified implementation
+const { safeReply } = require('./safeReply');
 
 module.exports = { logError, recordExternalError, setOriginalConsoleError, safeReply, getRecentErrors, clearErrorLog, registerErrorListener };

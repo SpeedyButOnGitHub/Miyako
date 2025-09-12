@@ -13,17 +13,32 @@ function buildClockInStateEmbed() {
 	});
 	for (const ev of clockEvents.slice(0, 10)) { // cap to avoid overlong embed
 		const pos = ev.__clockIn.positions || {};
+		const autoNext = ev.__clockIn.autoNext || {};
 		const roles = ['instance_manager','manager','bouncer','bartender','backup','maybe'];
 		const lines = [];
 		for (const r of roles) {
 			const arr = Array.isArray(pos[r]) ? pos[r] : [];
 			if (!arr.length) continue;
 			const label = r.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
-			lines.push(`${label}: ${arr.map(id=>`<@${id}>`).join(', ')}`.slice(0, 250));
+			const starred = arr.map(id => {
+				const assigned = typeof autoNext[id] === 'string' ? autoNext[id] : (autoNext[id] && autoNext[id].role);
+				return `<@${id}>${assigned === r ? '*' : ''}`;
+			});
+			lines.push(`${label}: ${starred.join(', ')}`.slice(0, 350));
 		}
 		if (!lines.length) lines.push('(empty)');
 		const lastSent = ev.__clockIn.lastSentTs ? `<t:${Math.floor(ev.__clockIn.lastSentTs/1000)}:R>` : '—';
+		const totalUsers = Object.values(pos).reduce((acc, arr) => acc + (Array.isArray(arr)?arr.length:0), 0);
+		const autoNextCount = Object.keys(autoNext).length;
 		lines.push(`Last Msg: ${lastSent}`);
+		lines.push(`Users: ${totalUsers} | AutoNext: ${autoNextCount}`);
+		if (autoNextCount) {
+			const preview = Object.entries(autoNext).slice(0,5).map(([uid,val]) => {
+				const role = typeof val === 'string' ? val : (val && val.role);
+				return `<@${uid}>→${role}`;
+			}).join(' ');
+			lines.push(`AutoNext Sample: ${preview}`.slice(0, 200));
+		}
 		safeAddField(embed, ev.name || `Event ${ev.id}`, lines.join('\n').slice(0, 1024));
 	}
 	if (clockEvents.length > 10) {
