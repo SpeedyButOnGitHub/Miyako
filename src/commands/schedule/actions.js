@@ -95,16 +95,11 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   } catch {}
   if (notif.isClockIn) {
     const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-    const POSITIONS = [
-      { key:'instance_manager', emoji:'🗝️', label:'Instance Manager', cap:1, short:'IM' },
-      { key:'manager',          emoji:'🛠️', label:'Manager',          cap:5, short:'M' },
-      { key:'bouncer',          emoji:'🛡️', label:'Bouncer',          cap:10, short:'B' },
-      { key:'bartender',        emoji:'🍸', label:'Bartender',        cap:15, short:'BT' },
-      { key:'backup',           emoji:'🎯', label:'Backup',           cap:20, short:'BK' },
-      { key:'maybe',            emoji:'⏳', label:'Maybe/Late',        cap:50, short:'?' }
-    ];
     ev.__clockIn = ev.__clockIn || { positions:{}, messageIds:[] };
-    for (const p of POSITIONS) { if (!Array.isArray(ev.__clockIn.positions[p.key])) ev.__clockIn.positions[p.key] = []; }
+    for (const p of POSITIONS) {
+      if (!Array.isArray(ev.__clockIn.positions[p.key])) ev.__clockIn.positions[p.key] = [];
+    }
+
     try {
       const DEDUP_MS = 5 * 60 * 1000;
       if (ev.__clockIn.lastSentTs && (Date.now() - ev.__clockIn.lastSentTs) < DEDUP_MS) {
@@ -114,19 +109,20 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
         return true;
       }
     } catch {}
+
     const fmtMentions = (arr=[]) => {
       if (!Array.isArray(arr) || arr.length === 0) return '*None*';
       const s = arr.map(id=>`<@${id}>`).join(', ');
       return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
     };
-    const nameSafe = ev.name || 'Event';
 
-    // Build positions to display; in testing mode seed up to 5 random users per role (IM max 1).
+    const nameSafe = ev.name || 'Event';
     let displayPositions = { ...ev.__clockIn.positions };
+
+    // In testing mode, optionally seed sample members for display
     try {
       if (config.testingMode && interaction.guild) {
         const guild = interaction.guild;
-        // Try to have some member IDs, avoid heavy fetch if cache is sufficient
         let membs = guild.members?.cache?.filter(m => !m.user?.bot)?.map(m => m.id) || [];
         if (!membs || membs.length < 10) {
           try {
@@ -135,11 +131,9 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
           } catch {}
         }
         const sample = (arr, n) => {
-          const out = [];
-          const pool = Array.isArray(arr) ? [...arr] : [];
+          const out = []; const pool = Array.isArray(arr) ? [...arr] : [];
           for (let i = pool.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [pool[i], pool[j]] = [pool[j], pool[i]];
+            const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]];
           }
           for (let i=0; i<Math.min(n, pool.length); i++) out.push(pool[i]);
           return out;
@@ -150,105 +144,78 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
           const need = Math.max(0, maxFill - current.length);
           if (need > 0 && membs && membs.length) {
             const add = sample(membs, need);
-            // avoid duplicates
             for (const id of add) if (!current.includes(id)) current.push(id);
           }
-          if (Number.isFinite(cap)) {
-            while (current.length > cap) current.pop();
-          }
+          if (Number.isFinite(cap)) while (current.length > cap) current.pop();
           displayPositions[key] = current;
         };
         ensure('instance_manager', 1);
-        ensure('manager');
-        ensure('bouncer');
-        ensure('bartender');
-        ensure('backup');
-        ensure('maybe');
+        ensure('manager'); ensure('bouncer'); ensure('bartender'); ensure('backup'); ensure('maybe');
       }
     } catch {}
 
-    // One-time autoNext signup application (users who opted to auto register for the NEXT clock-in)
+    // Apply any autoNext entries
     try {
       ev.__clockIn.autoNext = ev.__clockIn.autoNext && typeof ev.__clockIn.autoNext === 'object' ? ev.__clockIn.autoNext : {};
-      const autoNextEntries = Object.entries(ev.__clockIn.autoNext);
+      const autoNextEntries = Object.entries(ev.__clockIn.autoNext || {});
       if (autoNextEntries.length) {
         for (const [userId, roleKey] of autoNextEntries) {
           if (!roleKey || !displayPositions[roleKey]) { delete ev.__clockIn.autoNext[userId]; continue; }
-          // Capacity check (instance_manager has cap 1 already tracked; others effectively large)
-            const meta = POSITIONS.find(p=>p.key===roleKey);
-            const cap = meta ? meta.cap : 9999;
-            const arr = displayPositions[roleKey];
-            if (!arr.includes(userId) && arr.length < cap) {
-              arr.push(userId);
-            }
-          // Clear after one use (one-shot behavior)
+          const meta = POSITIONS.find(p=>p.key===roleKey);
+          const cap = meta ? meta.cap : 9999;
+          const arr = displayPositions[roleKey];
+          if (!arr.includes(userId) && arr.length < cap) arr.push(userId);
           delete ev.__clockIn.autoNext[userId];
         }
-        // Persist modified positions & cleared autoNext
         try { updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn }); } catch {}
       }
     } catch {}
 
-    const embedJson = {
-      title: `🕒 Staff Clock In — ${nameSafe}`,
-      description: "Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.",
-      color: 3447003,
-      fields: [
-        { name: '📝 Instance Manager (1 slot)', value: `${(displayPositions.instance_manager||[]).length} / 1\n${fmtMentions(displayPositions.instance_manager)}`, inline: false },
-        { name: '🛠️ Manager',   value: fmtMentions(displayPositions.manager),   inline: true },
-        { name: '🛡️ Bouncer',   value: fmtMentions(displayPositions.bouncer),   inline: true },
-        { name: '🍸 Bartender', value: fmtMentions(displayPositions.bartender), inline: true },
-        { name: '🎯 Backup',    value: fmtMentions(displayPositions.backup),    inline: true },
-        { name: '⏳ Maybe / Late', value: fmtMentions(displayPositions.maybe), inline: false },
-        { name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
-      ],
-      footer: { text: `Late Night Hours | Staff clock in for ${nameSafe}` }
-    };
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId(`clockin:${ev.id}:${notif.id}`)
-      .setPlaceholder('📋 Select your position')
-      .addOptions([
-        { label: 'Instance Manager', value: 'instance_manager', description: '1 slot available', emoji: { name: '📝' } },
-        { label: 'Manager',          value: 'manager',                              emoji: { name: '🛠️' } },
-        { label: 'Bouncer',          value: 'bouncer',                              emoji: { name: '🛡️' } },
-        { label: 'Bartender',        value: 'bartender',                            emoji: { name: '🍸' } },
-        { label: 'Backup',           value: 'backup',                               emoji: { name: '🎯' } },
-        { label: 'Maybe / Late',     value: 'maybe',                                emoji: { name: '⏳' } },
-        { label: 'Unregister / Clear', value: 'none',                               emoji: { name: '🚫' } }
-      ]);
-    const row = new ActionRowBuilder().addComponents(menu);
-    const sent = await channel.send({ content: '', embeds:[embedJson], components:[row] }).catch(()=>null);
-    if (sent && !config.testingMode) {
-      // Backoff future auto-triggers and persist clock-in context
-      notif.__skipUntil = Date.now() + 60*60*1000;
-      notif.lastManualTrigger = Date.now();
-      ev.__clockIn.lastSentTs = Date.now();
-      ev.__clockIn.channelId = channel.id;
-      // Track the message ID so interaction fallback can resolve the event by message
-      if (!Array.isArray(ev.__clockIn.messageIds)) ev.__clockIn.messageIds = [];
-      ev.__clockIn.messageIds.push(sent.id);
-      if (ev.__clockIn.messageIds.length > 10) ev.__clockIn.messageIds = ev.__clockIn.messageIds.slice(-10);
-      updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn });
-      // Schedule auto deletion & role reset if deleteAfterMs configured on notif (or default) for clock-in
-      try {
-        const delMs = Number(notif.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
-        if (delMs > 0) {
-          setTimeout(() => {
-            (async () => {
-              try { await sent.delete().catch(()=>{}); } catch {}
-              try {
-                // Reset positions for next clock-in
-                if (ev.__clockIn) {
-                  ev.__clockIn.positions = {};
-                  updateEvent(ev.id, { __clockIn: ev.__clockIn });
-                }
-              } catch {}
-            })();
-          }, delMs);
+    // Use canonical embed builder so clock-in rendering is consistent
+    try {
+      const { buildClockInEmbed } = require('../../utils/clockinTemplate');
+      const hydrated = { ...ev, __clockIn: { ...(ev.__clockIn || {}), positions: displayPositions } };
+      const embed = buildClockInEmbed(hydrated);
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId(`clockin:${ev.id}:${notif.id}`)
+        .setPlaceholder('📋 Select your position')
+        .addOptions([
+          { label: 'Instance Manager', value: 'instance_manager', description: '1 slot available', emoji: { name: '📝' } },
+          { label: 'Manager',          value: 'manager',                              emoji: { name: '🛠️' } },
+          { label: 'Bouncer',          value: 'bouncer',                              emoji: { name: '🛡️' } },
+          { label: 'Bartender',        value: 'bartender',                            emoji: { name: '🍸' } },
+          { label: 'Backup',           value: 'backup',                               emoji: { name: '🎯' } },
+          { label: 'Maybe / Late',     value: 'maybe',                                emoji: { name: '⏳' } },
+          { label: 'Unregister / Clear', value: 'none',                               emoji: { name: '🚫' } }
+        ]);
+      const row = new ActionRowBuilder().addComponents(menu);
+      const sentClock = await channel.send({ content: '', embeds:[embed], components:[row] }).catch(()=>null);
+      if (sentClock) {
+        // Persist mapping for future edits
+        try {
+          const map = ev.__notifMsgs && typeof ev.__notifMsgs === 'object' ? { ...ev.__notifMsgs } : {};
+          const rec = map[notif.id] && typeof map[notif.id] === 'object' ? { ...map[notif.id] } : { channelId: channel.id, ids: [] };
+          rec.channelId = channel.id;
+          rec.ids = Array.isArray(rec.ids) ? rec.ids : [];
+          rec.ids.push(sentClock.id);
+          if (rec.ids.length > 20) rec.ids = rec.ids.slice(-20);
+          map[notif.id] = rec;
+          ev.__notifMsgs = map;
+        } catch {}
+
+        if (!config.testingMode) {
+          notif.__skipUntil = Date.now() + 60*60*1000;
+          notif.lastManualTrigger = Date.now();
+          ev.__clockIn.lastSentTs = Date.now();
+          ev.__clockIn.channelId = channel.id;
+          if (!Array.isArray(ev.__clockIn.messageIds)) ev.__clockIn.messageIds = [];
+          ev.__clockIn.messageIds.push(sentClock.id);
+          if (ev.__clockIn.messageIds.length > 10) ev.__clockIn.messageIds = ev.__clockIn.messageIds.slice(-10);
+          updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn, __notifMsgs: ev.__notifMsgs });
         }
-      } catch {}
-    }
-    return !!sent;
+        return !!sentClock;
+      }
+    } catch (e) { /* fallback below */ }
   }
   let payload;
   if (notif.messageJSON && typeof notif.messageJSON === 'object') {

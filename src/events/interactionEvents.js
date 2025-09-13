@@ -20,6 +20,206 @@ const { semanticButton } = require("../ui");
 
 // Pending Kick/Ban confirmations: key = `${userId}:${action}:${moderatorId}` -> { reason: string|null, originChannelId?:string, originMessageId?:string }
 const pendingPunishments = new Map();
+// Lightweight in-memory locks to avoid concurrent edits stomping clock-in positions
+const _clockInLocks = new Set();
+
+// Exported helper: handle clock-in select menu interactions directly (used by tests)
+async function handleClockInSelect(interaction) {
+	try {
+		// Clock-In position select
+		if (!(interaction.isStringSelectMenu && interaction.isStringSelectMenu()) && !interaction.customId?.startsWith?.('clockin:')) return;
+		const parts = interaction.customId.split(':'); // clockin:eventId:notifId
+		const evId = parts[1];
+		const notifId = parts[2]; // may help to resolve if eventId is stale
+		let ev = getEvent(evId);
+		if (!ev) {
+			try { const { getEvent: ge } = require('../utils/eventsStorage'); ev = ge(evId); } catch {}
+		}
+		// Fallbacks: by message id, then by notif id (if present)
+		if (!ev) {
+			try {
+				const { getEvents } = require('../utils/eventsStorage');
+				const all = getEvents();
+				// 1) resolve by message id present on clock-in records
+				if (interaction.message?.id) {
+					ev = all.find(e => Array.isArray(e.__clockIn?.messageIds) && e.__clockIn.messageIds.includes(interaction.message.id)) || null;
+				}
+				// 2) resolve by notif id belonging to this event's autoMessages
+				if (!ev && notifId) {
+					ev = all.find(e => Array.isArray(e.autoMessages) && e.autoMessages.some(n => String(n.id) === String(notifId) && n.isClockIn)) || null;
+				}
+				// 3) templated customId recovery: if evId looks like a template (e.g., {{EVENT_ID}}), try channel/name heuristics
+				const looksTemplated = (s) => typeof s === 'string' && s.includes('{');
+				if (!ev && looksTemplated(evId)) {
+					// a) try by embed title -> event name
+					try {
+						const title = interaction.message?.embeds?.[0]?.title || '';
+						const partsT = title.split('—'); // em dash separator
+						let name = null;
+						if (partsT.length >= 2) name = partsT[partsT.length - 1].trim();
+						if (name && name !== '{{EVENT_NAME}}') {
+							ev = all.find(e => (e.name || '').trim() === name) || ev;
+						}
+					} catch {}
+					// b) try by channel affinity (stored clock-in channel or event channel)
+					if (!ev && interaction.channelId) {
+						const cand = all.filter(e => (e.__clockIn?.channelId === interaction.channelId) || (e.channelId === interaction.channelId));
+						if (cand.length === 1) ev = cand[0];
+						else if (cand.length > 1) {
+							// Prefer the most recently clock-in-sent event
+							cand.sort((a,b) => (b.__clockIn?.lastSentTs||0) - (a.__clockIn?.lastSentTs||0));
+							ev = cand[0];
+						}
+					}
+				}
+			} catch {}
+		}
+		// If we recovered an event via heuristics, backfill this message id for future lookups
+		if (ev && interaction.message?.id) {
+			try {
+				const clock = ev.__clockIn && typeof ev.__clockIn==='object' ? { ...ev.__clockIn } : { positions:{}, messageIds:[] };
+				if (!Array.isArray(clock.messageIds)) clock.messageIds = [];
+				if (!clock.messageIds.includes(interaction.message.id)) {
+					clock.messageIds.push(interaction.message.id);
+					if (clock.messageIds.length > 10) clock.messageIds = clock.messageIds.slice(-10);
+					updateEvent(ev.id, { __clockIn: clock });
+				}
+			} catch {}
+		}
+		if (!ev) {
+			await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{});
+			// Also log details to the config log channel for maintainers to debug
+			try {
+				const { CONFIG_LOG_CHANNEL } = require('../utils/logChannels');
+				if (CONFIG_LOG_CHANNEL) {
+					const ch = await interaction.client.channels.fetch(CONFIG_LOG_CHANNEL).catch(()=>null);
+					if (ch) {
+						const gid = interaction.guildId || 'guild';
+						const cid = interaction.channelId || 'channel';
+						const mid = interaction.message?.id;
+						const link = mid ? `https://discord.com/channels/${gid}/${cid}/${mid}` : '(no message id)';
+						await ch.send({ content: `⚠️ Clock-in select could not resolve event. customId="${interaction.customId}" user=<@${interaction.user?.id}> link: ${link}` }).catch(()=>{});
+					}
+				}
+			} catch {}
+			return;
+		}
+		const member = interaction.member;
+		if (!member) { await interaction.reply({ content:'Member not found.', flags:1<<6 }).catch(()=>{}); return; }
+		const choice = interaction.values[0];
+		const ROLE_REQUIRED = '1375958480380493844';
+		const POS_META = {
+			'instance_manager': { label: 'Instance Manager', max:1, role: ROLE_REQUIRED },
+			'manager': { label: 'Manager', max:Infinity, role: ROLE_REQUIRED },
+			'bouncer': { label: 'Bouncer', max:Infinity },
+			'bartender': { label: 'Bartender', max:Infinity },
+			'backup': { label: 'Backup', max:Infinity },
+			'maybe': { label: 'Maybe/Late', max:Infinity },
+			'none': { label: 'Unregister', max:Infinity }
+		};
+		if (!POS_META[choice]) { await interaction.reply({ content:'Invalid selection.', flags:1<<6 }).catch(()=>{}); return; }
+		const meta = POS_META[choice];
+		if (choice !== 'none' && meta.role && !member.roles.cache.has(meta.role)) {
+			await interaction.reply({ content:`You need the required role to select ${meta.label}.`, flags:1<<6 }).catch(()=>{}); return;
+		}
+		const clockKey = '__clockIn';
+		// Acquire lightweight in-memory lock for this event to avoid races that remove other users
+		if (_clockInLocks.has(ev.id)) {
+			try { await interaction.reply({ content: 'Clock-in is busy, please try again in a moment.', flags: 1<<6 }); } catch {}
+			return;
+		}
+		_clockInLocks.add(ev.id);
+		// Declare these in outer scope so we can reference after try/finally
+		let wasIn = false;
+		let wasInSame = false;
+		try {
+			// Deep clone positions to avoid mutating shared objects
+			const existing = ev[clockKey] && typeof ev[clockKey] === 'object' ? ev[clockKey] : { positions: {}, messageIds: [] };
+			const positions = JSON.parse(JSON.stringify(existing.positions || {}));
+			const messageIds = Array.isArray(existing.messageIds) ? existing.messageIds.slice() : [];
+			// Determine current membership
+			wasIn = Object.keys(positions).some(pos => Array.isArray(positions[pos]) && positions[pos].includes(member.id));
+			wasInSame = wasIn && Array.isArray(positions[choice]) && positions[choice].includes(member.id);
+			// Remove user from all positions in cloned map
+			for (const key of Object.keys(positions)) {
+				positions[key] = Array.isArray(positions[key]) ? positions[key].filter(id => id !== member.id) : [];
+			}
+			// Add to chosen position unless unregistering or re-selecting same
+			if (choice !== 'none' && !wasInSame) {
+				if (!Array.isArray(positions[choice])) positions[choice] = [];
+				if (meta.max !== Infinity && positions[choice].length >= meta.max) {
+					await interaction.reply({ content:`${meta.label} is full.`, flags:1<<6 }).catch(()=>{});
+					return;
+				}
+				positions[choice].push(member.id);
+			}
+			const newClock = { ...existing, positions, messageIds };
+			// Persist runtime overlay immediately
+			try { updateEvent(ev.id, { [clockKey]: newClock }); } catch (e) { try { require('../utils/logger').warn('[clockin] updateEvent failed', { err: e?.message, eventId: ev.id }); } catch {} }
+			// Re-render all clock-in messages using the hydrated event so embed builder sees updated positions
+			try {
+				const { buildClockInEmbed } = require('../utils/clockinTemplate');
+				const hydrated = { ...ev, [clockKey]: newClock };
+				const embed = buildClockInEmbed(hydrated);
+				// Collect message targets from multiple runtime locations for robustness
+				const msgTargets = [];
+				// 1) explicit __clockIn.messageIds
+				if (Array.isArray(newClock.messageIds)) {
+					for (const id of newClock.messageIds) {
+						msgTargets.push({ id, channelId: newClock.channelId || ev.channelId || interaction.channelId });
+					}
+				}
+				// 2) per-notification mapping __notifMsgs (may contain channelId and ids array)
+				try {
+					if (ev.__notifMsgs && typeof ev.__notifMsgs === 'object') {
+						for (const [nid, rec] of Object.entries(ev.__notifMsgs)) {
+							if (rec && Array.isArray(rec.ids)) {
+								for (const id of rec.ids) msgTargets.push({ id, channelId: rec.channelId || ev.channelId || interaction.channelId });
+							}
+						}
+					}
+				} catch {}
+				// De-duplicate by id
+				const seen = new Set();
+				const uniqueTargets = msgTargets.filter(t => { if (!t || !t.id) return false; if (seen.has(t.id)) return false; seen.add(t.id); return true; });
+				for (const t of uniqueTargets) {
+					try {
+						const ch = t.channelId ? await interaction.client.channels.fetch(t.channelId).catch(()=>null) : (interaction.channel || null);
+						const msg = ch && ch.messages ? await ch.messages.fetch(t.id).catch(()=>null) : null;
+						if (msg) await msg.edit({ content: '', embeds:[embed] }).catch(()=>{});
+					} catch {}
+				}
+			} catch (e) { try { require('../utils/logger').warn('[clockin] render failed', { err: e?.message, eventId: ev.id }); } catch {} }
+		} finally {
+			_clockInLocks.delete(ev.id);
+		}
+		const msgTxt = (choice === 'none' || wasInSame) ? 'Registration cleared.' : `Registered as ${meta.label}.`;
+		try {
+			const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+			const row = new ActionRowBuilder().addComponents(
+				new ButtonBuilder().setCustomId(`clockin:autoNext:${ev.id}:${choice}`).setLabel('Auto-register next').setStyle(ButtonStyle.Primary).setDisabled(choice==='none' || wasInSame),
+				new ButtonBuilder().setCustomId(`clockin:autoNextCancel:${ev.id}`).setLabel('Cancel auto').setStyle(ButtonStyle.Secondary)
+			);
+			await interaction.reply({ content: msgTxt, components:[row], flags:1<<6 }).catch(()=>{});
+		} catch {
+			await interaction.reply({ content: msgTxt, flags:1<<6 }).catch(()=>{});
+		}
+		return;
+	} catch (err) {
+		try {
+			const logger = require('../utils/logger');
+			logger.error('[Interaction Error]', { err: err.stack || err.message || String(err), customId: interaction?.customId, userId: interaction?.user?.id, messageId: interaction?.message?.id });
+		} catch {}
+		// Show stack to developers when testingMode is enabled; otherwise show concise message
+		try {
+			const testing = !!(require('../utils/storage').config?.testingMode);
+			const replyContent = testing ? `An error occurred.\n${err.stack || err.message || String(err)}` : `An error occurred.\n${err.message || String(err)}`;
+			if (interaction && interaction.isRepliable && interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+				await interaction.reply({ content: replyContent, flags: 1<<6 }).catch(() => {});
+			}
+		} catch {}
+	}
+}
 
 function attachInteractionEvents(client) {
 	// Idempotent attach guard to prevent duplicate listener registration
@@ -1011,146 +1211,9 @@ function attachInteractionEvents(client) {
 				return;
 			}
 
-			// Clock-In position select
+			// Clock-In position select - delegate to exported handler for reuse/testing
 			if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clockin:')) {
-				const parts = interaction.customId.split(':'); // clockin:eventId:notifId
-				const evId = parts[1];
-				const notifId = parts[2]; // may help to resolve if eventId is stale
-				let ev = getEvent(evId);
-				if (!ev) {
-					try { const { getEvent: ge } = require('../utils/eventsStorage'); ev = ge(evId); } catch {}
-				}
-				// Fallbacks: by message id, then by notif id (if present)
-				if (!ev) {
-					try {
-						const { getEvents } = require('../utils/eventsStorage');
-						const all = getEvents();
-						// 1) resolve by message id present on clock-in records
-						if (interaction.message?.id) {
-							ev = all.find(e => Array.isArray(e.__clockIn?.messageIds) && e.__clockIn.messageIds.includes(interaction.message.id)) || null;
-						}
-						// 2) resolve by notif id belonging to this event's autoMessages
-						if (!ev && notifId) {
-							ev = all.find(e => Array.isArray(e.autoMessages) && e.autoMessages.some(n => String(n.id) === String(notifId) && n.isClockIn)) || null;
-						}
-						// 3) templated customId recovery: if evId looks like a template (e.g., {{EVENT_ID}}), try channel/name heuristics
-						const looksTemplated = (s) => typeof s === 'string' && s.includes('{');
-						if (!ev && looksTemplated(evId)) {
-							// a) try by embed title -> event name
-							try {
-								const title = interaction.message?.embeds?.[0]?.title || '';
-								const partsT = title.split('—'); // em dash separator
-								let name = null;
-								if (partsT.length >= 2) name = partsT[partsT.length - 1].trim();
-								if (name && name !== '{{EVENT_NAME}}') {
-									ev = all.find(e => (e.name || '').trim() === name) || ev;
-								}
-							} catch {}
-							// b) try by channel affinity (stored clock-in channel or event channel)
-							if (!ev && interaction.channelId) {
-								const cand = all.filter(e => (e.__clockIn?.channelId === interaction.channelId) || (e.channelId === interaction.channelId));
-								if (cand.length === 1) ev = cand[0];
-								else if (cand.length > 1) {
-									// Prefer the most recently clock-in-sent event
-									cand.sort((a,b) => (b.__clockIn?.lastSentTs||0) - (a.__clockIn?.lastSentTs||0));
-									ev = cand[0];
-								}
-							}
-						}
-					} catch {}
-				}
-				// If we recovered an event via heuristics, backfill this message id for future lookups
-				if (ev && interaction.message?.id) {
-					try {
-						const clock = ev.__clockIn && typeof ev.__clockIn==='object' ? { ...ev.__clockIn } : { positions:{}, messageIds:[] };
-						if (!Array.isArray(clock.messageIds)) clock.messageIds = [];
-						if (!clock.messageIds.includes(interaction.message.id)) {
-							clock.messageIds.push(interaction.message.id);
-							if (clock.messageIds.length > 10) clock.messageIds = clock.messageIds.slice(-10);
-							updateEvent(ev.id, { __clockIn: clock });
-						}
-					} catch {}
-				}
-				if (!ev) {
-					await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{});
-					// Also log details to the config log channel for maintainers to debug
-					try {
-						const { CONFIG_LOG_CHANNEL } = require('../utils/logChannels');
-						if (CONFIG_LOG_CHANNEL) {
-							const ch = await interaction.client.channels.fetch(CONFIG_LOG_CHANNEL).catch(()=>null);
-							if (ch) {
-								const gid = interaction.guildId || 'guild';
-								const cid = interaction.channelId || 'channel';
-								const mid = interaction.message?.id;
-								const link = mid ? `https://discord.com/channels/${gid}/${cid}/${mid}` : '(no message id)';
-								await ch.send({ content: `⚠️ Clock-in select could not resolve event. customId="${interaction.customId}" user=<@${interaction.user?.id}> link: ${link}` }).catch(()=>{});
-							}
-						}
-					} catch {}
-					return;
-				}
-				const member = interaction.member;
-				if (!member) { await interaction.reply({ content:'Member not found.', flags:1<<6 }).catch(()=>{}); return; }
-				const choice = interaction.values[0];
-				const ROLE_REQUIRED = '1375958480380493844';
-				const POS_META = {
-					'instance_manager': { label: 'Instance Manager', max:1, role: ROLE_REQUIRED },
-					'manager': { label: 'Manager', max:Infinity, role: ROLE_REQUIRED },
-					'bouncer': { label: 'Bouncer', max:Infinity },
-					'bartender': { label: 'Bartender', max:Infinity },
-					'backup': { label: 'Backup', max:Infinity },
-					'maybe': { label: 'Maybe/Late', max:Infinity },
-					'none': { label: 'Unregister', max:Infinity }
-				};
-				if (!POS_META[choice]) { await interaction.reply({ content:'Invalid selection.', flags:1<<6 }).catch(()=>{}); return; }
-				const meta = POS_META[choice];
-				if (choice !== 'none' && meta.role && !member.roles.cache.has(meta.role)) {
-					await interaction.reply({ content:`You need the required role to select ${meta.label}.`, flags:1<<6 }).catch(()=>{}); return;
-				}
-				const clockKey = '__clockIn';
-				const state = ev[clockKey] && typeof ev[clockKey]==='object' ? { ...ev[clockKey] } : { positions: {}, messageIds: [] };
-				if (!state.positions) state.positions = {};
-				// Determine if the user is re-selecting the same slot (toggle off behavior)
-				const wasIn = Object.keys(state.positions).some(pos => Array.isArray(state.positions[pos]) && state.positions[pos].includes(member.id));
-				const wasInSame = wasIn && Array.isArray(state.positions[choice]) && state.positions[choice].includes(member.id);
-				// Always remove user from every position first
-				for (const key of Object.keys(state.positions)) {
-					state.positions[key] = Array.isArray(state.positions[key]) ? state.positions[key].filter(id => id !== member.id) : [];
-				}
-				// If selecting 'none' OR re-selecting same position -> act as unregister (skip add)
-				if (choice !== 'none' && !wasInSame) {
-					if (!Array.isArray(state.positions[choice])) state.positions[choice] = [];
-					if (meta.max !== Infinity && state.positions[choice].length >= meta.max) {
-						await interaction.reply({ content:`${meta.label} is full.`, flags:1<<6 }).catch(()=>{}); return;
-					}
-					state.positions[choice].push(member.id);
-				}
-				updateEvent(ev.id, { [clockKey]: state });
-				// Re-render all clock-in messages for this event
-				try {
-					const { buildClockInEmbed } = require('../utils/clockinTemplate');
-					const embed = buildClockInEmbed(ev);
-					// Choose a channel: prefer stored clock-in channel, then event channel, finally current interaction channel
-					const chId = (ev.__clockIn && ev.__clockIn.channelId) || ev.channelId || interaction.channelId;
-					const channel = chId ? (await interaction.client.channels.fetch(chId).catch(()=>null)) : null;
-					for (const mid of state.messageIds || []) {
-						try {
-							const msg = channel && channel.messages ? await channel.messages.fetch(mid).catch(()=>null) : null;
-							if (msg) await msg.edit({ content: '', embeds:[embed] }).catch(()=>{});
-						} catch {}
-					}
-				} catch {}
-				const msgTxt = (choice === 'none' || wasInSame) ? 'Registration cleared.' : `Registered as ${meta.label}.`;
-				try {
-					const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-					const row = new ActionRowBuilder().addComponents(
-						new ButtonBuilder().setCustomId(`clockin:autoNext:${ev.id}:${choice}`).setLabel('Auto-register next').setStyle(ButtonStyle.Primary).setDisabled(choice==='none' || wasInSame),
-						new ButtonBuilder().setCustomId(`clockin:autoNextCancel:${ev.id}`).setLabel('Cancel auto').setStyle(ButtonStyle.Secondary)
-					);
-					await interaction.reply({ content: msgTxt, components:[row], flags:1<<6 }).catch(()=>{});
-				} catch {
-					await interaction.reply({ content: msgTxt, flags:1<<6 }).catch(()=>{});
-				}
+				await handleClockInSelect(interaction);
 				return;
 			}
 
@@ -1194,4 +1257,4 @@ function attachInteractionEvents(client) {
 	});
 }
 
-module.exports = { attachInteractionEvents };
+module.exports = { attachInteractionEvents, handleClockInSelect };

@@ -1,0 +1,72 @@
+# Node
+node_modules/
+dist/
+coverage/
+.eslintcache
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+logs_runner.txt
+data/private/
+data/private/**
+data/vcLevels.json
+data/process-heartbeat.json
+data/backups/vcLevels.json.aggregate.json
+data/backups/process-heartbeat.json.aggregate.json
+
+# Volatile runtime JSON (auto-generated / frequently mutated)
+data/activeMenus.json
+data/bank.json
+data/buttonSessions.json
+data/cash.json
+data/changelogSnapshot.json
+data/depositProgress.json
+data/errorLog.json
+data/events.json
+data/levels.json
+data/schedules.json
+data/snipes.json
+data/testingBank.json
+data/testingCash.json
+data/lastShutdown.json
+data/crash-latest.json
+
+# Entire backups directory (individual .bak rollovers)
+data/backups/
+
+# Aggregate backup bundles (single-file history stores)
+**/backups/*.aggregate.json
+
+# Generated context summaries
+FULL_CONTEXT.txt
+PROJECT_SUMMARY.txt
+schedule_summary.txt
+
+# OS/editor
+.DS_Store
+Thumbs.db
+
+# Runtime singleton lock (changes every run)
+.miyako.lock
+
+# Config: ignore all by default, version only selected files
+config/*
+!config/botConfig.json
+!config/categories.js
+!config/roles.js
+!config/clockInEmbedTemplate.json
+
+# Optional: if a temporary legacy/ folder is recreated locally, keep it untracked
+legacy/
+
+# Data runtime: ignore everything under data (all JSON runtime state)
+data/

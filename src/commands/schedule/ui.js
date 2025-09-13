@@ -63,7 +63,18 @@ function mainRows(events) {
 
 function buildSelectRows(kind, events) {
   const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-  const options = events.slice(0,25).map(e => ({ label: e.name.slice(0,100), value: e.id, description: (e.times||[]).join(' ').slice(0,100), emoji: kind === 'delete' ? theme.emojis.delete : (e.enabled?theme.emojis.enable:theme.emojis.disable) }));
+  // If testingMode is active, hide known CI/test events from the UI to reduce noise
+  const { config } = require('../../utils/storage');
+  let list = events || [];
+  if (config && config.testingMode) {
+    list = list.filter(e => !(e.__testEvent || (typeof e.name === 'string' && e.name.startsWith('CI Test'))));
+  }
+  const options = list.slice(0,25).map(e => {
+    const desc = (e.times||[]).join(' ').slice(0,100) || undefined;
+    const opt = { label: (e.name||'').slice(0,100), value: String(e.id), emoji: kind === 'delete' ? theme.emojis.delete : (e.enabled?theme.emojis.enable:theme.emojis.disable) };
+    if (desc) opt.description = desc;
+    return opt;
+  });
   const rows = [
     new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`events_${kind === 'delete' ? 'delete' : 'select'}`).setPlaceholder(kind==='delete'? 'Select event to delete' : 'Select event...').addOptions(options))
   ];

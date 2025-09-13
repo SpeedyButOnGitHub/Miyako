@@ -6,7 +6,7 @@ module.exports = {
   cash: require('./cash'),
   cashDrops: require('./cashDrops'),
   changelog: require('./changelog'),
-  clockinEmbed: require('./clockinEmbed'),
+  clockinTemplate: require('./clockinTemplate'),
   commandLogger: require('./commandLogger'),
   configLogs: require('./configLogs'),
   configValidate: require('./configValidate'),

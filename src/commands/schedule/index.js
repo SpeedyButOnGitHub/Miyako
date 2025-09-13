@@ -10,9 +10,16 @@ const { DAY_NAMES, buildMainEmbed, buildDetailEmbed, mainRows, buildSelectRows, 
 const { buildNotifsEmbed, notifManagerRows, notifSelectRows, notifDetailRows, refreshTrackedAutoMessages } = require('./notifications');
 const { ensureAnchor, manualTriggerAutoMessage } = require('./actions');
 
+function visibleEvents() {
+  const events = getEvents();
+  // Filter test events when testingMode is enabled
+  if (config && config.testingMode) return events.filter(e => !(e.__testEvent || (typeof e.name === 'string' && e.name.startsWith('CI Test'))));
+  return events;
+}
+
 async function handleScheduleCommand(client, message) {
   if (message.author.id !== OWNER_ID) return;
-  const events = getEvents();
+  const events = visibleEvents();
   const embed = buildMainEmbed(message.guild, events);
   const sent = await message.reply({ embeds: [embed], components: mainRows(events), allowedMentions: { repliedUser: false } }).catch(()=>null);
   if (sent) ActiveMenus.registerMessage(sent, { type: 'events', userId: message.author.id, data: { mode: 'main' } });
@@ -253,19 +260,19 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
   }
   if (customId === 'events_select_mode') {
     data.mode = 'select';
-    const events = getEvents();
+    const events = visibleEvents();
     await interaction.update({ embeds: [buildMainEmbed(interaction.guild, events)], components: buildSelectRows('select', events) });
     session.data = data; return;
   }
   if (customId === 'events_delete_mode') {
     data.mode = 'delete';
-    const events = getEvents();
+    const events = visibleEvents();
     await interaction.update({ embeds: [buildMainEmbed(interaction.guild, events)], components: buildSelectRows('delete', events) });
     session.data = data; return;
   }
   if (customId === 'events_back') {
     data.mode = 'main'; data.currentId = null;
-    const events = getEvents();
+    const events = visibleEvents();
     await interaction.update({ embeds: [buildMainEmbed(interaction.guild, events)], components: mainRows(events) });
     session.data = data; return;
   }
@@ -377,7 +384,7 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
     const ev = getEvent(id); if (!ev) return interaction.reply({ content: 'Missing event.', flags: 1<<6 });
     removeEvent(id);
     data.mode = 'main'; data.currentId = null;
-    const events = getEvents();
+    const events = visibleEvents();
     await interaction.update({ embeds: [buildMainEmbed(interaction.guild, events)], components: mainRows(events) });
     return;
   }

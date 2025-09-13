@@ -58,7 +58,16 @@ function notifManagerRows(ev) {
 
 function notifSelectRows(ev) {
   const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
-  const opts = (ev.autoMessages||[]).slice(0,25).map(n => ({ label: `${humanizeMinutes(n.offsetMinutes)} ${n.enabled?'(on)':'(off)'} #${n.id}`.slice(0,100), value: n.id, description: (n.messageJSON?.content || n.message || '').replace(/\n/g,' ').slice(0,90) }));
+  const raw = (ev.autoMessages||[]).slice(0,25);
+  const opts = raw.map(n => {
+    const descRaw = (n.messageJSON?.content || n.message || '').replace(/\n/g,' ').slice(0,90);
+    const opt = {
+      label: `${humanizeMinutes(n.offsetMinutes)} ${n.enabled ? '(on)' : '(off)'} #${n.id}`.slice(0,100),
+      value: n.id
+    };
+      if (descRaw && descRaw.length) opt.description = descRaw; // Ensure description is set only if not empty
+    return opt;
+  });
   const row1 = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(`event_notif_select_${ev.id}`).setPlaceholder('Select auto message').addOptions(opts));
   return [row1];
 }
@@ -80,6 +89,11 @@ async function refreshTrackedAutoMessages(client, ev) {
     const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? ev.__notifMsgs : null;
     if (map && Array.isArray(ev.autoMessages)) {
       for (const notif of ev.autoMessages) {
+        // Skip generic payload edits for clock-in messages: clock-in messages are rendered
+        // dynamically via the dedicated clock-in renderer below and must not be overwritten
+        // by the static template stored on the autoMessage. Treat the autoMessage entry as
+        // a template only in that case.
+        if (notif && notif.isClockIn) continue;
         const rec = map[notif.id];
         if (!rec || !rec.channelId || !Array.isArray(rec.ids) || rec.ids.length===0) continue;
         const channel = await client.channels.fetch(rec.channelId).catch(()=>null);
