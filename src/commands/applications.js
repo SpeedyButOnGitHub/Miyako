@@ -64,7 +64,14 @@ async function tryEditDeployedApplication(appId, client) {
     }
     // attempt edit
     try {
-      await msg.edit(payload);
+      // sanitize before sending to Discord API to strip any non-Discord keys
+      const tmpForSanitize = { embed: Array.isArray(payload.embeds) ? payload.embeds[0] : null, components: payload.components, content: payload.content };
+      const sanitized = sanitizeMessageJSON(tmpForSanitize);
+      const finalPayload = {};
+      if (sanitized.embed) finalPayload.embeds = [sanitized.embed]; else if (payload.embeds) finalPayload.embeds = payload.embeds;
+      if (Array.isArray(sanitized.components)) finalPayload.components = sanitized.components;
+      if (typeof payload.content === 'string') finalPayload.content = payload.content;
+      await msg.edit(finalPayload);
       return 'ok';
     } catch (e) {
       try { require('../utils/logger').warn('[applications] edit deployed message failed', { err: e && e.message }); } catch {}
@@ -117,6 +124,49 @@ function validateMessageJSON(obj) {
   return { ok: errors.length === 0, errors };
 }
 
+// Sanitize stored messageJSON before sending/editing so Discord API only receives
+// allowed fields. This strips unknown metadata (for example developer-only
+// keys like `flows`) that were accidentally persisted into component objects.
+function sanitizeMessageJSON(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  const out = {};
+  if (obj.embed && typeof obj.embed === 'object') out.embed = obj.embed;
+  if (Array.isArray(obj.components)) {
+    out.components = obj.components.map(row => {
+      if (!row || typeof row !== 'object') return null;
+      const safeRow = {};
+      // preserve basic row shape
+      if (row.type) safeRow.type = row.type;
+      const children = Array.isArray(row.components) ? row.components : row['components'] || [];
+      safeRow.components = children.map(child => {
+        if (!child || typeof child !== 'object') return null;
+        // whitelist common component keys
+        const allowed = new Set(['type','custom_id','placeholder','min_values','max_values','options','style','label','value','description','emoji','url','disabled','default']);
+        const outChild = {};
+        for (const k of Object.keys(child)) {
+          if (allowed.has(k)) outChild[k] = child[k];
+        }
+        // sanitize options array for selects
+        if (Array.isArray(outChild.options)) {
+          outChild.options = outChild.options.map(opt => {
+            if (!opt || typeof opt !== 'object') return null;
+            const o = {};
+            if (typeof opt.label === 'string') o.label = opt.label;
+            if (typeof opt.value === 'string') o.value = opt.value;
+            if (typeof opt.description === 'string') o.description = opt.description;
+            if (opt.default) o.default = !!opt.default;
+            if (opt.emoji) o.emoji = opt.emoji;
+            return o;
+          }).filter(Boolean);
+        }
+        return outChild;
+      }).filter(Boolean);
+      return safeRow;
+    }).filter(Boolean);
+  }
+  return out;
+}
+
 // --- Helpers -----------------------------------------------------------------
 
 function buildRootEmbed() {
@@ -158,21 +208,65 @@ function buildApplicationsListEmbed(page = 0, pageSize = 5) {
 
 function buildApplicationsListComponents(page, totalPages, apps) {
   // apps may be omitted; compute slice if necessary
-  const allApps = Array.isArray(apps) ? apps : listApplications().slice(page * 5, page * 5 + 5);
-  const prev = semanticButton('nav', { id: 'appmgr_apps_prev', label: 'Prev', enabled: page > 0 });
-  const next = semanticButton('nav', { id: 'appmgr_apps_next', label: 'Next', enabled: page < totalPages - 1 });
+  const p = Number.isFinite(page) ? page : 0;
+  const t = Number.isFinite(totalPages) ? totalPages : 1;
+  const allApps = Array.isArray(apps) ? apps : listApplications().slice(p * 5, p * 5 + 5);
   const createBtn = semanticButton('success', { id: 'appmgr_apps_create', label: 'Create', emoji: theme.emojis.create });
   const deleteBtn = semanticButton('danger', { id: 'appmgr_apps_delete', label: 'Delete', emoji: theme.emojis.delete });
   const back = backButton('appmgr_back_root', 'Back');
-  const appButtons = allApps.map(a => semanticButton('primary', { id: `appmgr_app_select_${a.id}`, label: a.name.slice(0, 20) }));
-  // Build selection rows (max 5 per row). If none, show clear disabled button.
-  const selectionRows = appButtons.length ? splitButtonsIntoRows(appButtons) : [ buildNavRow([semanticButton('secondary', { id: 'noop', label: 'No applications', enabled: false })]) ];
-  // Bottom-most row: navigation + create/delete + back
-  const bottomItems = [];
-  if ((totalPages || 1) > 1 && page > 0) bottomItems.push(prev);
-  if ((totalPages || 1) > 1 && page < (totalPages - 1)) bottomItems.push(next);
-  bottomItems.push(createBtn, deleteBtn, back);
-  return [...selectionRows, ...splitButtonsIntoRows(bottomItems)];
+  const prev = semanticButton('nav', { id: 'appmgr_apps_prev', label: 'Prev', enabled: p > 0 });
+  const next = semanticButton('nav', { id: 'appmgr_apps_next', label: 'Next', enabled: t > (p + 1) });
+  // Build a single select menu row listing current page apps
+  try {
+    const { StringSelectMenuBuilder, ActionRowBuilder } = require('discord.js');
+    const sel = new StringSelectMenuBuilder()
+      .setCustomId('appmgr_app_select_menu')
+      .setPlaceholder(allApps.length ? 'Select an application' : 'No applications')
+      .setMinValues(1)
+      .setMaxValues(1)
+      .setDisabled(allApps.length === 0);
+    for (const a of allApps) {
+      const label = `#${a.id} ${a.name}`.slice(0, 100);
+      sel.addOptions({ label, value: String(a.id) });
+    }
+    const bottomItems = [];
+    if (t > 1 && p > 0) bottomItems.push(prev);
+    if (t > 1 && p < (t - 1)) bottomItems.push(next);
+    bottomItems.push(createBtn, deleteBtn, back);
+    const bottomRow = buildNavRow(bottomItems);
+    if (!allApps.length) {
+      const selectionRow = buildNavRow([semanticButton('secondary', { id: 'noop', label: 'No applications', enabled: false })]);
+      return [selectionRow, bottomRow];
+    }
+    const selRow = new ActionRowBuilder().addComponents(sel);
+    return [selRow, bottomRow];
+  } catch (e) {
+    // Fallback to buttons if select not available
+    const appButtons = allApps.map(a => semanticButton('primary', { id: `appmgr_app_select_${a.id}`, label: a.name.slice(0, 20) }));
+    const selectionRows = appButtons.length ? splitButtonsIntoRows(appButtons) : [ buildNavRow([semanticButton('secondary', { id: 'noop', label: 'No applications', enabled: false })]) ];
+    const bottomItems = [];
+    if ((t || 1) > 1 && p > 0) bottomItems.push(prev);
+    if ((t || 1) > 1 && p < (t - 1)) bottomItems.push(next);
+    bottomItems.push(createBtn, deleteBtn, back);
+    return [...selectionRows, ...splitButtonsIntoRows(bottomItems)];
+  }
+}
+
+// Build the edit header (Questions/Messages/Roles/Properties) — highlights active section
+function buildAppEditHeader(appId, activeSection) {
+  const sections = [
+    { id: `appmgr_app_questions_${appId}`, label: 'Questions', key: 'questions' },
+    { id: `appmgr_app_msgs_${appId}`, label: 'Messages', key: 'messages' },
+    { id: `appmgr_app_roles_${appId}`, label: 'Roles', key: 'roles' },
+    { id: `appmgr_app_props_${appId}`, label: 'Properties', key: 'properties' }
+  ];
+  const buttons = sections
+    .map(s => {
+      const kind = (activeSection === s.key) ? 'primary' : 'nav';
+      return semanticButton(kind, { id: s.id, label: s.label });
+    })
+    .filter(Boolean);
+  return buildNavRow(buttons);
 }
 
 // Small helper to add a Deploy button next to app entries (used on panel deploy rows)
@@ -379,13 +473,14 @@ async function handleApplicationsCommand(client, message) {
 
 ActiveMenus.registerHandler('applications', async (interaction, session) => {
   // Accept buttons and select menus for the applications UI
+  // handler entry
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
   if (interaction.user.id !== session.userId) {
     return interaction.reply({ content: 'Not your session.', flags: 1 << 6 }).catch(() => {});
   }
   const id = interaction.customId;
   try {
-    // Close button removed (was appmgr_close) – users navigate back instead.
+    // handling customId
     // Root navigation
     if (id === 'appmgr_back_root') {
       session.data.view = 'root'; session.data.page = 0; session.data.appId = null; session.data.panelId = null;
@@ -395,6 +490,39 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       session.data.view = 'apps'; session.data.page = 0;
       const { embed, page, totalPages, apps } = buildApplicationsListEmbed(0);
       return interaction.update({ embeds: [embed], components: buildApplicationsListComponents(page, totalPages, apps) });
+    }
+  // Select menu from Applications overview
+    if (id === 'appmgr_app_select_menu' && interaction.isStringSelectMenu() && interaction.values) {
+      const appId = interaction.values[0];
+  // selected appId
+      if (!getApplication(appId)) {
+        try { require('../utils/logger').warn('[applications] select-menu missing app', { appId }); } catch (e) {}
+        return interaction.reply({ content: 'Application not found.', flags:1<<6 }).catch(()=>{});
+      }
+      session.data.view = 'appDetail'; session.data.appId = appId; session.data.editSection = null;
+      // Build Application Menu per spec
+  const app = getApplication(appId);
+  // Build embed using internal helper (avoid discord.js types in tests)
+  const e = createEmbed({ title: app.name || `Application #${app.id}`, description: app.description || '' });
+  safeAddField(e, 'Questions', String((app.questions||[]).length), true);
+  safeAddField(e, 'Submission Channel', app.submissionChannelId ? `<#${app.submissionChannelId}>` : '*none*', true);
+  // Build buttons using semantic helpers
+      // Persist per-admin expanded preference
+      try {
+        const prefs = require('../utils/uiPreferences');
+        const userPrefs = prefs.get(interaction.user.id) || {};
+        if (typeof userPrefs.appExpanded === 'boolean') session.data.appExpanded = userPrefs.appExpanded;
+      } catch {}
+      const row1 = buildNavRow([
+        semanticButton('toggle', { id: `appmgr_app_toggle_${app.id}`, label: app.enabled ? 'Disable' : 'Enable', active: app.enabled }),
+        semanticButton('success', { id: `appmgr_app_trigger_${app.id}`, label: 'Trigger' }),
+        semanticButton('primary', { id: `appmgr_app_edit_${app.id}`, label: 'Edit' })
+      ]);
+      const row2 = buildNavRow([
+        semanticButton('danger', { id: `appmgr_app_delete_${app.id}`, label: 'Delete' }),
+        backButton('appmgr_back_apps', 'Back')
+      ]);
+      return interaction.update({ embeds: [e], components: [row1, row2] });
     }
     if (id === 'appmgr_panels') {
       session.data.view = 'panels'; session.data.page = 0;
@@ -488,20 +616,23 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         return interaction.update({ embeds:[embed], components: buildQuestionListComponents(appId, page, totalPages) });
       }
       if (sel.includes('appmgr_app_msgs_')) {
-        session.data.view = 'appMsgs'; session.data.appId = appId;
-        const e = createEmbed({ title:`Messages • App #${appId}`, description:'Edit the various lifecycle messages.' });
+        session.data.view = 'appMsgs'; session.data.appId = appId; session.data.editSection = 'messages';
         const a = getApplication(appId);
-        safeAddField(e, 'Accept', a.acceptMessage || '(none)');
-        safeAddField(e, 'Deny', a.denyMessage || '(none)');
-        safeAddField(e, 'Confirm', a.confirmMessage || '(none)');
-        safeAddField(e, 'Completion', a.completionMessage || '(none)');
+        const e = createEmbed({ title:`📨 Messages • App #${appId}`, description: a.name || 'Messages for this application' });
+        // Compact inline fields with emoji labels
+        safeAddField(e, '✅ Accept', a.acceptMessage ? `${a.acceptMessage.slice(0,120)}` : '*(none)*', true);
+        safeAddField(e, '❌ Deny', a.denyMessage ? `${a.denyMessage.slice(0,120)}` : '*(none)*', true);
+        safeAddField(e, '✉️ Confirm', a.confirmMessage ? `${a.confirmMessage.slice(0,120)}` : '*(none)*', true);
+        safeAddField(e, '🏁 Completion', a.completionMessage ? `${a.completionMessage.slice(0,120)}` : '*(none)*', true);
         const row = buildNavRow([
           semanticButton('primary', { id:`appmsg_edit_accept_${appId}`, label:'Accept' }),
           semanticButton('primary', { id:`appmsg_edit_deny_${appId}`, label:'Deny' }),
           semanticButton('primary', { id:`appmsg_edit_confirm_${appId}`, label:'Confirm' }),
-  backButton(`appmsg_back_${appId}`, 'Back')
+          semanticButton('primary', { id:`appmsg_edit_completion_${appId}`, label:'Completion' }),
+          backButton(`appmsg_back_${appId}`, 'Back')
         ]);
-        return interaction.update({ embeds:[e], components:[row] });
+        const header = buildAppEditHeader(appId, 'messages');
+        return interaction.update({ embeds:[e], components:[header, row] });
       }
       if (sel.includes('appmgr_app_deployed_')) {
         // reuse deployed handler logic
@@ -537,7 +668,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         return null;
       }
       if (sel.includes('appmgr_app_props_')) {
-        session.data.view = 'appProps'; session.data.appId = appId;
+        session.data.view = 'appProps'; session.data.appId = appId; session.data.editSection = 'properties';
         const a = getApplication(appId);
         const e = createEmbed({ title:`Properties • App #${appId}`, description: a.name });
         safeAddField(e, 'Name', a.name);
@@ -550,10 +681,11 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
           semanticButton('primary', { id:`appprops_toggledm_${appId}`, label:'DMs' }),
   backButton(`appprops_back_${appId}`, 'Back')
         ]);
-        return interaction.update({ embeds:[e], components:[row] });
+        const header = buildAppEditHeader(appId, 'properties');
+        return interaction.update({ embeds:[e], components:[header, ...[row]] });
       }
       if (sel.includes('appmgr_app_roles_')) {
-        session.data.view = 'appRoles'; session.data.appId = appId;
+        session.data.view = 'appRoles'; session.data.appId = appId; session.data.editSection = 'roles';
         const a = getApplication(appId);
         const e = createEmbed({ title:`Roles • App #${appId}`, description: a.name });
         const show = (arr) => (arr && arr.length) ? arr.map(r=>`<@&${r}>`).join(' ') : '*none*';
@@ -574,7 +706,8 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
           semanticButton('primary', { id:`approles_restricted_${appId}`, label:'Restrict' }),
           semanticButton('primary', { id:`approles_denied_${appId}`, label:'Denied' })
         ]);
-        return interaction.update({ embeds:[e], components:[row1, row2] });
+        const header = buildAppEditHeader(appId, 'roles');
+        return interaction.update({ embeds:[e], components:[header, ...[row1, row2]] });
       }
       // Unknown selection fallback
       return interaction.reply({ content:'Unhandled selection.', flags:1<<6 }).catch(()=>{});
@@ -586,6 +719,13 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       if (!app) return interaction.reply({ content: 'App missing.', flags: 1<<6 }).catch(()=>{});
       // toggle expanded state on session
       session.data.appExpanded = !!id.startsWith('appmgr_app_more_');
+      // Persist per-admin preference
+      try {
+        const prefs = require('../utils/uiPreferences');
+        const cur = prefs.get(interaction.user.id) || {};
+        cur.appExpanded = session.data.appExpanded;
+        prefs.set(interaction.user.id, cur);
+      } catch (e) {}
       session.data.view = 'appDetail'; session.data.appId = appId;
       return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId, session.data.appExpanded) });
     }
@@ -608,13 +748,42 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       const app = getApplication(appId);
       if (app) {
         updateApplication(app.id, { enabled: !app.enabled });
-        try {
-          return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId) });
-        } catch (e) {
-          try { require('../utils/logger').error('[applications] toggle failed', { err: e.message, stack: e.stack }); } catch {}
-        }
+        // Refresh the app detail view per spec (color and label change)
+        const refreshed = buildAppDetailEmbed(appId);
+        const comps = buildAppDetailComponents(appId, session.data.appExpanded);
+        try { return interaction.update({ embeds: [refreshed], components: comps }); } catch (e) { try { require('../utils/logger').error('[applications] toggle failed', { err: e.message }); } catch {} }
       }
       return interaction.reply({ content: 'Application not found.', flags: 1<<6 }).catch(()=>{});
+    }
+    // Trigger posting the configured application message into its configured channel
+    if (id.startsWith('appmgr_app_trigger_')) {
+      const appId = id.split('_').pop();
+      const app = getApplication(appId);
+      if (!app) return interaction.reply({ content:'App missing.', flags:1<<6 }).catch(()=>{});
+      const chId = app.submissionChannelId || interaction.channelId;
+      const ch = await interaction.client.channels.fetch(chId).catch(()=>null);
+      if (!ch || !ch.send) return interaction.reply({ content:'Target channel unavailable.', flags:1<<6 }).catch(()=>{});
+      try {
+        const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+        const emb = createEmbed({ title: app.name || `Application #${app.id}`, description: app.name || 'Apply using the button below.' });
+        safeAddField(emb, 'Questions', String((app.questions||[]).length));
+        const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`apply_app_${app.id}`).setLabel('Apply').setStyle(ButtonStyle.Primary));
+        await ch.send({ embeds: [emb], components: [row] });
+        return interaction.reply({ content: 'Application triggered.', flags: 1<<6 }).catch(()=>{});
+      } catch (e) {
+        try { require('../utils/logger').error('[applications] trigger failed', { err:e.message }); } catch {}
+        return interaction.reply({ content:'Failed to trigger application.', flags:1<<6 }).catch(()=>{});
+      }
+    }
+    // Enter Edit menu for an application
+    if (id.startsWith('appmgr_app_edit_')) {
+      const appId = id.split('_').pop();
+      const app = getApplication(appId);
+      if (!app) return interaction.reply({ content:'App missing.', flags:1<<6 }).catch(()=>{});
+      session.data.view = 'appDetail'; session.data.appId = appId; session.data.editSection = 'questions';
+      const e = buildAppDetailEmbed(appId);
+      const header = buildAppEditHeader(appId, 'questions');
+      return interaction.update({ embeds: [e], components: [header, ...buildQuestionListComponents(appId, 0, Math.max(1, Math.ceil((app.questions||[]).length/6)))] });
     }
     // Show deployed refs/status for an application (nicer ephemeral embed)
     if (id.startsWith('appmgr_app_deployed_')) {
@@ -685,7 +854,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         return submitted.reply({ content: `Validation failed: ${v.errors.slice(0,5).join('; ')}${v.errors.length>5?` (+${v.errors.length-5} more)`:''}`, flags:1<<6 }).catch(()=>{});
       }
       // Persist
-      updateApplication(app.id, { messageJSON: parsed });
+  updateApplication(app.id, { messageJSON: sanitizeMessageJSON(parsed) });
       // Attempt to apply to deployed message if present
       const _res_editmsg = await tryEditDeployedApplication(app.id, interaction.client);
       if (_res_editmsg === 'ok') {
@@ -712,8 +881,9 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       try {
         const sent = await channel.send({ embeds: [emb], components: [row] });
   // persist refs and full message JSON (embed + components) so edits can reuse the same structure
-  const compsJSON = (sent.components || rows.slice(0,5)).map(r => r.toJSON ? r.toJSON() : r);
-  updateApplication(app.id, { channelId: channel.id, messageId: sent.id, messageJSON: { embed: emb.data, components: compsJSON } });
+      const compsJSON = (sent.components || []).map(r => r.toJSON ? r.toJSON() : r);
+      const embedJSON = emb.data ? emb.data : (typeof emb.toJSON === 'function' ? emb.toJSON() : undefined);
+      updateApplication(app.id, { channelId: channel.id, messageId: sent.id, messageJSON: sanitizeMessageJSON({ embed: embedJSON, components: compsJSON }) });
         return interaction.reply({ content: 'Application posted.', flags: 1<<6 }).catch(()=>{});
       } catch (e) {
         try { require('../utils/logger').error('[applications] app deploy failed', { err: e && e.message }); } catch {}
@@ -793,7 +963,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       const appId = parts[2];
       const app = getApplication(appId); if (!app) return interaction.reply({ content:'App missing.', flags:1<<6 }).catch(()=>{});
       if (action === 'back') {
-        session.data.view = 'appDetail';
+        session.data.view = 'appDetail'; session.data.editSection = null;
         return interaction.update({ embeds:[buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId) });
       }
       const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
@@ -807,30 +977,91 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         updateApplication(app.id, { name: val });
         const _res = await tryEditDeployedApplication(app.id, interaction.client);
         if (_res === 'cleared' || _res === 'failed') await sub.reply({ content: 'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
+        // Update view with header
+        const header = buildAppEditHeader(appId, 'properties');
+        const e = createEmbed({ title:`Properties • App #${appId}`, description: app.name });
+        safeAddField(e, 'Name', (app.name));
+        safeAddField(e, 'Submission Channel', app.submissionChannelId?`<#${app.submissionChannelId}>`:'*none*');
+        safeAddField(e, 'DM Responses', app.dmResponses ? 'Enabled' : 'Disabled');
+        const propsRow = buildNavRow([
+          semanticButton('primary', { id:`appprops_setname_${appId}`, label:'Name' }),
+          semanticButton('primary', { id:`appprops_setchan_${appId}`, label:'SetChan' }),
+          semanticButton('danger', { id:`appprops_clearchan_${appId}`, label:'ClrChan', enabled: !!app.submissionChannelId }),
+          semanticButton('primary', { id:`appprops_toggledm_${appId}`, label:'DMs' }),
+          backButton(`appprops_back_${appId}`, 'Back')
+        ]);
+        if (sub.update) {
+          return sub.update({ embeds:[e], components:[header, propsRow] });
+        }
         return sub.reply({ content:'Updated name.', flags:1<<6 }).catch(()=>{});
       }
       if (action === 'setchan') {
         updateApplication(app.id, { submissionChannelId: interaction.channelId });
         const _res_chan = await tryEditDeployedApplication(app.id, interaction.client);
         if (_res_chan === 'cleared' || _res_chan === 'failed') await interaction.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
+        const header2 = buildAppEditHeader(appId, 'properties');
+        const e2 = createEmbed({ title:`Properties • App #${appId}`, description: app.name });
+        safeAddField(e2, 'Name', (app.name));
+        safeAddField(e2, 'Submission Channel', interaction.channelId?`<#${interaction.channelId}>`:'*none*');
+        safeAddField(e2, 'DM Responses', app.dmResponses ? 'Enabled' : 'Disabled');
+        const propsRow2 = buildNavRow([
+          semanticButton('primary', { id:`appprops_setname_${appId}`, label:'Name' }),
+          semanticButton('primary', { id:`appprops_setchan_${appId}`, label:'SetChan' }),
+          semanticButton('danger', { id:`appprops_clearchan_${appId}`, label:'ClrChan', enabled: !!app.submissionChannelId }),
+          semanticButton('primary', { id:`appprops_toggledm_${appId}`, label:'DMs' }),
+          backButton(`appprops_back_${appId}`, 'Back')
+        ]);
+        if (interaction.update) {
+          return interaction.update({ embeds:[e2], components:[header2, propsRow2] });
+        }
         return interaction.reply({ content:'Submission channel set to this channel.', flags:1<<6 }).catch(()=>{});
       }
       if (action === 'clearchan') {
         updateApplication(app.id, { submissionChannelId: null });
         const _res_c = await tryEditDeployedApplication(app.id, interaction.client);
         if (_res_c === 'cleared' || _res_c === 'failed') await interaction.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
+        const header3 = buildAppEditHeader(appId, 'properties');
+        const e3 = createEmbed({ title:`Properties • App #${appId}`, description: app.name });
+        safeAddField(e3, 'Name', (app.name));
+        safeAddField(e3, 'Submission Channel', '*none*');
+        safeAddField(e3, 'DM Responses', app.dmResponses ? 'Enabled' : 'Disabled');
+        const propsRow3 = buildNavRow([
+          semanticButton('primary', { id:`appprops_setname_${appId}`, label:'Name' }),
+          semanticButton('primary', { id:`appprops_setchan_${appId}`, label:'SetChan' }),
+          semanticButton('danger', { id:`appprops_clearchan_${appId}`, label:'ClrChan', enabled: !!app.submissionChannelId }),
+          semanticButton('primary', { id:`appprops_toggledm_${appId}`, label:'DMs' }),
+          backButton(`appprops_back_${appId}`, 'Back')
+        ]);
+        if (interaction.update) {
+          return interaction.update({ embeds:[e3], components:[header3, propsRow3] });
+        }
         return interaction.reply({ content:'Submission channel cleared.', flags:1<<6 }).catch(()=>{});
       }
       if (action === 'toggledm') {
         updateApplication(app.id, { dmResponses: !app.dmResponses });
         const _res_dm = await tryEditDeployedApplication(app.id, interaction.client);
         if (_res_dm === 'cleared' || _res_dm === 'failed') await interaction.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
+        const header4 = buildAppEditHeader(appId, 'properties');
+        const e4 = createEmbed({ title:`Properties • App #${appId}`, description: app.name });
+        safeAddField(e4, 'Name', (app.name));
+        safeAddField(e4, 'Submission Channel', app.submissionChannelId?`<#${app.submissionChannelId}>`:'*none*');
+        safeAddField(e4, 'DM Responses', !app.dmResponses ? 'Enabled' : 'Disabled');
+        const propsRow4 = buildNavRow([
+          semanticButton('primary', { id:`appprops_setname_${appId}`, label:'Name' }),
+          semanticButton('primary', { id:`appprops_setchan_${appId}`, label:'SetChan' }),
+          semanticButton('danger', { id:`appprops_clearchan_${appId}`, label:'ClrChan', enabled: !!app.submissionChannelId }),
+          semanticButton('primary', { id:`appprops_toggledm_${appId}`, label:'DMs' }),
+          backButton(`appprops_back_${appId}`, 'Back')
+        ]);
+        if (interaction.update) {
+          return interaction.update({ embeds:[e4], components:[header4, propsRow4] });
+        }
         return interaction.reply({ content:`DM responses now ${!app.dmResponses ? 'enabled':'disabled'}.`, flags:1<<6 }).catch(()=>{});
       }
     }
     if (id.startsWith('appmgr_app_roles_')) {
       const appId = id.split('_').pop();
-      session.data.view = 'appRoles'; session.data.appId = appId;
+      session.data.view = 'appRoles'; session.data.appId = appId; session.data.editSection = 'roles';
       const app = getApplication(appId); if (!app) return interaction.reply({ content:'App missing.', flags:1<<6 }).catch(()=>{});
       const e = createEmbed({ title:`Roles • App #${appId}`, description: app.name });
       const show = (arr) => (arr && arr.length) ? arr.map(r=>`<@&${r}>`).join(' ') : '*none*';
@@ -851,14 +1082,15 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         semanticButton('primary', { id:`approles_restricted_${appId}`, label:'Restrict' }),
         semanticButton('primary', { id:`approles_denied_${appId}`, label:'Denied' })
       ]);
-      return interaction.update({ embeds:[e], components:[row1, row2] });
+      const header = buildAppEditHeader(appId, 'roles');
+      return interaction.update({ embeds:[e], components:[header, ...[row1, row2]] });
     }
     if (session.data.view === 'appRoles' && /^approles_/.test(id)) {
       const parts = id.split('_'); // approles,field,appId
       const field = parts[1];
       const appId = parts[2];
       if (field === 'back') {
-        session.data.view = 'appDetail';
+        session.data.view = 'appDetail'; session.data.editSection = null;
         return interaction.update({ embeds:[buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId) });
       }
       const map = {
@@ -882,29 +1114,67 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       const submitted = await interaction.awaitModalSubmit({ time:120000, filter:i=>i.customId===modalId && i.user.id===interaction.user.id }).catch(()=>null);
       if (!submitted) return;
       const raw = (submitted.fields.getTextInputValue('roles')||'').trim();
-      const parseRoles = (txt) => txt.split(/[\s,]+/).map(t=>t.trim()).filter(Boolean).map(t=>t.replace(/[^0-9]/g,'')).filter(Boolean);
-      if (field === 'pending') {
-        const first = parseRoles(raw)[0] || null;
-        updateApplication(app.id, { pendingRole: first });
-        const _res_pr = await tryEditDeployedApplication(app.id, interaction.client);
-        if (_res_pr === 'cleared' || _res_pr === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
+      const parseRoles = (txt) => txt.split(/[,\s]+/).map(t=>t.trim()).filter(Boolean);
+      // Accept explicit 'none' to clear
+      if (/^\s*(none|null|-)\s*$/i.test(raw)) {
+        if (field === 'pending') updateApplication(app.id, { pendingRole: null });
+        else updateApplication(app.id, { [key]: [] });
+        const _res_clear = await tryEditDeployedApplication(app.id, interaction.client);
+        if (_res_clear === 'cleared' || _res_clear === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
       } else {
-        const roles = parseRoles(raw);
-        updateApplication(app.id, { [key]: roles });
-        const _res_roles = await tryEditDeployedApplication(app.id, interaction.client);
-        if (_res_roles === 'cleared' || _res_roles === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
+        const tokens = parseRoles(raw).map(t=>t.replace(/[^0-9]/g,'')).filter(Boolean);
+        // Validate against guild roles when possible
+        let valid = [];
+        try {
+          const guild = interaction.client.guilds.cache.get(session.guildId) || await interaction.client.guilds.fetch(session.guildId).catch(()=>null);
+          const guildRoles = guild ? (guild.roles && guild.roles.cache ? guild.roles.cache : null) : null;
+          for (const r of tokens) {
+            if (!guildRoles) { valid.push(r); continue; }
+            if (guildRoles.has(r)) valid.push(r);
+          }
+        } catch (e) { valid = tokens; }
+        if (!valid.length && tokens.length) {
+          await submitted.reply({ content: 'No valid role IDs found in input; no changes applied.', flags:1<<6 }).catch(()=>{});
+        } else {
+          if (field === 'pending') updateApplication(app.id, { pendingRole: valid[0] || null });
+          else updateApplication(app.id, { [key]: valid });
+          const _res_roles = await tryEditDeployedApplication(app.id, interaction.client);
+          if (_res_roles === 'cleared' || _res_roles === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
+        }
       }
-      return submitted.reply({ content:'Updated roles.', flags:1<<6 }).catch(()=>{});
+      // After updating, show roles view with header
+      const refreshed = getApplication(appId);
+      const eRoles = createEmbed({ title:`Roles • App #${appId}`, description: refreshed.name });
+      const show2 = (arr) => (arr && arr.length) ? arr.map(r=>`<@&${r}>`).join(' ') : '*none*';
+      safeAddField(eRoles, 'Manager', show2(refreshed.managerRoles));
+      safeAddField(eRoles, 'Required', show2(refreshed.requiredRoles));
+      safeAddField(eRoles, 'Accepted', show2(refreshed.acceptedRoles));
+      safeAddField(eRoles, 'Pending', refreshed.pendingRole?`<@&${refreshed.pendingRole}>`:'*none*');
+      safeAddField(eRoles, 'Restricted', show2(refreshed.restrictedRoles));
+      safeAddField(eRoles, 'Denied', show2(refreshed.deniedRoles));
+      const headerRoles = buildAppEditHeader(appId, 'roles');
+      const r1 = buildNavRow([
+        semanticButton('primary', { id:`approles_manager_${appId}`, label:'Manager' }),
+        semanticButton('primary', { id:`approles_required_${appId}`, label:'Required' }),
+        semanticButton('primary', { id:`approles_accepted_${appId}`, label:'Accepted' }),
+        semanticButton('primary', { id:`approles_pending_${appId}`, label:'Pending' }),
+  backButton(`approles_back_${appId}`, 'Back')
+      ]);
+      const r2 = buildNavRow([
+        semanticButton('primary', { id:`approles_restricted_${appId}`, label:'Restrict' }),
+        semanticButton('primary', { id:`approles_denied_${appId}`, label:'Denied' })
+      ]);
+      return submitted.update ? submitted.update({ embeds:[eRoles], components:[headerRoles, r1, r2] }) : submitted.reply({ content:'Updated roles.', flags:1<<6 }).catch(()=>{});
     }
     if (id.startsWith('appmgr_app_msgs_')) {
       const appId = id.split('_').pop();
-      session.data.view = 'appMsgs'; session.data.appId = appId;
-      const app = getApplication(appId);
-      const e = createEmbed({ title:`Messages • App #${appId}`, description:'Edit the various lifecycle messages.' });
-      safeAddField(e, 'Accept', app.acceptMessage || '(none)');
-      safeAddField(e, 'Deny', app.denyMessage || '(none)');
-      safeAddField(e, 'Confirm', app.confirmMessage || '(none)');
-      safeAddField(e, 'Completion', app.completionMessage || '(none)');
+      session.data.view = 'appMsgs'; session.data.appId = appId; session.data.editSection = 'messages';
+  const app = getApplication(appId);
+  const e = createEmbed({ title:`📨 Messages • App #${appId}`, description: app.name || 'Messages for this application' });
+  safeAddField(e, '✅ Accept', app.acceptMessage ? `${app.acceptMessage.slice(0,120)}` : '*(none)*', true);
+  safeAddField(e, '❌ Deny', app.denyMessage ? `${app.denyMessage.slice(0,120)}` : '*(none)*', true);
+  safeAddField(e, '✉️ Confirm', app.confirmMessage ? `${app.confirmMessage.slice(0,120)}` : '*(none)*', true);
+  safeAddField(e, '🏁 Completion', app.completionMessage ? `${app.completionMessage.slice(0,120)}` : '*(none)*', true);
       const row = buildNavRow([
         semanticButton('primary', { id:`appmsg_edit_accept_${appId}`, label:'Accept' }),
         semanticButton('primary', { id:`appmsg_edit_deny_${appId}`, label:'Deny' }),
@@ -912,7 +1182,8 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         semanticButton('primary', { id:`appmsg_edit_completion_${appId}`, label:'Completion' }),
   backButton(`appmsg_back_${appId}`, 'Back')
       ]);
-      return interaction.update({ embeds:[e], components:[row] });
+      const header = buildAppEditHeader(appId, 'messages');
+      return interaction.update({ embeds:[e], components:[header, row] });
     }
     if (session.data.view === 'appMsgs' && /^appmsg_(edit|back)_/.test(id)) {
       const parts = id.split('_'); // appmsg,action,field,appId
@@ -920,7 +1191,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       const field = parts[2];
       const appId = parts[3];
       if (action === 'back') {
-        session.data.view = 'appDetail';
+        session.data.view = 'appDetail'; session.data.editSection = null;
         return interaction.update({ embeds:[buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId) });
       }
       const validFields = { accept:'acceptMessage', deny:'denyMessage', confirm:'confirmMessage', completion:'completionMessage' };
@@ -939,7 +1210,22 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         updateApplication(app.id, { [key]: val });
         const _res_msg = await tryEditDeployedApplication(app.id, interaction.client);
         if (_res_msg === 'cleared' || _res_msg === 'failed') await submitted.reply({ content:'Deployed message could not be updated and was deregistered.', flags:1<<6 }).catch(()=>{});
-        return submitted.reply({ content:'Updated message.', flags:1<<6 }).catch(()=>{});
+        // Refresh messages view with header
+        const refreshed = getApplication(appId);
+        const eMsg = createEmbed({ title:`Messages • App #${appId}`, description:'Edit the various lifecycle messages.' });
+        safeAddField(eMsg, 'Accept', refreshed.acceptMessage || '(none)');
+        safeAddField(eMsg, 'Deny', refreshed.denyMessage || '(none)');
+        safeAddField(eMsg, 'Confirm', refreshed.confirmMessage || '(none)');
+        safeAddField(eMsg, 'Completion', refreshed.completionMessage || '(none)');
+        const headerMsg = buildAppEditHeader(appId, 'messages');
+        const row2 = buildNavRow([
+          semanticButton('primary', { id:`appmsg_edit_accept_${appId}`, label:'Accept' }),
+          semanticButton('primary', { id:`appmsg_edit_deny_${appId}`, label:'Deny' }),
+          semanticButton('primary', { id:`appmsg_edit_confirm_${appId}`, label:'Confirm' }),
+          semanticButton('primary', { id:`appmsg_edit_completion_${appId}`, label:'Completion' }),
+    backButton(`appmsg_back_${appId}`, 'Back')
+        ]);
+        return submitted.update ? submitted.update({ embeds:[eMsg], components:[headerMsg, row2] }) : submitted.reply({ content:'Updated message.', flags:1<<6 }).catch(()=>{});
     }
     if (id.startsWith('appmgr_app_questions_')) {
       const appId = id.split('_').pop();
@@ -1158,8 +1444,8 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       if (current.components.length) rows.push(current);
       try {
   const sent = await channel.send({ embeds: [panelEmbed], components: rows.slice(0,5) });
-  const compsJSON = (sent.components || rows.slice(0,5)).map(r => r.toJSON ? r.toJSON() : r);
-  updatePanel(panel.id, { channelId: channel.id, messageId: sent.id, messageJSON: { embed: panelEmbed.data, components: compsJSON } });
+      const compsJSON = (sent.components || rows.slice(0,5)).map(r => r.toJSON ? r.toJSON() : r);
+      updatePanel(panel.id, { channelId: channel.id, messageId: sent.id, messageJSON: sanitizeMessageJSON({ embed: panelEmbed.data, components: compsJSON }) });
         return interaction.reply({ content: 'Panel deployed.', flags: 1<<6 }).catch(()=>{});
       } catch (e) {
         try { require('../utils/logger').error('[applications] panel deploy failed', { err: e.message }); } catch {}
@@ -1173,22 +1459,30 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
     }
   } catch (err) {
     try {
-      require('../utils/logger').error('[applications] handler error', { err: err.message, stack: err.stack });
-      if (err.data && err.data.components) {
-        require('../utils/logger').error('[applications] Discord API error', { data: err.data });
-      }
-    } catch {}
-    if (interaction.isRepliable && typeof interaction.isRepliable === 'function' && interaction.isRepliable() && !interaction.replied) {
-      interaction.reply({ content: 'Error handling interaction.', flags: 1 << 6 }).catch(()=>{});
+      const logger = require('../utils/logger');
+      const context = {
+        err: err?.message || String(err),
+        stack: err?.stack,
+        customId: interaction.customId,
+        userId: interaction.user?.id,
+        sessionData: session.data
+      };
+      logger.error('[applications] handler error', context);
+      if (err.data) logger.error('[applications] discord api data', { data: err.data });
+    } catch (e) {}
+    if (interaction.isRepliable && !interaction.replied) {
+      // Provide richer error message to admin with hint to check logs
+      interaction.reply({ content: 'Error handling interaction. Details were logged to server logs.', flags: 1 << 6 }).catch(()=>{});
     }
   }
 });
 
 // Legacy style export similar to other command modules
 // Export internals for testing and reuse (non-breaking addition)
-module.exports = { handleApplicationsCommand, _test: {
+module.exports = { handleApplicationsCommand, buildAppDetailComponents, _test: {
   buildApplicationsListComponents,
   buildApplicationsListEmbed,
   buildPanelsListComponents,
-  buildPanelsListEmbed
+  buildPanelsListEmbed,
+  buildAppDetailComponents
 } };
