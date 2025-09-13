@@ -7,19 +7,24 @@
     "start": "node index.js",
     "start:dev": "nodemon --watch src --ext js,json --ignore config/*.json index.js",
     "start:bg": "node ./scripts/startBot.js",
+  "start:pm2": "pm2 start ecosystem.config.js --env production",
+  "start:pm2:dev": "pm2 start ecosystem.config.js --env development --watch",
     "stop": "node ./scripts/stopBot.js",
     "import-levels": "node ./scripts/import-levels.js",
     "export:text": "node ./scripts/export-text.js",
     "export:summary": "node ./scripts/export-summary.js",
     "export:watch": "node ./scripts/export-watch.js",
     "export:schedule": "node ./scripts/export-schedule-summary.js",
-    "test": "jest --runInBand",
+  "test": "jest --runInBand",
     "lint": "eslint \"src/**/*.js\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "migrate:clockin": "node ./scripts/migrate-clockin.js",
     "migrate:event-channels": "node ./scripts/migrate-event-channel-ids.js",
     "migrate:event-runtime": "node ./scripts/migrate-event-runtime.js"
+  },
+  "jest": {
+    "setupFiles": ["<rootDir>/tests/jest.setup.js"]
   },
   "dependencies": {
     "discord.js": "^14.22.1",

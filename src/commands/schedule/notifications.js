@@ -84,7 +84,7 @@ function notifDetailRows(ev, notif) {
   return [row1, row2];
 }
 
-async function refreshTrackedAutoMessages(client, ev) {
+async function refreshTrackedAutoMessages(client, ev, options = {}) {
   try {
     const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? ev.__notifMsgs : null;
     if (map && Array.isArray(ev.autoMessages)) {
@@ -112,8 +112,8 @@ async function refreshTrackedAutoMessages(client, ev) {
           payload = { content };
         }
         // Handle role mentions if present; ensure allowedMentions to avoid accidental mass pings
-        if (Array.isArray(notif.mentions) && notif.mentions.length) {
-          const mentionLine = notif.mentions.map(r=>`<@&${r}>`).join(' ');
+        const mentionLine = Array.isArray(notif.mentions) && notif.mentions.length ? notif.mentions.map(r=>`<@&${r}>`).join(' ') : null;
+        if (mentionLine) {
           if (payload.content) payload.content = `${mentionLine}\n${payload.content}`.slice(0,2000);
           else payload.content = mentionLine.slice(0,2000);
           payload.allowedMentions = { roles: notif.mentions.slice(0,20) };
@@ -121,6 +121,7 @@ async function refreshTrackedAutoMessages(client, ev) {
         // Canonical live-content preservation: if the most recent existing message differs from the freshly built
         // payload (indicating a manual/live edit or drift), prefer the live snapshot to avoid reverting on restart.
         try {
+          const shouldForce = options && (options.forceAll === true || (Array.isArray(options.forceForIds) && options.forceForIds.map(String).includes(String(notif.id))));
           const latestId = rec.ids[rec.ids.length - 1];
           const latestMsg = await channel.messages.fetch(latestId).catch(()=>null);
           if (latestMsg) {
@@ -132,7 +133,7 @@ async function refreshTrackedAutoMessages(client, ev) {
               c: payload.content || '',
               e: (payload.embeds||[]).map(e=>({ t:e.title, d:e.description, f:(e.fields||[]).map(f=>({n:f.name,v:f.value})) }))
             });
-            if (liveSig !== newSig) {
+            if (!shouldForce && liveSig !== newSig) {
               // Adopt live content/embeds (but keep allowedMentions we computed if any)
               payload.content = latestMsg.content || payload.content;
               if ((latestMsg.embeds||[]).length) {
@@ -144,11 +145,27 @@ async function refreshTrackedAutoMessages(client, ev) {
                   fields: (e.fields||[]).map(f=>({ name: f.name, value: f.value, inline: f.inline }))
                 })).slice(0,10);
               }
+            } else {
+              // If forcing update we keep new payload; fallthrough
             }
+            // Ensure mention line is present when configured. If live content was adopted and lacks the mention
+            // prepend it so role pings configured by staff cannot be accidentally lost.
+            try {
+              if (mentionLine && payload && payload.content && !payload.content.startsWith(mentionLine)) {
+                payload.content = `${mentionLine}\n${payload.content}`.slice(0,2000);
+                payload.allowedMentions = payload.allowedMentions || { roles: notif.mentions.slice(0,20) };
+              }
+            } catch {}
           }
         } catch {}
         for (const mid of rec.ids.slice(-3)) {
-          try { const msg = await channel.messages.fetch(mid).catch(()=>null); if (msg) await msg.edit(payload).catch(()=>{}); } catch {}
+          try {
+            const msg = await channel.messages.fetch(mid).catch(()=>null);
+            if (msg) {
+              const { retry } = require('../../utils/retry');
+              await retry(() => msg.edit(payload), { attempts: 3, baseMs: 50, maxMs: 300 }).catch((e)=>{ try { require('../../utils/logger').warn('[notif refresh] edit failed', { err: e?.message, mid, eventId: ev.id }); } catch{} });
+            }
+          } catch (e) { try { require('../../utils/logger').warn('[notif refresh] fetch/edit failed', { err: e.message, mid, eventId: ev.id }); } catch {} }
         }
       }
     }
@@ -223,7 +240,10 @@ async function refreshTrackedAutoMessages(client, ev) {
               let nextSig = '';
               try { nextSig = JSON.stringify({ title: embed.title, desc: embed.description, fields: embed.fields, footer: embed.footer?.text }); } catch {}
               if (existingSig !== nextSig) {
-                await msg.edit({ content:'', embeds:[embed] }).catch(()=>{});
+                try {
+                  const { retry } = require('../../utils/retry');
+                  await retry(() => msg.edit({ content:'', embeds:[embed] }), { attempts: 3, baseMs: 50, maxMs: 300 }).catch((e)=>{ try { require('../../utils/logger').warn('[notif refresh] clockin edit failed', { err: e?.message, mid, eventId: ev.id }); } catch{} });
+                } catch (e) { try { require('../../utils/logger').warn('[notif refresh] clockin edit outer failed', { err: e?.message, mid, eventId: ev.id }); } catch {} }
               }
             }
           } catch {}

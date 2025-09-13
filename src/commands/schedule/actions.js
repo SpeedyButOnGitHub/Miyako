@@ -82,9 +82,20 @@ async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
 }
 
 async function manualTriggerAutoMessage(interaction, ev, notif) {
+  try {
+    const { getEvent } = require('../../utils/eventsStorage');
+    const fresh = getEvent(ev.id) || null;
+    if (fresh) {
+      // merge channelId from original in-memory event if storage sanitized it out
+      if (!fresh.channelId && ev.channelId) fresh.channelId = ev.channelId;
+      ev = fresh;
+    }
+  } catch {}
   const { CONFIG_LOG_CHANNEL } = require('../../utils/logChannels');
   const { applyTimestampPlaceholders } = require('../../utils/timestampPlaceholders');
-  const targetChannelId = config.testingMode ? CONFIG_LOG_CHANNEL : (notif.channelId || ev.channelId);
+  let targetChannelId = config.testingMode ? CONFIG_LOG_CHANNEL : (notif.channelId || ev.channelId);
+  // Fallback to interaction's channel when notif/ev lack a channel (useful for tests and some interactions)
+  if (!targetChannelId && interaction) targetChannelId = interaction.channelId || (interaction.channel && interaction.channel.id) || null;
   if (!targetChannelId) throw new Error('No channel');
   const channel = await interaction.client.channels.fetch(targetChannelId).catch(()=>null);
   if (!channel) throw new Error('Channel not found');

@@ -1,6 +1,6 @@
 const { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { getEvents, getEvent, addEvent, updateEvent, removeEvent } = require('../../services/scheduleService');
-const { OWNER_ID } = require('../moderation/permissions');
+const { getOwnerId } = require('../moderation/permissions');
 const ActiveMenus = require('../../utils/activeMenus');
 const { config } = require('../../utils/storage');
 const { safeReply } = require('../../utils/safeReply');
@@ -222,9 +222,9 @@ async function handleEventNotificationModal(interaction) {
       }
       return e;
     });
-    updatedEv = updateEvent(ev.id, { autoMessages: newList });
-    await interaction.reply({ content:'✅ Auto messages updated for this event.', flags:1<<6 }).catch(()=>{});
-    try { await refreshTrackedAutoMessages(interaction.client, updatedEv); } catch {}
+  updatedEv = updateEvent(ev.id, { autoMessages: newList });
+  await interaction.reply({ content:'✅ Auto messages updated for this event.', flags:1<<6 }).catch(()=>{});
+  try { await refreshTrackedAutoMessages(interaction.client, updatedEv, { forceForIds: [notifId] }); } catch {}
   }
   if (managerMessageId && updatedEv) {
     try {
@@ -241,11 +241,78 @@ async function handleEventNotificationModal(interaction) {
   }
 }
 
+// Handle ad-hoc button/select interactions related to schedule UI when ActiveMenus
+// session routing is not available (long-lived global buttons). Keep handlers
+// conservative and failure-tolerant to avoid bubbling errors into the global
+// interaction router.
+async function handleEventButtonInteraction(interaction) {
+  try {
+    const ActiveMenus = require('../../utils/activeMenus');
+    // Let activeMenus handle session-backed interactions first
+    try {
+      const res = await ActiveMenus.processInteraction(interaction).catch(()=>({ handled: false }));
+      if (res && res.handled) return;
+    } catch {}
+
+    const id = interaction.customId || '';
+    if (id.startsWith('event_notify_')) {
+      // Lightweight acknowledge; detailed subscribe/unsubscribe handled elsewhere
+      if (interaction.replied || interaction.deferred) return;
+      try { await interaction.reply({ content: '🔔 Notification buttons are managed by the Events Manager.', flags: 1<<6 }); } catch {}
+      return;
+    }
+    // Unknown schedule button: avoid throwing
+    if (interaction.replied || interaction.deferred) return;
+    try { await interaction.reply({ content: 'Button pressed (no-op in this environment).', flags: 1<<6 }); } catch {}
+  } catch (e) {
+    try { await interaction.reply({ content: 'An error occurred handling the schedule button.', flags: 1<<6 }); } catch {}
+  }
+}
+
+async function handleClockInSelect(interaction) {
+  try {
+    if (!interaction.isStringSelectMenu || typeof interaction.isStringSelectMenu !== 'function' || !interaction.isStringSelectMenu()) return;
+    const id = interaction.customId || '';
+    if (!id.startsWith('clockin:')) return;
+    const parts = id.split(':');
+    const evId = parts[1];
+    const notifId = parts[2];
+    if (!evId) return;
+    const ev = getEvent(evId);
+    if (!ev) return interaction.reply({ content: 'Event not found.', flags: 1<<6 }).catch(()=>{});
+
+    const selected = (interaction.values && interaction.values[0]) || null;
+    const userId = interaction.user && interaction.user.id;
+    if (!userId) return;
+    ev.__clockIn = ev.__clockIn || { positions: {}, messageIds: [] };
+    const POSITIONS = { instance_manager:1, manager:5, bouncer:10, bartender:15, backup:20, maybe:50 };
+    // Remove user from all roles first
+    for (const k of Object.keys(ev.__clockIn.positions || {})) {
+      ev.__clockIn.positions[k] = (ev.__clockIn.positions[k] || []).filter(id => id !== userId);
+    }
+    if (selected && selected !== 'none') {
+      ev.__clockIn.positions = ev.__clockIn.positions || {};
+      ev.__clockIn.positions[selected] = ev.__clockIn.positions[selected] || [];
+      // Enforce cap
+      const cap = POSITIONS[selected] || 9999;
+      if (!ev.__clockIn.positions[selected].includes(userId)) {
+        ev.__clockIn.positions[selected].push(userId);
+        while (ev.__clockIn.positions[selected].length > cap) ev.__clockIn.positions[selected].shift();
+      }
+    }
+    try { updateEvent(ev.id, { __clockIn: ev.__clockIn }); } catch {}
+    try { await interaction.reply({ content: selected === 'none' ? 'You have been unregistered.' : `You have been registered as ${selected}.`, flags: 1<<6 }); } catch {}
+  } catch (e) {
+    try { await interaction.reply({ content: 'Failed to process selection.', flags: 1<<6 }); } catch {}
+  }
+}
+
 // ActiveMenus wiring
 ActiveMenus.registerHandler('events', async (interaction, session) => {
-  if (interaction.user.id !== OWNER_ID) return interaction.reply({ content: 'Not for you.', flags: 1<<6 });
-  const data = session.data || {};
-  const customId = interaction.customId;
+  try {
+    if (interaction.user.id !== getOwnerId()) return interaction.reply({ content: 'Not for you.', flags: 1<<6 });
+    const data = session.data || {};
+    const customId = interaction.customId;
 
   if (customId === 'events_create') {
     const modal = new ModalBuilder().setCustomId(`event_create_modal_${interaction.message.id}`).setTitle('Create Event')
@@ -420,6 +487,62 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
       return;
     }
   }
+  } catch (err) {
+    // Generate short error code for correlation (EVT-xxxx)
+    const genErrorCode = () => {
+      try {
+        const id = (Date.now() & 0xfffff).toString(36).toUpperCase();
+        const rnd = Math.floor(Math.random() * 36 * 36).toString(36).toUpperCase();
+        return `EVT-${id}${rnd}`.slice(0,12);
+      } catch (e) { return `EVT-${Math.floor(Math.random()*9000)+1000}`; }
+    };
+    const errorCode = genErrorCode();
+    // Acknowledge the interaction safely so users don't see the Discord client error UI
+    try { await safeReply(interaction, { content: `An error occurred processing the events menu. (${errorCode})`, flags: 1<<6 }); } catch {}
+    // Expanded logging for maintainers: include full/truncated stack, session and interaction metadata
+    try {
+      const logger = require('../../utils/logger');
+      const meta = {
+        customId: interaction?.customId || null,
+        userId: interaction?.user?.id || null,
+        guildId: interaction?.guildId || null,
+        channelId: interaction?.channelId || null,
+        messageId: interaction?.message?.id || null,
+        sessionId: session?.id || null,
+        sessionData: session?.data || null,
+        errMessage: err && err.message ? err.message : String(err),
+        stack: err && err.stack ? String(err.stack) : null,
+        errorCode
+      };
+      logger.error('[events handler] error', meta);
+    } catch (e) { try { require('../../utils/logger').error('[events handler] (logging failed)', { err: e && e.message ? e.message : String(e) }); } catch {} }
+    // Best-effort: if configured, post a truncated detailed payload to the configured log channel
+    try {
+      const { config: cfg } = require('../../utils/storage');
+      const shouldPost = !!(cfg && (cfg.postInteractionErrorsToLogChannel || cfg.debugMode));
+      if (shouldPost) {
+        // Only post to the log channel for schedule-related customId prefixes to reduce noise
+        const prefixes = [
+          'events_', 'event_', 'event_notif_', 'events_select', 'events_delete', 'events_create',
+          'clockin:', 'clockin:autoNext', 'clockin:autoNextCancel'
+        ];
+        const cid = String(interaction?.customId || '');
+        const matchesPrefix = prefixes.some(p => cid.startsWith(p));
+        if (!matchesPrefix) return;
+        const { CONFIG_LOG_CHANNEL } = require('../../utils/logChannels');
+        if (CONFIG_LOG_CHANNEL && interaction?.client?.channels?.fetch) {
+          const ch = await interaction.client.channels.fetch(CONFIG_LOG_CHANNEL).catch(()=>null);
+          if (ch && typeof ch.send === 'function') {
+            const shortStack = err && err.stack ? String(err.stack).split('\n').slice(0,4).join('\n') : (err && err.message ? String(err.message) : String(err));
+            const payload = `⚠️ [Events Handler Error] ${errorCode}\ncustomId="${interaction?.customId||''}" user=<@${interaction?.user?.id||'unknown'}> guild=${interaction?.guildId||'none'} channel=${interaction?.channelId||'none'} message=${interaction?.message?.id||'none'}\nsession=${session?.id||'none'}\nerror=${String(err && err.message ? err.message : String(err))}\nstack:\n${shortStack}`;
+            // Truncate to reasonable length for Discord message
+            const content = payload.length > 1900 ? payload.slice(0, 1897) + '...' : payload;
+            await ch.send({ content }).catch(()=>{});
+          }
+        }
+      }
+    } catch (e) { try { require('../../utils/logger').error('[events handler] (post to channel failed)', { err: e.message }); } catch {} }
+  }
 });
 
 module.exports = {
@@ -428,6 +551,8 @@ module.exports = {
   handleEventCreateModal,
   handleEventEditModal,
   handleEventNotificationModal,
+  handleEventButtonInteraction,
+  handleClockInSelect,
   ensureAnchor,
   manualTriggerAutoMessage,
   refreshTrackedAutoMessages,

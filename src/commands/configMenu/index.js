@@ -1,6 +1,6 @@
 const { buildRootEmbed, buildCategorySelect, buildCategoryEmbed, buildSettingEmbed, buildSettingSelect, buildSettingRow, renderSettingEmbed } = require('./render');
 const { handleButton } = require('./handlers');
-const { OWNER_ID } = require('../moderation/permissions');
+// Note: read OWNER_ID at runtime to allow tests to set process.env before invocation
 const { config, saveConfig } = require('../../utils/storage');
 const { logConfigChange } = require('../../utils/configLogs');
 const ActiveMenus = require('../../utils/activeMenus');
@@ -11,7 +11,8 @@ function buildRootComponents(currentCat) {
 }
 
 async function handleConfigMenuCommand(message) {
-	if (String(message.author.id) !== String(OWNER_ID)) {
+	const { getOwnerId } = require('../moderation/permissions');
+	if (String(message.author.id) !== String(getOwnerId())) {
 		await message.reply({ content: 'Only the Owner can use this.' });
 		return;
 	}
@@ -26,6 +27,7 @@ async function handleConfigMenuCommand(message) {
 		return;
 	}
 	ActiveMenus.registerMessage(sent, { type: 'configMenu', userId: message.author.id, data: { view: 'root' } });
+	return sent;
 }
 
 // ActiveMenus handler

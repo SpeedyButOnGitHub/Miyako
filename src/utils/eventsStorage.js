@@ -39,9 +39,34 @@ function saveObj(obj) {
 	enqueueWrite(EVENTS_FILE, () => JSON.stringify(obj, null, 2), { aggregateBackups: true });
 }
 
-function mergeRuntime(ev) { if (!ev) return ev; const rt = getRuntime(ev.id) || {}; return { ...ev, ...rt }; }
+function mergeRuntime(ev) {
+	if (!ev) return ev;
+	const rt = getRuntime(ev.id) || {};
+	const merged = { ...ev, ...rt };
+	// Ensure a safe __clockIn shape so callers can rely on positions/messageIds
+	if (!merged.__clockIn || typeof merged.__clockIn !== 'object') merged.__clockIn = { positions: {}, messageIds: [] };
+	else {
+		if (!merged.__clockIn.positions || typeof merged.__clockIn.positions !== 'object') merged.__clockIn.positions = {};
+		if (!Array.isArray(merged.__clockIn.messageIds)) merged.__clockIn.messageIds = [];
+	}
+	return merged;
+}
+
 function getEvents() { return loadObj().events.map(mergeRuntime); }
-function getEvent(id) { id = String(id); const base = loadObj().events.find(e => String(e.id) === id) || null; return mergeRuntime(base); }
+
+function getEvent(id) {
+	id = String(id);
+	const base = loadObj().events.find(e => String(e.id) === id) || null;
+	if (base) return mergeRuntime(base);
+	// Fallback: if base is missing but runtime exists (e.g., in tests or transient states), return a runtime-only view
+	try {
+		const rt = getRuntime(id);
+		if (rt && typeof rt === 'object') {
+			return mergeRuntime({ id, ...rt });
+		}
+	} catch {}
+	return null;
+}
 function sanitize(ev) {
 	// Strip channelId & volatile runtime fields before persisting to events.json
 	const { channelId, anchorChannelId, anchorMessageId, __notifMsgs, __clockIn, dynamicBaseContent, ...rest } = ev;

@@ -134,28 +134,31 @@ async function sendBotStatusMessage() {
     // Build changelog overview + store details for button expansion
     let changelogSession = null;
     try {
-      const { createSnapshot, compareSnapshots } = require('./utils/changelog');
-      const snapshotFile = path.join(projectRoot, 'config', 'changelogSnapshot.json');
-      let prev = null;
-      try { if (fs.existsSync(snapshotFile)) prev = JSON.parse(fs.readFileSync(snapshotFile, 'utf8')); } catch {}
-      const curr = createSnapshot(projectRoot);
-      const result = compareSnapshots(prev, curr);
-      try { fs.writeFileSync(snapshotFile, JSON.stringify({ createdAt: Date.now(), files: curr }, null, 2)); } catch {}
-      const total = result.added.length + result.removed.length + result.modified.length;
-      if (total === 0) {
-        safeAddField(embed, 'Changelog Overview', 'No changes have been made since last restart.');
-      } else {
-        const summary = `Files changed: ${total} (➕ ${result.added.length}, ✖️ ${result.removed.length}, 🔧 ${result.modified.length})`;
-        safeAddField(embed, 'Changelog Overview', summary);
-        // Prepare detailed lines (full lists capped)
-        const detailLines = [];
-        for (const it of result.added) detailLines.push(`➕ ${it.path}`);
-        for (const it of result.removed) detailLines.push(`✖️ ${it.path}`);
-        for (const it of result.modified) {
-          const ld = it.linesDelta === 0 ? '±0' : (it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`);
-          detailLines.push(`🔧 ${it.path} (${ld} lines)`);
+      const changelog = require('./utils/changelog');
+      try {
+        // Use the changelog module's snapshot helpers to ensure consistent format
+        const prevSnap = changelog.loadSnapshot();
+        const curr = changelog.createSnapshot(projectRoot);
+        const result = changelog.compareSnapshots(prevSnap, curr);
+        try { changelog.saveSnapshot(curr); } catch {}
+        const total = result.added.length + result.removed.length + result.modified.length;
+        if (total === 0) {
+          safeAddField(embed, 'Changelog Overview', 'No changes have been made since last restart.');
+        } else {
+          const summary = `Files changed: ${total} (➕ ${result.added.length}, ✖️ ${result.removed.length}, 🔧 ${result.modified.length})`;
+          safeAddField(embed, 'Changelog Overview', summary);
+          // Prepare detailed lines (full lists capped)
+          const detailLines = [];
+          for (const it of result.added) detailLines.push(`➕ ${it.path}`);
+          for (const it of result.removed) detailLines.push(`✖️ ${it.path}`);
+          for (const it of result.modified) {
+            const ld = it.linesDelta === 0 ? '±0' : (it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`);
+            detailLines.push(`🔧 ${it.path} (${ld} lines)`);
+          }
+          changelogSession = { summary, detailLines };
         }
-        changelogSession = { summary, detailLines };
+      } catch (e) {
+        safeAddField(embed, 'Changelog Overview', 'No changes have been made since last restart.');
       }
     } catch (e) {
       safeAddField(embed, 'Changelog Overview', 'No changes have been made since last restart.');

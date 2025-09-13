@@ -18,7 +18,7 @@ const { maybeSpawnDrop, tryClaimDrop } = require("../utils/cashDrops");
 const { EmbedBuilder } = require("discord.js");
 const { semanticButton, buildNavRow } = require('../ui');
 const { config } = require("../utils/storage");
-const { handleCashCommand } = require("../commands/cash");
+// cash command import removed to avoid unused import warning; handled by separate module when needed
 const { handleBalanceCommand } = require("../commands/balance");
 const { handleMetricsCommand } = require("../commands/metrics");
 const { handleClockInStateCommand } = require("../commands/clockin");
@@ -27,6 +27,7 @@ const { handleMyAppsCommand } = require('../commands/myapps');
 const { handleAppStatsCommand } = require('../commands/appstats');
 const { markCommand } = require('../services/metricsService');
 const { checkPolicy } = require('../utils/policy');
+const { getOwnerId } = require('../commands/moderation/permissions');
 const theme = require("../utils/theme");
 // Unused imports removed to reduce ESLint noise
 const { getRecentErrors, clearErrorLog } = require('../utils/errorUtil');
@@ -77,7 +78,27 @@ function attachMessageEvents(client) {
 			const row = buildNavRow([
 				semanticButton('primary', { id: claimed.testing ? 'cash:check:test' : 'cash:check', label: 'Balance', emoji: '💳' })
 			]);
-			try { await message.reply({ embeds: [claimEmbed], components: [row], allowedMentions: { repliedUser: false } }); } catch {}
+			try {
+				const sentReply = await message.reply({ embeds: [claimEmbed], components: [row], allowedMentions: { repliedUser: false } }).catch(() => null);
+				try {
+					// If we have a recorded spawn message, delete it so channel doesn't keep the unused spawn
+					const { activeDrops } = require('../utils/cashDrops');
+					const dropNow = activeDrops.get(message.channel.id);
+					if (dropNow) {
+						// remove the drop entry
+						try { activeDrops.delete(message.channel.id); } catch {}
+						if (dropNow.messageId) {
+							try {
+								const ch = message.channel;
+								const orig = await ch.messages.fetch(dropNow.messageId).catch(() => null);
+								if (orig) await orig.delete().catch(() => {});
+							} catch {}
+						}
+					}
+				} catch {}
+				// Delete the claim reply after 60s to reduce clutter
+				if (sentReply) setTimeout(() => { try { sentReply.delete().catch(() => {}); } catch {} }, 60 * 1000);
+			} catch {}
 		} else {
 			const drop = maybeSpawnDrop(message, config);
 			if (drop) {
@@ -129,7 +150,8 @@ function attachMessageEvents(client) {
 			} else if (command === "config") {
 				if (!checkPolicy('config', message)) return;
 				_logCtx = logStart({ name: 'config', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleMessageCreate(client, message); markCommand();
+				// handleConfigMenuCommand expects a message object only
+				_sentMsg = await handleMessageCreate(message); markCommand();
 			} else if (command === "level" || command === "rank") {
 				_logCtx = logStart({ name: 'rank', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
 				_sentMsg = await handleRankCommand(client, message); markCommand();
@@ -144,7 +166,7 @@ function attachMessageEvents(client) {
 				_logCtx = logStart({ name: 'leaderboard', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
 				_sentMsg = await handleLeaderboardCommand(client, message); markCommand();
 			} else if (command === "restart") {
-				if (message.author.id !== process.env.OWNER_ID) return;
+				if (message.author.id !== getOwnerId()) return;
 				// Record restart timestamp for next boot to compute downtime
 				try {
 					const fs = require("fs");
@@ -155,7 +177,7 @@ function attachMessageEvents(client) {
 				try {
 					const { spawn } = require('child_process');
 					const nodeExec = process.argv[0];
-					// Resolve helper from project root to avoid src/ relative issues
+								if (message.author.id !== getOwnerId()) return;
 					const helper = path.resolve(process.cwd(), 'scripts', 'restartHelper.js');
 					const child = spawn(nodeExec, [helper], {
 						cwd: process.cwd(),
@@ -171,7 +193,7 @@ function attachMessageEvents(client) {
 				}
 				setTimeout(() => process.exit(0), 200);
 			} else if (command === "stop") {
-				if (message.author.id !== process.env.OWNER_ID) return;
+				if (message.author.id !== getOwnerId()) return;
 				await message.reply("🛑 Stopping bot...");
 				process.exit(0);
 			} else if (command === "schedule") {
@@ -182,11 +204,11 @@ function attachMessageEvents(client) {
 				_sentMsg = await handleScriptsCommand(client, message); markCommand();
 			} else if (command === "cash") {
 				_logCtx = logStart({ name: 'cash', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleCashCommand(client, message); markCommand();
+								if (message.author.id !== getOwnerId()) return;
 			} else if (command === "balance" || command === "bal") {
 				_logCtx = logStart({ name: 'balance', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
 				_sentMsg = await handleBalanceCommand(client, message); markCommand();
-			} else if (command === "diag" || command === "diagnostics") {
+								if (message.author.id !== getOwnerId()) return;
 				_logCtx = logStart({ name: 'diagnostics', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
 				_sentMsg = await handleDiagnosticsCommand(client, message); markCommand();
 			} else if (command === 'metrics') {
@@ -205,7 +227,7 @@ function attachMessageEvents(client) {
 				_logCtx = logStart({ name: 'appstats', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
 				_sentMsg = await handleAppStatsCommand(client, message); markCommand();
 			} else if (command === 'errors' || command === 'err') {
-				if (message.author.id !== process.env.OWNER_ID) return;
+				if (message.author.id !== getOwnerId()) return;
 				_logCtx = logStart({ name: 'errors', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
 				// Accept patterns: .errors, .errors 25, .errors embed 25, .errors 25 embed
 				const embedMode = args.some(a => a.toLowerCase() === 'embed');
@@ -230,9 +252,9 @@ function attachMessageEvents(client) {
 				const pageSize = 10;
 				const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
 				const buildPage = (page) => {
+					const embed = createEmbed({ title: '🧾 Recent Errors', description: `Page ${page+1}/${totalPages} • ${rows.length} item(s)`, color: 'danger' });
 					const start = page * pageSize;
 					const slice = rows.slice(start, start + pageSize);
-					const embed = createEmbed({ title: '🧾 Recent Errors', description: `Page ${page+1}/${totalPages} • ${rows.length} item(s)`, color: 'danger' });
 					for (const r of slice) {
 						safeAddField(embed, `#${r.idx} [${r.scope}] ${r.ts.split(' ')[1]}`, r.first || '(no message)');
 					}
@@ -246,12 +268,14 @@ function attachMessageEvents(client) {
 				_sentMsg = await message.reply({ embeds: [buildPage(0)], components: [row(0)], allowedMentions: { repliedUser: false } });
 				ActiveMenus.registerMessage(_sentMsg, { type: 'errors', userId: message.author.id, data: { page: 0, limit } });
 			} else if (command === 'clearerrors' || command === 'cerr') {
-				if (message.author.id !== process.env.OWNER_ID) return;
+				const { getOwnerId } = require('../commands/moderation/permissions');
+				if (message.author.id !== String(getOwnerId())) return;
 				clearErrorLog();
 				_logCtx = logStart({ name: 'clearerrors', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
 				_sentMsg = await message.reply({ content: '🧹 Error log cleared.', allowedMentions: { repliedUser: false } });
 			} else if (command === 'errdetail') {
-				if (message.author.id !== process.env.OWNER_ID) return;
+				const { getOwnerId } = require('../commands/moderation/permissions');
+				if (message.author.id !== String(getOwnerId())) return;
 				const idx = Number(args[0]);
 				_logCtx = logStart({ name: 'errdetail', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
 				if (!Number.isInteger(idx)) { _sentMsg = await message.reply({ content: 'Provide an index from .errors list.', allowedMentions:{repliedUser:false}}); return; }

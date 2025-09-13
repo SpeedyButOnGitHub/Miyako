@@ -1,5 +1,5 @@
 {
-  "nextId": 4,
+  "nextId": 28,
   "events": [
     {
       "id": "3",
@@ -203,6 +203,267 @@
         "messageIds": [],
         "lastPruneTs": 1757610628687
       }
+    },
+    {
+      "id": "4",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "5",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "6",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "7",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "8",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "9",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "12",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "13",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "14",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "15",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "16",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "17",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "20",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "21",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "22",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "23",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "24",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "25",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "26",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
     }
   ]
 }
