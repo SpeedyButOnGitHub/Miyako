@@ -196,9 +196,11 @@ async function handleClockInSelect(interaction) {
 		const msgTxt = (choice === 'none' || wasInSame) ? 'Registration cleared.' : `Registered as ${meta.label}.`;
 		try {
 			const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+			// Disable cancel auto when user does not currently have an autoNext set
+			const userHasAuto = !!(ev.__clockIn && ev.__clockIn.autoNext && ev.__clockIn.autoNext[interaction.user.id]);
 			const row = new ActionRowBuilder().addComponents(
 				new ButtonBuilder().setCustomId(`clockin:autoNext:${ev.id}:${choice}`).setLabel('Auto-register next').setStyle(ButtonStyle.Primary).setDisabled(choice==='none' || wasInSame),
-				new ButtonBuilder().setCustomId(`clockin:autoNextCancel:${ev.id}`).setLabel('Cancel auto').setStyle(ButtonStyle.Secondary)
+				new ButtonBuilder().setCustomId(`clockin:autoNextCancel:${ev.id}`).setLabel('Cancel auto').setStyle(ButtonStyle.Secondary).setDisabled(!userHasAuto)
 			);
 			await interaction.reply({ content: msgTxt, components:[row], flags:1<<6 }).catch(()=>{});
 		} catch {
@@ -1293,6 +1295,24 @@ function attachInteractionEvents(client) {
 				clock.autoNext = clock.autoNext && typeof clock.autoNext==='object' ? { ...clock.autoNext } : {};
 				clock.autoNext[interaction.user.id] = roleKey;
 				updateEvent(ev.id, { __clockIn: clock });
+				// Immediately re-render embedded clock-in messages to show the star next to the user
+				try {
+					const { buildClockInEmbed } = require('../utils/clockinTemplate');
+					const hydrated = { ...ev, __clockIn: clock };
+					const embed = buildClockInEmbed(hydrated);
+					const msgTargets = [];
+					if (Array.isArray(clock.messageIds)) for (const id of clock.messageIds) msgTargets.push({ id, channelId: clock.channelId || ev.channelId || interaction.channelId });
+					if (ev.__notifMsgs && typeof ev.__notifMsgs === 'object') for (const rec of Object.values(ev.__notifMsgs || {})) if (rec && Array.isArray(rec.ids)) for (const id of rec.ids) msgTargets.push({ id, channelId: rec.channelId || ev.channelId || interaction.channelId });
+					const seen = new Set();
+					for (const t of msgTargets) {
+						if (!t || !t.id) continue; if (seen.has(t.id)) continue; seen.add(t.id);
+						try {
+							const ch = t.channelId ? await interaction.client.channels.fetch(t.channelId).catch(()=>null) : interaction.channel;
+							const msg = ch && ch.messages ? await ch.messages.fetch(t.id).catch(()=>null) : null;
+							if (msg) await msg.edit({ content:'', embeds:[embed] }).catch(()=>{});
+						} catch {}
+					}
+				} catch {}
 				await interaction.reply({ content:`You will be auto-registered as ${roleKey.replace(/_/g,' ')} next clock-in.`, flags:1<<6 }).catch(()=>{});
 				return;
 			}
@@ -1306,6 +1326,24 @@ function attachInteractionEvents(client) {
 				if (clock.autoNext && clock.autoNext[interaction.user.id]) {
 					delete clock.autoNext[interaction.user.id];
 					updateEvent(ev.id, { __clockIn: clock });
+					// Immediately re-render embedded clock-in messages to remove the star next to the user
+					try {
+						const { buildClockInEmbed } = require('../utils/clockinTemplate');
+						const hydrated = { ...ev, __clockIn: clock };
+						const embed = buildClockInEmbed(hydrated);
+						const msgTargets = [];
+						if (Array.isArray(clock.messageIds)) for (const id of clock.messageIds) msgTargets.push({ id, channelId: clock.channelId || ev.channelId || interaction.channelId });
+						if (ev.__notifMsgs && typeof ev.__notifMsgs === 'object') for (const rec of Object.values(ev.__notifMsgs || {})) if (rec && Array.isArray(rec.ids)) for (const id of rec.ids) msgTargets.push({ id, channelId: rec.channelId || ev.channelId || interaction.channelId });
+						const seen = new Set();
+						for (const t of msgTargets) {
+							if (!t || !t.id) continue; if (seen.has(t.id)) continue; seen.add(t.id);
+							try {
+								const ch = t.channelId ? await interaction.client.channels.fetch(t.channelId).catch(()=>null) : interaction.channel;
+								const msg = ch && ch.messages ? await ch.messages.fetch(t.id).catch(()=>null) : null;
+								if (msg) await msg.edit({ content:'', embeds:[embed] }).catch(()=>{});
+							} catch {}
+						}
+					} catch {}
 					await interaction.reply({ content:'Auto registration cancelled.', flags:1<<6 }).catch(()=>{});
 				} else {
 					await interaction.reply({ content:'No auto registration found.', flags:1<<6 }).catch(()=>{});

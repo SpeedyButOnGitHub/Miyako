@@ -6,12 +6,12 @@ const BASE_TEMPLATE = Object.freeze({
   description: 'Please select your role below to clock in.\n\n**Instance Manager** is responsible for opening, managing and closing an instance.',
   color: 3447003,
   fields: [
-    { name: '📝 Instance Manager (1 slot)', value: '{{IM_VALUE}}', inline: false },
+    { name: '📝 Instance Manager (1 slot)', value: '{{IM_VALUE}}', inline: true },
     { name: '🛠️ Manager',   value: '{{MANAGER}}',   inline: true },
     { name: '🛡️ Bouncer',   value: '{{BOUNCER}}',   inline: true },
     { name: '🍸 Bartender', value: '{{BARTENDER}}', inline: true },
     { name: '🎯 Backup',    value: '{{BACKUP}}',    inline: true },
-    { name: '⏳ Maybe / Late', value: '{{MAYBE}}', inline: false },
+    { name: '⏳ Maybe / Late', value: '{{MAYBE}}', inline: true },
     { name: 'Eligible roles', value: '<@&1375995842858582096>, <@&1380277718091829368>, <@&1380323145621180466>, <@&1375958480380493844>' }
   ],
   footer: { text: 'Late Night Hours | Staff clock in for {{EVENT_NAME}}' }
@@ -21,11 +21,16 @@ function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
 function getAutoNextRole(val) { return typeof val === 'string' ? val : (val && typeof val === 'object' ? val.role : null); }
 function fmtMentions(arr=[], roleKey=null, autoNextMap=null) {
   if (!Array.isArray(arr) || arr.length === 0) return '*None*';
-  const s = arr.map(id=>{
+  const lines = arr.map(id => {
     const starred = autoNextMap && roleKey && getAutoNextRole(autoNextMap[id]) === roleKey ? '*' : '';
     return `<@${id}>${starred}`;
-  }).join(', ');
-  return config.testingMode ? s.replace(/<@&?\d+>\*?/g, m=>`\`${m}\``) : s;
+  });
+  const s = lines.join('\n');
+  // In testing mode, quote mentions so snapshots are stable; preserve newlines
+  if (config.testingMode) {
+    return s.split('\n').map(line => line.replace(/<@&?\d+>\*?/g, m => `\`${m}\``)).join('\n');
+  }
+  return s;
 }
 
 function buildClockInEmbed(ev) {
@@ -57,7 +62,8 @@ function buildClockInEmbed(ev) {
         return assignedRole && Object.entries(positions).some(([rk, arr]) => Array.isArray(arr) && arr.includes(uid) && assignedRole === rk);
       });
       if (anyStarred && tpl.fields.length < 25) {
-        tpl.fields.push({ name: 'Legend', value: '* = Auto-registered for next clock-in', inline: false });
+        // Updated legend format per UX request
+        tpl.fields.push({ name: 'Legend', value: '*** :**Auto registered next', inline: false });
       }
     }
   } catch {}

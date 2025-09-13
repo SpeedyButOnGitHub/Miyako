@@ -2,6 +2,15 @@ const theme = require('../../utils/theme');
 const { config } = require('../../utils/storage');
 const { updateEvent } = require('../../utils/eventsStorage');
 const { applyEventName, applyPlaceholdersToJsonPayload, sanitizeMentionsForTesting } = require('./helpers');
+// Position metadata used by clock-in logic (iterable, includes capacity per role)
+const POSITIONS = [
+  { key: 'instance_manager', cap: 1 },
+  { key: 'manager', cap: 5 },
+  { key: 'bouncer', cap: 10 },
+  { key: 'bartender', cap: 15 },
+  { key: 'backup', cap: 20 },
+  { key: 'maybe', cap: 50 }
+];
 
 async function ensureAnchor(interactionOrClient, ev, basePayloadOverride) {
   const client = interactionOrClient.client || interactionOrClient;
@@ -128,7 +137,11 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     };
 
     const nameSafe = ev.name || 'Event';
-    let displayPositions = { ...ev.__clockIn.positions };
+  // Start a fresh set of display positions for a new clock-in message.
+  // This ensures previous registrations are cleared when a new clock-in is posted
+  // and only autoNext entries (or seeded testing members) populate the view.
+  const displayPositions = {};
+  for (const p of POSITIONS) displayPositions[p.key] = [];
 
     // In testing mode, optionally seed sample members for display
     try {
@@ -178,7 +191,12 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
           if (!arr.includes(userId) && arr.length < cap) arr.push(userId);
           delete ev.__clockIn.autoNext[userId];
         }
-        try { updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn }); } catch {}
+        try {
+          // Persist modified positions & cleared autoNext to the runtime overlay
+          ev.__clockIn = ev.__clockIn || {};
+          ev.__clockIn.positions = displayPositions;
+          updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn });
+        } catch {}
       }
     } catch {}
 
@@ -200,15 +218,26 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
           { label: 'Unregister / Clear', value: 'none',                               emoji: { name: '🚫' } }
         ]);
       const row = new ActionRowBuilder().addComponents(menu);
-      const sentClock = await channel.send({ content: '', embeds:[embed], components:[row] }).catch(()=>null);
+  const prevMessageIds = Array.isArray(ev.__clockIn.messageIds) ? ev.__clockIn.messageIds.slice() : [];
+      // Prepend mentions to clock-in message if configured on the notification
+      const sendPayload = { content: '', embeds:[embed], components:[row] };
+      try {
+        if (Array.isArray(notif.mentions) && notif.mentions.length) {
+          const mentionLine = notif.mentions.map(r=>`<@&${r}>`).join(' ');
+          sendPayload.content = `${mentionLine}\n`;
+          sendPayload.allowedMentions = { roles: notif.mentions.slice(0,20) };
+        }
+      } catch {}
+      const sentClock = await channel.send(sendPayload).catch(()=>null);
       if (sentClock) {
         // Persist mapping for future edits
         try {
           const map = ev.__notifMsgs && typeof ev.__notifMsgs === 'object' ? { ...ev.__notifMsgs } : {};
           const rec = map[notif.id] && typeof map[notif.id] === 'object' ? { ...map[notif.id] } : { channelId: channel.id, ids: [] };
           rec.channelId = channel.id;
-          rec.ids = Array.isArray(rec.ids) ? rec.ids : [];
-          rec.ids.push(sentClock.id);
+          rec.ids = Array.isArray(rec.ids) ? rec.ids.filter(Boolean) : [];
+          if (!rec.ids.includes(sentClock.id)) rec.ids.push(sentClock.id);
+          // keep recent ids only
           if (rec.ids.length > 20) rec.ids = rec.ids.slice(-20);
           map[notif.id] = rec;
           ev.__notifMsgs = map;
@@ -220,9 +249,39 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
           ev.__clockIn.lastSentTs = Date.now();
           ev.__clockIn.channelId = channel.id;
           if (!Array.isArray(ev.__clockIn.messageIds)) ev.__clockIn.messageIds = [];
-          ev.__clockIn.messageIds.push(sentClock.id);
+          ev.__clockIn.messageIds = ev.__clockIn.messageIds.filter(Boolean);
+          if (!ev.__clockIn.messageIds.includes(sentClock.id)) ev.__clockIn.messageIds.push(sentClock.id);
           if (ev.__clockIn.messageIds.length > 10) ev.__clockIn.messageIds = ev.__clockIn.messageIds.slice(-10);
           updateEvent(ev.id, { autoMessages: ev.autoMessages, __clockIn: ev.__clockIn, __notifMsgs: ev.__notifMsgs });
+
+          // Attempt to delete any previous clock-in messages recorded for this event
+          try {
+            const { retry } = require('../../utils/retry');
+            const opts = { attempts: 3, baseMs: 50, maxMs: 300 };
+            for (const mid of prevMessageIds || []) {
+              if (!mid || mid === sentClock.id) continue;
+              try {
+                const oldMsg = await channel.messages.fetch(mid).catch(()=>null);
+                if (oldMsg && typeof oldMsg.delete === 'function') {
+                  // use retry so tests can mock retry
+                  await retry(() => oldMsg.delete(), opts).catch(()=>{});
+                }
+              } catch {}
+            }
+            // prune any deleted ids from stored arrays
+            ev.__clockIn.messageIds = (ev.__clockIn.messageIds || []).filter(id => id && id === sentClock.id);
+            // also prune from notif mapping
+            try {
+              const map = ev.__notifMsgs && typeof ev.__notifMsgs === 'object' ? { ...ev.__notifMsgs } : {};
+              const rec = map[notif.id] && typeof map[notif.id] === 'object' ? { ...map[notif.id] } : null;
+              if (rec && Array.isArray(rec.ids)) {
+                rec.ids = rec.ids.filter(id => id && id === sentClock.id);
+                map[notif.id] = rec;
+                ev.__notifMsgs = map;
+              }
+            } catch {}
+            updateEvent(ev.id, { __clockIn: ev.__clockIn, __notifMsgs: ev.__notifMsgs });
+          } catch {}
         }
         return !!sentClock;
       }
@@ -257,12 +316,12 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
     }
   } catch {}
   try {
-    if (sent && sent.id) {
+      if (sent && sent.id) {
       const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? { ...ev.__notifMsgs } : {};
       const rec = map[notif.id] && typeof map[notif.id]==='object' ? { ...map[notif.id] } : { channelId: channel.id, ids: [] };
       rec.channelId = channel.id;
-      rec.ids = Array.isArray(rec.ids) ? rec.ids : [];
-      rec.ids.push(sent.id);
+      rec.ids = Array.isArray(rec.ids) ? rec.ids.filter(Boolean) : [];
+      if (!rec.ids.includes(sent.id)) rec.ids.push(sent.id);
       if (rec.ids.length > 20) rec.ids = rec.ids.slice(-20);
       map[notif.id] = rec;
       updateEvent(ev.id, { __notifMsgs: map });

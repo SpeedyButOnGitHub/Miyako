@@ -169,10 +169,37 @@ async function refreshTrackedAutoMessages(client, ev, options = {}) {
         }
       }
     }
-    if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length) {
-      const chId = ev.__clockIn.channelId || ev.channelId;
-      const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
-      if (channel && channel.messages) {
+    if (ev.__clockIn && (Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length || (ev.__notifMsgs && typeof ev.__notifMsgs === 'object'))) {
+      // Collect message targets from multiple runtime locations so startup rehydration
+      // edits every known posted clock-in message (some messages may live only in
+      // the per-notification mapping __notifMsgs).
+      const msgTargets = [];
+      try {
+        if (Array.isArray(ev.__clockIn.messageIds)) {
+          for (const id of ev.__clockIn.messageIds) {
+            msgTargets.push({ id, channelId: ev.__clockIn.channelId || ev.channelId });
+          }
+        }
+      } catch {}
+
+      try {
+        if (ev.__notifMsgs && typeof ev.__notifMsgs === 'object') {
+          for (const rec of Object.values(ev.__notifMsgs)) {
+            if (rec && Array.isArray(rec.ids)) {
+              for (const id of rec.ids) msgTargets.push({ id, channelId: rec.channelId || ev.__clockIn?.channelId || ev.channelId });
+            }
+          }
+        }
+      } catch {}
+
+      // De-duplicate and limit to recent targets to avoid excessive edits on large histories
+      const seen = new Set();
+      const uniqueTargets = msgTargets.filter(t => { if (!t || !t.id) return false; if (seen.has(t.id)) return false; seen.add(t.id); return true; }).slice(-20);
+
+      for (const t of uniqueTargets) {
+        const chId = t.channelId || ev.__clockIn?.channelId || ev.channelId;
+        const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
+        if (!channel || !channel.messages) continue;
         // Hydrate runtime clock-in state explicitly. In some restart scenarios the in-memory
         // merged event passed into this function may not yet include the latest persisted
         // runtime overlay (positions), causing the embed to show *None* for all roles until
@@ -220,9 +247,14 @@ async function refreshTrackedAutoMessages(client, ev, options = {}) {
         } catch {}
         const { buildClockInEmbed } = require('../../utils/clockinTemplate');
         const embed = buildClockInEmbed(hydrated);
-        for (const mid of ev.__clockIn.messageIds.slice(-3)) {
+  // If this notification template configured role mentions, ensure mention line is present
+  let mentionLine = null;
+  try { mentionLine = Array.isArray(notif.mentions) && notif.mentions.length ? notif.mentions.map(r=>`<@&${r}>`).join(' ') : null; } catch {}
+        // Edit each unique target (limited above to recent 20). This mirrors the
+        // interaction-path re-render which considers both __clockIn.messageIds and __notifMsgs.
+        for (const t2 of uniqueTargets) {
           try {
-            const msg = await channel.messages.fetch(mid).catch(()=>null);
+            const msg = await channel.messages.fetch(t2.id).catch(()=>null);
             if (msg) {
               // Rate-limit guard: only edit if embed content changed (compare serialized fields)
               let existingSig = '';
@@ -242,8 +274,11 @@ async function refreshTrackedAutoMessages(client, ev, options = {}) {
               if (existingSig !== nextSig) {
                 try {
                   const { retry } = require('../../utils/retry');
-                  await retry(() => msg.edit({ content:'', embeds:[embed] }), { attempts: 3, baseMs: 50, maxMs: 300 }).catch((e)=>{ try { require('../../utils/logger').warn('[notif refresh] clockin edit failed', { err: e?.message, mid, eventId: ev.id }); } catch{} });
-                } catch (e) { try { require('../../utils/logger').warn('[notif refresh] clockin edit outer failed', { err: e?.message, mid, eventId: ev.id }); } catch {} }
+                  const content = mentionLine ? `${mentionLine}\n` : '';
+                  const payload = { content, embeds:[embed] };
+                  if (mentionLine) payload.allowedMentions = { roles: notif.mentions.slice(0,20) };
+                  await retry(() => msg.edit(payload), { attempts: 3, baseMs: 50, maxMs: 300 }).catch((e)=>{ try { require('../../utils/logger').warn('[notif refresh] clockin edit failed', { err: e?.message, mid: t2.id, eventId: ev.id }); } catch{} });
+                } catch (e) { try { require('../../utils/logger').warn('[notif refresh] clockin edit outer failed', { err: e?.message, mid: t2.id, eventId: ev.id }); } catch {} }
               }
             }
           } catch {}

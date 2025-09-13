@@ -1,6 +1,7 @@
 const { ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { getEvents, getEvent, addEvent, updateEvent, removeEvent } = require('../../services/scheduleService');
 const { getOwnerId } = require('../moderation/permissions');
+const OWNER_ID = getOwnerId();
 const ActiveMenus = require('../../utils/activeMenus');
 const { config } = require('../../utils/storage');
 const { safeReply } = require('../../utils/safeReply');
@@ -285,7 +286,14 @@ async function handleClockInSelect(interaction) {
     const userId = interaction.user && interaction.user.id;
     if (!userId) return;
     ev.__clockIn = ev.__clockIn || { positions: {}, messageIds: [] };
-    const POSITIONS = { instance_manager:1, manager:5, bouncer:10, bartender:15, backup:20, maybe:50 };
+    const POSITIONS = [
+      { key: 'instance_manager', cap: 1 },
+      { key: 'manager', cap: 5 },
+      { key: 'bouncer', cap: 10 },
+      { key: 'bartender', cap: 15 },
+      { key: 'backup', cap: 20 },
+      { key: 'maybe', cap: 50 }
+    ];
     // Remove user from all roles first
     for (const k of Object.keys(ev.__clockIn.positions || {})) {
       ev.__clockIn.positions[k] = (ev.__clockIn.positions[k] || []).filter(id => id !== userId);
@@ -294,7 +302,8 @@ async function handleClockInSelect(interaction) {
       ev.__clockIn.positions = ev.__clockIn.positions || {};
       ev.__clockIn.positions[selected] = ev.__clockIn.positions[selected] || [];
       // Enforce cap
-      const cap = POSITIONS[selected] || 9999;
+  const capMeta = POSITIONS.find(x => x.key === selected);
+  const cap = capMeta ? capMeta.cap : 9999;
       if (!ev.__clockIn.positions[selected].includes(userId)) {
         ev.__clockIn.positions[selected].push(userId);
         while (ev.__clockIn.positions[selected].length > cap) ev.__clockIn.positions[selected].shift();
