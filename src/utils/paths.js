@@ -16,8 +16,15 @@ function findProjectRoot(startDir) {
 
 const projectRoot = findProjectRoot(__dirname);
 
+// Allow tests or CI to override the runtime data directory via environment variable
+// e.g. MIYAKO_RUNTIME_DIR=C:\some\tmp\dir
 function cfgPath(...parts) { return path.join(projectRoot, 'config', ...parts); }
-function dataDir() { return path.join(projectRoot, 'data'); }
+function dataDir() {
+	if (process.env.MIYAKO_RUNTIME_DIR && String(process.env.MIYAKO_RUNTIME_DIR).trim()) {
+		try { const p = String(process.env.MIYAKO_RUNTIME_DIR); if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); return p; } catch {};
+	}
+	return path.join(projectRoot, 'data');
+}
 function logsDir() { return path.join(projectRoot, 'logs'); }
 function ensureDir(p) { try { if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); } catch {} }
 function logPath(...parts) { const dir = logsDir(); ensureDir(dir); return path.join(dir, ...parts); }

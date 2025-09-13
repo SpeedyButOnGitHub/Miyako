@@ -15,13 +15,16 @@
     "export:summary": "node ./scripts/export-summary.js",
     "export:watch": "node ./scripts/export-watch.js",
     "export:schedule": "node ./scripts/export-schedule-summary.js",
-    "test": "jest --runInBand",
+  "test": "jest --runInBand",
     "lint": "eslint \"src/**/*.js\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "migrate:clockin": "node ./scripts/migrate-clockin.js",
     "migrate:event-channels": "node ./scripts/migrate-event-channel-ids.js",
     "migrate:event-runtime": "node ./scripts/migrate-event-runtime.js"
+  },
+  "jest": {
+    "setupFiles": ["<rootDir>/tests/jest.setup.js"]
   },
   "dependencies": {
     "discord.js": "^14.22.1",
