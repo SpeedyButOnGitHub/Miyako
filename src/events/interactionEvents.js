@@ -1174,6 +1174,13 @@ function attachInteractionEvents(client) {
 				const clockKey = '__clockIn';
 				const state = ev[clockKey] && typeof ev[clockKey]==='object' ? { ...ev[clockKey] } : { positions: {}, messageIds: [] };
 				if (!state.positions) state.positions = {};
+				// Ensure all expected position buckets exist so we don't drop keys when persisting
+				for (const pk of Object.keys(POS_META)) {
+					if (!Array.isArray(state.positions[pk])) {
+						// Prefer existing runtime positions when available to preserve current users
+						state.positions[pk] = (ev[clockKey] && ev[clockKey].positions && Array.isArray(ev[clockKey].positions[pk])) ? [...ev[clockKey].positions[pk]] : [];
+					}
+				}
 				// Determine if the user is re-selecting the same slot (toggle off behavior)
 				const wasIn = Object.keys(state.positions).some(pos => Array.isArray(state.positions[pos]) && state.positions[pos].includes(member.id));
 				const wasInSame = wasIn && Array.isArray(state.positions[choice]) && state.positions[choice].includes(member.id);

@@ -1,5 +1,5 @@
 {
-  "nextId": 28,
+  "nextId": 36,
   "events": [
     {
       "id": "3",
@@ -444,6 +444,93 @@
     },
     {
       "id": "26",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "28",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "29",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "30",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "31",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "32",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "33",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "34",
       "name": "E",
       "autoMessages": [
         {
