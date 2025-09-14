@@ -309,6 +309,21 @@ function startScheduler(client, opts = {}) {
 							}
 						}
 					} catch (e) { /* ignore anchor update errors */ }
+
+					// If the event is closed, ensure any lingering clock-in messages are removed
+					try {
+						if (status === 'closed' && ev.__clockIn && Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length) {
+							const chId = ev.__clockIn.channelId || ev.channelId;
+							const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
+							if (channel && channel.messages) {
+								for (const mid of ev.__clockIn.messageIds.slice()) {
+									try { const m = await channel.messages.fetch(mid).catch(()=>null); if (m && m.delete) await m.delete().catch(()=>{}); } catch {}
+								}
+							}
+							ev.__clockIn.messageIds = [];
+							try { updateEvent(ev.id, { __clockIn: ev.__clockIn }); } catch {}
+						}
+					} catch (e) {}
 				}
 				try {
 					if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds)) {

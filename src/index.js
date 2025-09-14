@@ -332,6 +332,79 @@ client.once('clientReady', async () => {
           await channel.messages.delete(commandId).catch(() => {});
         }
       }
+
+        // Ensure currently-open events have their anchor/clock-in messages present.
+        try {
+          const { ensureAnchor, manualTriggerAutoMessage } = require('./commands/schedule/actions');
+          const evs2 = getEvents();
+          const nowDt = new Date();
+          const currentDay = nowDt.getDay();
+          const hh = nowDt.getHours().toString().padStart(2, "0");
+          const mm = nowDt.getMinutes().toString().padStart(2, "0");
+          const currentHM = `${hh}:${mm}`;
+
+          const isOpen = (ev) => {
+            try {
+              if (Array.isArray(ev.ranges) && ev.ranges.length) {
+                for (const r of ev.ranges) {
+                  if (!r || !r.start || !r.end) continue;
+                  const [sh, sm] = r.start.split(':').map(n=>parseInt(n,10));
+                  const [eh, em] = r.end.split(':').map(n=>parseInt(n,10));
+                  if ([sh,sm,eh,em].some(n => Number.isNaN(n))) continue;
+                  const startMinutes = sh*60+sm;
+                  const endMinutes = eh*60+em;
+                  const curMinutes = parseInt(hh,10)*60+parseInt(mm,10);
+                  if (curMinutes >= startMinutes && curMinutes < endMinutes) return true;
+                }
+                return false;
+              }
+              if (Array.isArray(ev.times) && ev.times.includes(currentHM)) {
+                if (Array.isArray(ev.days) && ev.days.length && !ev.days.includes(currentDay)) return false;
+                return true;
+              }
+            } catch {}
+            return false;
+          };
+
+          for (const ev of evs2) {
+            try {
+              if (!ev || !ev.enabled) continue;
+              if (ev.type !== 'multi-daily') continue;
+
+              // Refresh anchor for this event so its message reflects current status
+              try {
+                await ensureAnchor(client, ev).catch(()=>null);
+              } catch {}
+
+              // If the event is currently open, ensure a clock-in message exists
+              try {
+                if (isOpen(ev)) {
+                  const clk = (ev.autoMessages||[]).find(a => a.isClockIn && a.enabled);
+                  const hasClockMsgs = ev.__clockIn && Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length > 0;
+                  if (clk && !hasClockMsgs) {
+                    // call manualTriggerAutoMessage with a lightweight interaction-like object that exposes client
+                    await manualTriggerAutoMessage({ client }, ev, clk).catch(()=>null);
+                  }
+                } else {
+                  // If event is not open on startup, ensure any stale clock-in messages are removed
+                  try {
+                    if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length) {
+                      const chId = ev.__clockIn.channelId || ev.channelId;
+                      const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
+                      if (channel && channel.messages) {
+                        for (const mid of ev.__clockIn.messageIds.slice()) {
+                          try { await channel.messages.fetch(mid).then(m=>m.delete()).catch(()=>{}); } catch {}
+                        }
+                      }
+                      ev.__clockIn.messageIds = [];
+                      try { updateEvent(ev.id, { __clockIn: ev.__clockIn }); } catch {}
+                    }
+                  } catch {}
+                }
+              } catch {}
+            } catch {}
+          }
+        } catch (e) { logger && logger.warn && logger.warn('[Startup Reconcile] failed', { err: e && e.message }); }
       fs.writeFileSync(ACTIVE_MENUS_FILE, '[]');
   } catch (err) { logger.warn('[Startup Menu Cleanup Error]', { err: err.message }); }
   }
