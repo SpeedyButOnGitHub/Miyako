@@ -32,7 +32,7 @@ function attachGuildEvents(client) {
 						try {
 							await member.roles.add(botRole);
 						} catch (e) {
-							try { logger.warn('[guildMemberAdd] failed to add bot autorole', { guildId: member.guild.id, userId: member.id, roleId: botRole, err: e && e.message }); } catch {};
+							try { logger.warn('[guildMemberAdd] failed to add bot autorole', { guildId: member.guild.id, userId: member.id, roleId: botRole, err: e && e.message }); } catch {}
 						}
 					}
 				}
@@ -42,7 +42,7 @@ function attachGuildEvents(client) {
 					try {
 						await member.roles.add(auto);
 					} catch (e) {
-						try { logger.warn('[guildMemberAdd] failed to add autoroles', { guildId: member.guild.id, userId: member.id, roles: auto, err: e && e.message }); } catch {};
+						try { logger.warn('[guildMemberAdd] failed to add autoroles', { guildId: member.guild.id, userId: member.id, roles: auto, err: e && e.message }); } catch {}
 					}
 				}
 				// After assignment, schedule an update to the Staff Team message (debounced)

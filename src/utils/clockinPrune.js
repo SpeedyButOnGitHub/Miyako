@@ -1,4 +1,4 @@
-const { getEvents, updateEvent, getEvent } = require('../utils/eventsStorage');
+const { updateEvent, getEvent } = require('../utils/eventsStorage');
 
 /**
  * Prune clock-in positions for a specific event id: keep only users from autoNext

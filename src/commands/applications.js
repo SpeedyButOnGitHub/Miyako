@@ -270,9 +270,7 @@ function buildAppEditHeader(appId, activeSection) {
 }
 
 // Small helper to add a Deploy button next to app entries (used on panel deploy rows)
-function buildAppDeployButton(appId) {
-  return semanticButton('success', { id: `appmgr_app_deploy_${appId}`, label: 'Deploy' });
-}
+// (removed) previously returned a Deploy button for panels — no longer used
 
 function buildPanelsListEmbed(page = 0, pageSize = 5) {
   const panels = listPanels();
@@ -375,7 +373,7 @@ function buildAppDetailComponents(appId, expanded = false) {
     // Add remaining actions in an extra row if present
     const rem = actions.slice(visibleCount);
     if (rem.length) {
-      const r2 = buildNavRow([]);
+      let r2 = buildNavRow([]);
       for (const a of rem) {
         const lbl = compact(a.label, 14);
         const b = semanticButton(a.kind === 'primary' ? 'primary' : 'nav', { id: a.id, label: lbl, emoji: a.emoji });
@@ -636,12 +634,9 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
       }
       if (sel.includes('appmgr_app_deployed_')) {
         // reuse deployed handler logic
-        return (async () => {
-          const fakeId = `appmgr_app_deployed_${appId}`;
-          // call into same branch by fabricating an update
-          session.data.view = 'appDetail'; session.data.appId = appId;
-          return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId, session.data.appExpanded) });
-        })();
+        // Reuse detail view rendering
+        session.data.view = 'appDetail'; session.data.appId = appId;
+        return interaction.update({ embeds: [buildAppDetailEmbed(appId)], components: buildAppDetailComponents(appId, session.data.appExpanded) });
       }
       if (sel.includes('appmgr_app_editmsg_')) {
         // open the edit modal path — reuse existing code path by triggering the modal branch
@@ -1160,7 +1155,7 @@ ActiveMenus.registerHandler('applications', async (interaction, session) => {
         semanticButton('primary', { id:`approles_pending_${appId}`, label:'Pending' }),
   backButton(`approles_back_${appId}`, 'Back')
       ]);
-      const r2 = buildNavRow([
+  let r2 = buildNavRow([
         semanticButton('primary', { id:`approles_restricted_${appId}`, label:'Restrict' }),
         semanticButton('primary', { id:`approles_denied_${appId}`, label:'Denied' })
       ]);

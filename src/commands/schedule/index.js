@@ -159,7 +159,7 @@ async function handleEventNotificationModal(interaction) {
   const parts = interaction.customId.split('_');
   const kind = parts[1];
   const evId = parts[3];
-  const notifId = (kind==='add') ? null : parts[4];
+    const _notifId = (kind==='add') ? null : parts[4];
   const managerMessageId = (kind==='add') ? parts[4] : parts[5];
   const ev = getEvent(evId);
   if (!ev) { await interaction.reply({ content:'Event missing.', flags:1<<6 }).catch(()=>{}); return; }
@@ -192,8 +192,8 @@ async function handleEventNotificationModal(interaction) {
     updatedEv = updateEvent(ev.id, { autoMessages: list, nextAutoId: Number(nextId)+1 });
     await interaction.reply({ content:`✅ Auto message #${nextId} created${messageJSON?' (JSON)':''}.`, flags:1<<6 }).catch(()=>{});
   } else if (kind==='edit') {
-    const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
-    const idx = list.findIndex(n=>String(n.id)===String(notifId));
+  const list = Array.isArray(ev.autoMessages)? [...ev.autoMessages]:[];
+  const idx = list.findIndex(n=>String(n.id)===String(_notifId));
   if (idx===-1) return safeReply(interaction, { content:'Not found.', flags:1<<6 });
     const chanRaw = (interaction.fields.getTextInputValue('channel')||'').trim();
     const cleanedChan = chanRaw.replace(/[<#>]/g,'');
@@ -208,7 +208,7 @@ async function handleEventNotificationModal(interaction) {
     let messageJSON = null; const healed = healJSON(msgRaw); if (healed.startsWith('{') && healed.endsWith('}')) { try { const parsed = JSON.parse(healed); if (parsed && typeof parsed==='object') messageJSON = parsed; } catch {} }
     const newList = list.map(entry => {
       const e = { ...entry };
-      if (String(e.id) === String(notifId)) {
+      if (String(e.id) === String(_notifId)) {
         e.offsetMinutes = offset;
         e.message = msgRaw;
         e.messageJSON = messageJSON;
@@ -225,7 +225,7 @@ async function handleEventNotificationModal(interaction) {
     });
   updatedEv = updateEvent(ev.id, { autoMessages: newList });
   await interaction.reply({ content:'✅ Auto messages updated for this event.', flags:1<<6 }).catch(()=>{});
-  try { await refreshTrackedAutoMessages(interaction.client, updatedEv, { forceForIds: [notifId] }); } catch {}
+  try { await refreshTrackedAutoMessages(interaction.client, updatedEv, { forceForIds: [_notifId] }); } catch {}
   }
   if (managerMessageId && updatedEv) {
     try {
@@ -277,7 +277,6 @@ async function handleClockInSelect(interaction) {
     if (!id.startsWith('clockin:')) return;
     const parts = id.split(':');
     const evId = parts[1];
-    const notifId = parts[2];
     if (!evId) return;
     const ev = getEvent(evId);
     if (!ev) return interaction.reply({ content: 'Event not found.', flags: 1<<6 }).catch(()=>{});

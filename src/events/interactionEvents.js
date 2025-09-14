@@ -178,7 +178,7 @@ async function handleClockInSelect(interaction) {
 				// 2) per-notification mapping __notifMsgs (may contain channelId and ids array)
 				try {
 					if (ev.__notifMsgs && typeof ev.__notifMsgs === 'object') {
-						for (const [nid, rec] of Object.entries(ev.__notifMsgs)) {
+						for (const rec of Object.values(ev.__notifMsgs)) {
 							if (rec && Array.isArray(rec.ids)) {
 								for (const id of rec.ids) msgTargets.push({ id, channelId: rec.channelId || ev.channelId || interaction.channelId });
 							}

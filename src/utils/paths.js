@@ -21,7 +21,7 @@ const projectRoot = findProjectRoot(__dirname);
 function cfgPath(...parts) { return path.join(projectRoot, 'config', ...parts); }
 function dataDir() {
 	if (process.env.MIYAKO_RUNTIME_DIR && String(process.env.MIYAKO_RUNTIME_DIR).trim()) {
-		try { const p = String(process.env.MIYAKO_RUNTIME_DIR); if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); return p; } catch {};
+		try { const p = String(process.env.MIYAKO_RUNTIME_DIR); if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); return p; } catch {}
 	}
 	return path.join(projectRoot, 'data');
 }

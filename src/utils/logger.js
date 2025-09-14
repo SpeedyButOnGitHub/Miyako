@@ -45,7 +45,7 @@ function baseWrite(level, msg, meta) {
       if (!isTest) {
         if (level === 'error') console.error(out); else console.log(out);
       }
-    } catch {};
+    } catch {}
   }
 }
 

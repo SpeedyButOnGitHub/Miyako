@@ -39,6 +39,7 @@ const ActiveMenus = require('./utils/activeMenus');
 const { startVoiceLeveling } = require('./utils/voiceLeveling');
 const { validateConfig } = require('./utils/configValidate');
 const { startCashDrops } = require('./utils/cashDrops');
+const { getEvents, updateEvent } = require('./utils/eventsStorage');
 // Load daily deposit progress tracker
 try { require('./utils/depositProgress').load(); } catch {}
 

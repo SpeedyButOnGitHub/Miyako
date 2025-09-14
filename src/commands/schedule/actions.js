@@ -130,13 +130,7 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
       }
     } catch {}
 
-    const fmtMentions = (arr=[]) => {
-      if (!Array.isArray(arr) || arr.length === 0) return '*None*';
-      const s = arr.map(id=>`<@${id}>`).join(', ');
-      return config.testingMode ? s.replace(/<@&?\d+>/g, m=>`\`${m}\``) : s;
-    };
-
-    const nameSafe = ev.name || 'Event';
+    // (unused helpers removed — kept logic above simple and per-notification)
   // Start a fresh set of display positions for a new clock-in message.
   // This ensures previous registrations are cleared when a new clock-in is posted
   // and only autoNext entries (or seeded testing members) populate the view.

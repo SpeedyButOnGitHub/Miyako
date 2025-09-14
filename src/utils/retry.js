@@ -1,5 +1,4 @@
 // Small retry helper for async operations with backoff and logging
-const { config } = require('./storage');
 const logger = require('./logger');
 
 async function retry(fn, opts = {}) {
