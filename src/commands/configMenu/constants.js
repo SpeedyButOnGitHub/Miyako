@@ -207,39 +207,31 @@ const configCategories = {
 			}
 		}
 	},
-	Testing: {
-		description: "Owner-only testing utilities.",
+	Autoroles: {
+		description: "Automatically-assign roles to new members. Manage member autoroles and the bot-only autorole.",
 		settings: {
-			TestingMode: {
-				description: () => `Toggle testing mode. When enabled, certain logs route to a test channel and the warnings UI can use seeded data. Currently: **${config.testingMode ? "Enabled" : "Disabled"}**`,
-				getDisplay: () => (config.testingMode ? "Enabled" : "Disabled"),
-				getLabel: () => "Testing Mode",
-				getSummary: () => (config.testingMode ? "On" : "Off"),
+			AutoRoles: {
+				description: "Roles that will be automatically assigned to new members. Order matters; you can remove by number.",
+				getDisplay: () => {
+					const arr = config.autoRoles || [];
+					if (!arr.length) return "*None*";
+					return arr.map((id, i) => `${i + 1}. <@&${id}>`).join("\n");
+				},
+				getLabel: () => 'Roles',
+				getSummary: () => `${(config.autoRoles || []).length}`,
 				buttons: [
-					{ id: "enable", label: "Enable", style: ButtonStyle.Secondary, emoji: "✅" },
-					{ id: "disable", label: "Disable", style: ButtonStyle.Secondary, emoji: "🛑" }
+					{ id: "addRole", label: "Add Role", style: ButtonStyle.Secondary, emoji: "➕" },
+					{ id: "removeRole", label: "Remove Role", style: ButtonStyle.Secondary, emoji: "✖️" },
+					{ id: "botRole", label: "Bot Role", style: ButtonStyle.Primary, emoji: "🤖" }
 				]
 			},
-			TestingWarnings: {
-				description: () => {
-					const explicitUsers = Object.keys(config.testingWarnings || {}).length;
-					const seededUsers = Object.keys(config.testingSeed || {}).length;
-					return `Manage testing warnings used by the .warnings UI. Explicit: ${explicitUsers}, Seeded: ${seededUsers}.`;
-				},
-				getDisplay: () => {
-					const explicitUsers = Object.keys(config.testingWarnings || {}).length;
-					const seededUsers = Object.keys(config.testingSeed || {}).length;
-					return `Explicit users: ${explicitUsers}\nSeeded users: ${seededUsers}`;
-				},
-				getLabel: () => "Testing Warnings",
-				getSummary: () => {
-					const explicitUsers = Object.keys(config.testingWarnings || {}).length;
-					const seededUsers = Object.keys(config.testingSeed || {}).length;
-					return `${explicitUsers} explicit • ${seededUsers} seeded`;
-				},
+			BotRole: {
+				description: "Role to be automatically assigned to bot accounts (single).",
+				getDisplay: () => (config.autoRolesBot ? `<@&${config.autoRolesBot}>` : "*None*"),
+				getLabel: () => "Bot Role",
+				getSummary: () => (config.autoRolesBot ? "Set" : "None"),
 				buttons: [
-					{ id: "reseed", label: "Reseed", style: ButtonStyle.Secondary, emoji: "🌱" },
-					{ id: "clear", label: "Clear", style: ButtonStyle.Secondary, emoji: "🧹" }
+					{ id: "botRole", label: "Edit", style: ButtonStyle.Primary, emoji: "�" }
 				]
 			}
 		}

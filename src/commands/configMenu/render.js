@@ -90,13 +90,29 @@ function buildSettingEmbed(categoryName, settingName) {
 	const title = `${theme.emojis.edit} ${categoryName} • ${setting.getLabel ? setting.getLabel() : settingName}`;
 	const metaKey = `${categoryName}.${settingName}`;
 	const lastUpdatedTs = settingMeta?.[metaKey]?.lastUpdated;
+	const currentDisplay = setting.getDisplay ? setting.getDisplay() : '—';
 	const e = buildSettingEmbedUnified({
 		title,
 		description: (typeof setting.description === 'function' ? setting.description() : setting.description) || '',
-		current: setting.getDisplay ? setting.getDisplay() : '—',
+		current: null, // we'll add fields below for Autoroles to control inline
 		toggleKey,
 		lastUpdatedTs
 	});
+
+	// Special rendering for Autoroles: show each role as its own non-inline field for compactness
+	if (categoryName === 'Autoroles' && settingName === 'AutoRoles') {
+		const arr = (typeof config.autoRoles === 'object' && Array.isArray(config.autoRoles)) ? config.autoRoles : [];
+		if (!arr.length) {
+			e.addFields({ name: 'Current', value: '*None*' });
+		} else {
+			for (let i = 0; i < arr.length; i++) {
+				const id = arr[i];
+				e.addFields({ name: `${i + 1}.`, value: `<@&${id}>`, inline: false });
+			}
+		}
+	} else {
+		if (currentDisplay) e.addFields({ name: 'Current', value: currentDisplay });
+	}
 	return e;
 }
 
@@ -206,6 +222,16 @@ function renderSettingEmbed(categoryName, settingKey) {
 		const toggleKey = categoryName === 'Testing' ? 'testingMode' : (categoryName==='Sniping' ? 'snipeMode' : 'levelingMode');
 		const on = toggleKey === 'testingMode' ? !!config.testingMode : (toggleKey==='snipeMode' ? config.snipeMode==='whitelist' : config.levelingMode==='whitelist');
 		applyToggleVisual(itemEmbed, { on });
+	}
+
+	// Autoroles legacy display: show each autorole as its own field
+	if (categoryName === 'Autoroles' && settingKey === 'AutoRoles') {
+		const arr = Array.isArray(config.autoRoles) ? config.autoRoles : [];
+		if (!arr.length) {
+			itemEmbed.addFields({ name: 'Current', value: '*None*' });
+		} else {
+			for (let i = 0; i < arr.length; i++) itemEmbed.addFields({ name: `${i+1}.`, value: `<@&${arr[i]}>`, inline: false });
+		}
 	}
 
 	// Single row with toggles/actions/back

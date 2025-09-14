@@ -254,8 +254,21 @@ function startScheduler(client, opts = {}) {
 						const channel = await client.channels.fetch(ev.anchorChannelId).catch(()=>null);
 						if (channel) {
 							const msg = await channel.messages.fetch(ev.anchorMessageId).catch(()=>null);
-							if (msg) {
-								let baseContent = ev.dynamicBaseContent || ev.messageJSON?.content || ev.message || '';
+								if (msg) {
+									// Protect: do not treat clock-in embeds as anchor event messages.
+									// Some events incorrectly had their anchorMessageId point at the
+									// Staff Clock In message; we must avoid editing those.
+									try {
+										const firstEmbed = msg.embeds && msg.embeds[0];
+										const embedTitle = firstEmbed && firstEmbed.title ? String(firstEmbed.title) : '';
+										const embedFooter = firstEmbed && firstEmbed.footer && firstEmbed.footer.text ? String(firstEmbed.footer.text) : '';
+										if (embedTitle.includes('Staff Clock In') || embedFooter.includes('Staff clock in')) {
+											// Skip anchor update for clock-in UI messages
+											continue;
+										}
+									} catch (e) { /* ignore guard failures and continue */ }
+
+									let baseContent = ev.dynamicBaseContent || ev.messageJSON?.content || ev.message || '';
 								baseContent = applyTimestampPlaceholders(baseContent, ev);
 								if (!baseContent) baseContent = `Event: ${ev.name}`;
 								let newContent = baseContent;

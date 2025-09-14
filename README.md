@@ -133,3 +133,21 @@ Windows alternative: if you prefer a Windows service, use NSSM (Non-Sucking Serv
 
 If you'd like, I can add a sample PowerShell script and NSSM instructions for installing the bot as a service.
 
+## Testing shortcuts
+
+For fast local feedback during development the repository is configured so `npm test` runs a curated fast test set (startup, clock-in, scheduling, refresh/delete semantics).
+
+- Quick run (fast, intended for iterative dev):
+
+```powershell
+npm test
+```
+
+- Full test suite (comprehensive, slower):
+
+```powershell
+npm run test:full
+```
+
+The fast runner is driven by `fast-tests.json` and `scripts/fast-tests.js` so you can tweak which tests are included without editing `package.json` directly. If you need comments/descriptions for the curated tests we can switch the list to a small JS file for inline notes.
+

@@ -154,6 +154,12 @@ async function handleClockInSelect(interaction) {
 				positions[choice].push(member.id);
 			}
 			const newClock = { ...existing, positions, messageIds };
+			// If user unregistered (choice === 'none'), also clear any autoNext registration they may have
+			try {
+				if (choice === 'none' && newClock && typeof newClock === 'object' && newClock.autoNext && newClock.autoNext[member.id]) {
+					delete newClock.autoNext[member.id];
+				}
+			} catch {}
 			// Persist runtime overlay immediately
 			try { updateEvent(ev.id, { [clockKey]: newClock }); } catch (e) { try { require('../utils/logger').warn('[clockin] updateEvent failed', { err: e?.message, eventId: ev.id }); } catch {} }
 			// Re-render all clock-in messages using the hydrated event so embed builder sees updated positions
@@ -1313,7 +1319,14 @@ function attachInteractionEvents(client) {
 						} catch {}
 					}
 				} catch {}
-				await interaction.reply({ content:`You will be auto-registered as ${roleKey.replace(/_/g,' ')} next clock-in.`, flags:1<<6 }).catch(()=>{});
+								try {
+									const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+									const userHasAuto = !!(clock && clock.autoNext && clock.autoNext[interaction.user.id]);
+									const row = new ActionRowBuilder().addComponents(
+										new ButtonBuilder().setCustomId(`clockin:autoNextCancel:${ev.id}`).setLabel('Cancel auto').setStyle(ButtonStyle.Secondary).setDisabled(!userHasAuto)
+									);
+									await interaction.reply({ content:`You will be auto-registered as ${roleKey.replace(/_/g,' ')} next clock-in.`, components:[row], flags:1<<6 }).catch(()=>{});
+								} catch { await interaction.reply({ content:`You will be auto-registered as ${roleKey.replace(/_/g,' ')} next clock-in.`, flags:1<<6 }).catch(()=>{}); }
 				return;
 			}
 			// Clock-In autoNext cancel

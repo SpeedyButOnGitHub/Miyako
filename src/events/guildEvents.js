@@ -2,6 +2,15 @@ const { logMemberLeave } = require("../utils/memberLogs");
 const { logRoleChange } = require("../utils/roleLogs");
 const { logMessageDelete, logMessageEdit } = require("../utils/messageLogs");
 const { handleMessageDelete: handleSnipeDelete } = require("../commands/snipes");
+const { updateStaffMessage } = require('../utils/staffTeam');
+const { config } = require('../utils/storage');
+const rolesConfig = require('../../config/roles');
+
+// Debounce map to coalesce frequent staff updates per guild (ms)
+const staffUpdateTimers = new Map();
+const STAFF_UPDATE_DEBOUNCE_MS = 5000; // 5s debounce
+
+const logger = require('../utils/logger');
 
 function attachGuildEvents(client) {
 	// Member leaves
@@ -13,11 +22,57 @@ function attachGuildEvents(client) {
 		}
 	});
 
+		// Member joins: assign autoroles
+		client.on('guildMemberAdd', async (member) => {
+			try {
+				// If configured, assign bot-only autorole to bots
+				if (member.user && member.user.bot) {
+					const botRole = config.autoRolesBot || null;
+					if (botRole) {
+						try {
+							await member.roles.add(botRole);
+						} catch (e) {
+							try { logger.warn('[guildMemberAdd] failed to add bot autorole', { guildId: member.guild.id, userId: member.id, roleId: botRole, err: e && e.message }); } catch {};
+						}
+					}
+				}
+				// Assign configured autoroles to regular members
+				const auto = Array.isArray(config.autoRoles) ? config.autoRoles.slice() : [];
+				if (auto && auto.length && !(member.user && member.user.bot)) {
+					try {
+						await member.roles.add(auto);
+					} catch (e) {
+						try { logger.warn('[guildMemberAdd] failed to add autoroles', { guildId: member.guild.id, userId: member.id, roles: auto, err: e && e.message }); } catch {};
+					}
+				}
+				// After assignment, schedule an update to the Staff Team message (debounced)
+				try {
+					const gid = member.guild.id;
+					if (staffUpdateTimers.has(gid)) clearTimeout(staffUpdateTimers.get(gid));
+					staffUpdateTimers.set(gid, setTimeout(async () => {
+						staffUpdateTimers.delete(gid);
+						try { await updateStaffMessage(member.guild); } catch (e) { try { logger.warn('[updateStaffMessage] debounced update failed', { guildId: gid, err: e && e.message }); } catch {} }
+					}, STAFF_UPDATE_DEBOUNCE_MS));
+				} catch (e) { try { logger.warn('[guildMemberAdd] schedule staff update failed', { guildId: member.guild.id, err: e && e.message }); } catch {} }
+			} catch (err) {
+				console.error('[guildMemberAdd] autorole error:', err && err.message ? err.message : err);
+			}
+		});
+
 	// Role add/remove
 	client.on("guildMemberUpdate", async (oldMember, newMember) => {
 		try {
 			const oldRoles = new Set(oldMember.roles.cache.keys());
 			const newRoles = new Set(newMember.roles.cache.keys());
+
+			// Determine whether any of the tracked staff roles changed
+			let staffRoleChanged = false;
+			try {
+				const tracked = Object.values(rolesConfig.ROLES || {});
+				for (const r of tracked) {
+					if (oldRoles.has(r) !== newRoles.has(r)) { staffRoleChanged = true; break; }
+				}
+			} catch {}
 
 			// Added roles
 			for (const roleId of newRoles) {
@@ -33,6 +88,18 @@ function attachGuildEvents(client) {
 					if (role) await logRoleChange(client, newMember, role, "remove");
 				}
 			}
+
+			// If any staff role changed, update the staff message
+				if (staffRoleChanged) {
+					try {
+						const gid = newMember.guild.id;
+						if (staffUpdateTimers.has(gid)) clearTimeout(staffUpdateTimers.get(gid));
+						staffUpdateTimers.set(gid, setTimeout(async () => {
+							staffUpdateTimers.delete(gid);
+							try { await updateStaffMessage(newMember.guild); } catch (e) { try { logger.warn('[updateStaffMessage] debounced update failed', { guildId: gid, err: e && e.message }); } catch {} }
+						}, STAFF_UPDATE_DEBOUNCE_MS));
+					} catch (e) { try { logger.warn('[guildMemberUpdate] schedule staff update failed', { guildId: newMember.guild.id, err: e && e.message }); } catch {} }
+				}
 		} catch (err) {
 			console.error("[guildMemberUpdate] role log error:", err);
 		}

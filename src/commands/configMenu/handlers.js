@@ -324,6 +324,96 @@ async function handleButton(interaction, [categoryName, settingName, action]) {
 		return;
 	}
 
+	// Autoroles management
+	if (categoryName === 'Autoroles' && settingName === 'AutoRoles' && (action === 'addRole' || action === 'removeRole')) {
+	if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });
+		const modalId = `config:modal:autoroles:${action}:${Date.now()}`;
+		const modal = new ModalBuilder().setCustomId(modalId).setTitle(action === 'addRole' ? 'Add Autorole(s)' : 'Remove Autorole');
+		const input = new TextInputBuilder()
+			.setCustomId('roles')
+			.setLabel(action === 'addRole' ? 'Role IDs or mentions (comma-separated)' : 'Role numbers or IDs (comma-separated)')
+			.setStyle(TextInputStyle.Paragraph)
+			.setRequired(true)
+			.setMaxLength(400);
+		modal.addComponents(new ActionRowBuilder().addComponents(input));
+		await interaction.showModal(modal);
+		const submitted = await interaction.awaitModalSubmit({ time: 30000, filter: i => i.customId === modalId && i.user.id === interaction.user.id }).catch(() => null);
+		if (!submitted) return;
+		const raw = submitted.fields.getTextInputValue('roles') || '';
+		const items = raw.split(',').map(s => s.trim()).filter(Boolean);
+		// addRole: accept role mentions or ids; allow multiple
+		if (action === 'addRole') {
+			const ids = items.map(s => s.replace(/[^0-9]/g, '')).filter(Boolean);
+			const valid = ids.filter(id => !!interaction.guild.roles.cache.get(id));
+			if (!valid.length) return submitted.reply({ content: 'No valid roles found in input.', flags: 1<<6 });
+			config.autoRoles = Array.isArray(config.autoRoles) ? config.autoRoles : [];
+			for (const id of valid) if (!config.autoRoles.includes(id)) config.autoRoles.push(id);
+			await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
+			await logConfigChange(interaction.client, { user: interaction.user, change: `Added autoroles: ${valid.map(id=>`<@&${id}>`).join(', ')}` });
+			await submitted.reply({ content: `Added autoroles: ${valid.map(id=>`<@&${id}>`).join(', ')}.`, flags: 1<<6 });
+			await refreshSettingMessage(interaction.message, categoryName, settingName);
+			return;
+		}
+		// removeRole: accept numeric indices (1-based) or role ids
+		if (action === 'removeRole') {
+			const arr = Array.isArray(config.autoRoles) ? config.autoRoles.slice() : [];
+			const toRemove = new Set();
+			for (const it of items) {
+				const num = Number(it);
+				if (Number.isInteger(num) && num >= 1 && num <= arr.length) {
+					toRemove.add(arr[num - 1]);
+					continue;
+				}
+				const id = it.replace(/[^0-9]/g, '');
+				if (id && arr.includes(id)) toRemove.add(id);
+			}
+			if (!toRemove.size) return submitted.reply({ content: 'No matching autoroles found to remove.', flags: 1<<6 });
+			config.autoRoles = arr.filter(id => !toRemove.has(id));
+			await saveConfig(); touchSettingMeta(`${categoryName}.${settingName}`);
+			await logConfigChange(interaction.client, { user: interaction.user, change: `Removed autoroles: ${[...toRemove].map(id=>`<@&${id}>`).join(', ')}` });
+			await submitted.reply({ content: `Removed autoroles.`, flags: 1<<6 });
+			await refreshSettingMessage(interaction.message, categoryName, settingName);
+			return;
+		}
+	}
+
+	// Bot autorole edit (single value) -- accept invocations from either the AutoRoles row or the BotRole setting
+	if (categoryName === 'Autoroles' && (settingName === 'BotRole' || settingName === 'AutoRoles') && action === 'botRole') {
+	if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });
+		const modalId = `config:modal:autoroles:bot:${Date.now()}`;
+		const modal = new ModalBuilder().setCustomId(modalId).setTitle('Set Bot Autorole');
+		const input = new TextInputBuilder()
+			.setCustomId('role')
+			.setLabel('Role ID or mention (leave blank to clear)')
+			.setStyle(TextInputStyle.Short)
+			.setRequired(false)
+			.setMaxLength(64);
+		modal.addComponents(new ActionRowBuilder().addComponents(input));
+		await interaction.showModal(modal);
+		const submitted = await interaction.awaitModalSubmit({ time: 30000, filter: i => i.customId === modalId && i.user.id === interaction.user.id }).catch(() => null);
+		if (!submitted) return;
+		const raw = submitted.fields.getTextInputValue('role') || '';
+		const id = (raw || '').replace(/[^0-9]/g, '');
+		if (id) {
+			const role = interaction.guild.roles.cache.get(id);
+			if (!role) return submitted.reply({ content: 'Invalid or unknown role.', flags: 1<<6 });
+			config.autoRolesBot = id;
+			await saveConfig(); touchSettingMeta(`${categoryName}.BotRole`);
+			await logConfigChange(interaction.client, { user: interaction.user, change: `Set bot autorole to <@&${id}>` });
+			await submitted.reply({ content: `Bot autorole set to <@&${id}>.`, flags: 1<<6 });
+			await refreshSettingMessage(interaction.message, categoryName, settingName);
+			return;
+		}
+		// clearing
+		const prev = config.autoRolesBot;
+		delete config.autoRolesBot;
+		await saveConfig(); touchSettingMeta(`${categoryName}.BotRole`);
+		await logConfigChange(interaction.client, { user: interaction.user, change: `Cleared bot autorole (was ${prev || 'none'})` });
+		await submitted.reply({ content: 'Cleared bot autorole.', flags: 1<<6 });
+		await refreshSettingMessage(interaction.message, categoryName, settingName);
+		return;
+	}
+
 	// Role Log Blacklist management
 	if (categoryName === 'Moderation' && settingName === 'RoleLogBlacklist' && (action === 'addBlacklistRole' || action === 'removeBlacklistRole')) {
 	if (!interaction.guild) return interaction.reply({ content: 'Guild only.', flags: 1<<6 });

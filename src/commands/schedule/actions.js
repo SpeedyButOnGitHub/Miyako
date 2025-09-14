@@ -243,6 +243,12 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
           ev.__notifMsgs = map;
         } catch {}
 
+        // Ensure scheduled deletion is registered for the posted clock-in message
+        try {
+          const { scheduleDeleteForMessage } = require('./notifications');
+          try { scheduleDeleteForMessage(interaction.client, channel, sentClock, notif, ev); } catch {}
+        } catch {}
+
         if (!config.testingMode) {
           notif.__skipUntil = Date.now() + 60*60*1000;
           notif.lastManualTrigger = Date.now();
@@ -312,7 +318,10 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   try {
     const delMs = Number(notif.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
     if (!config.testingMode && sent && delMs > 0) {
-      setTimeout(() => { try { sent.delete().catch(()=>{}); } catch {} }, delMs);
+      try {
+        const { scheduleDeleteForMessage } = require('./notifications');
+        try { scheduleDeleteForMessage(interaction.client, channel, sent, notif, ev); } catch {}
+      } catch {}
     }
   } catch {}
   try {

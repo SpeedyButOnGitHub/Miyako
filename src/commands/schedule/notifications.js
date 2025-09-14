@@ -2,7 +2,10 @@ const theme = require('../../utils/theme');
 const { createEmbed, safeAddField } = require('../../utils/embeds');
 const { buildNavRow, semanticButton } = require('../../ui');
 const { config } = require('../../utils/storage');
+const { updateEvent } = require('../../utils/eventsStorage');
 const { humanizeMinutes, humanizeMs, applyPlaceholdersToJsonPayload, sanitizeMentionsForTesting } = require('./helpers');
+const { getAll: getPersistedDeletes, setForMessage: persistDeleteForMessage, removeForMessage: removePersistedDelete } = require('../../utils/scheduledDeletes');
+const logger = require('../../utils/logger');
 
 function buildNotifsEmbed(guild, ev) {
   const embed = createEmbed({
@@ -84,15 +87,95 @@ function notifDetailRows(ev, notif) {
   return [row1, row2];
 }
 
+// Map of scheduled delete timers keyed by message id to avoid double-scheduling
+const scheduledDeleteTimers = new Map();
+
+function scheduleDeleteForMessage(client, channel, msg, notif, ev) {
+  try {
+    if (!msg || !msg.id) return;
+    const delMs = Number(notif.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
+    if (config.testingMode || !delMs || delMs <= 0) return;
+  if (scheduledDeleteTimers.has(msg.id)) return;
+    const age = Date.now() - (msg.createdTimestamp || Date.now());
+    const remaining = delMs - age;
+    // If already expired, delete now and persist pruning
+    if (remaining <= 0) {
+      try { if (channel && channel.messages) channel.messages.delete(msg.id).catch(()=>{}); } catch {}
+      try {
+        if (ev && ev.id && notif && notif.id) {
+          const map = ev.__notifMsgs && typeof ev.__notifMsgs === 'object' ? { ...ev.__notifMsgs } : {};
+          const rec = map[notif.id] && typeof map[notif.id] === 'object' ? { ...map[notif.id] } : null;
+          if (rec && Array.isArray(rec.ids)) {
+            rec.ids = rec.ids.filter(id => id && id !== msg.id);
+            map[notif.id] = rec;
+            ev.__notifMsgs = map;
+          }
+          if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds)) ev.__clockIn.messageIds = ev.__clockIn.messageIds.filter(id => id && id !== msg.id);
+          updateEvent(ev.id, { __notifMsgs: map, __clockIn: ev.__clockIn });
+        }
+      } catch {}
+      try { removePersistedDelete(msg.id); } catch {}
+      return;
+    }
+
+    const t = setTimeout(async () => {
+      try { scheduledDeleteTimers.delete(msg.id); } catch {}
+      try {
+        const ch = channel || (client && client.channels ? await client.channels.fetch(msg.channelId).catch(()=>null) : null);
+        if (ch && ch.messages) await ch.messages.delete(msg.id).catch(()=>{});
+      } catch {}
+      try {
+        if (ev && ev.id && notif && notif.id) {
+          const map = ev.__notifMsgs && typeof ev.__notifMsgs === 'object' ? { ...ev.__notifMsgs } : {};
+          const rec = map[notif.id] && typeof map[notif.id] === 'object' ? { ...map[notif.id] } : null;
+          if (rec && Array.isArray(rec.ids)) {
+            rec.ids = rec.ids.filter(id => id && id !== msg.id);
+            map[notif.id] = rec;
+          }
+          if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds)) ev.__clockIn.messageIds = ev.__clockIn.messageIds.filter(id => id && id !== msg.id);
+          updateEvent(ev.id, { __notifMsgs: map, __clockIn: ev.__clockIn });
+        }
+      } catch {}
+    }, remaining);
+    if (typeof t.unref === 'function') t.unref();
+    scheduledDeleteTimers.set(msg.id, t);
+    try {
+      const entry = { eventId: ev && ev.id ? ev.id : null, notifId: notif && notif.id ? notif.id : null, channelId: channel && channel.id ? channel.id : (msg.channelId||null), scheduledAt: Date.now(), deleteAfterMs: delMs, messageCreatedAt: msg.createdTimestamp || Date.now() };
+      try { persistDeleteForMessage(msg.id, entry); } catch (e) { logger && logger.warn && logger.warn('[scheduleDelete] persist failed', { err: e && e.message }); }
+    } catch (e) { logger && logger.warn && logger.warn('[scheduleDelete] prepare persist failed', { err: e && e.message }); }
+  } catch (e) { try { require('../../utils/logger').warn('[scheduleDelete] failed', { err: e && e.message }); } catch{} }
+}
+
+async function reconstructScheduledDeletes(client) {
+  try {
+  const persisted = getPersistedDeletes();
+    if (!persisted || typeof persisted !== 'object') return;
+    const { getEvent } = require('../../utils/eventsStorage');
+    for (const [mid, entry] of Object.entries(persisted)) {
+      try {
+        const chId = entry.channelId;
+        const ch = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
+        if (!ch || !ch.messages) continue;
+        const msg = await ch.messages.fetch(mid).catch(()=>null);
+        if (!msg) continue;
+  // Reconstruct notif and event if possible
+        let ev = null; let notif = null;
+        try { if (entry.eventId) ev = getEvent(entry.eventId); } catch {}
+        try { if (ev && ev.autoMessages && entry.notifId) notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(entry.notifId)); } catch {}
+        if (!notif) notif = { deleteAfterMs: entry.deleteAfterMs };
+        // Schedule using existing helper
+        try { scheduleDeleteForMessage(client, ch, msg, notif, ev); } catch {}
+      } catch {}
+    }
+  } catch (e) { try { require('../../utils/logger').warn('[reconstructScheduledDeletes] failed', { err: e && e.message }); } catch{} }
+
+}
+
 async function refreshTrackedAutoMessages(client, ev, options = {}) {
   try {
     const map = ev.__notifMsgs && typeof ev.__notifMsgs==='object' ? ev.__notifMsgs : null;
     if (map && Array.isArray(ev.autoMessages)) {
       for (const notif of ev.autoMessages) {
-        // Skip generic payload edits for clock-in messages: clock-in messages are rendered
-        // dynamically via the dedicated clock-in renderer below and must not be overwritten
-        // by the static template stored on the autoMessage. Treat the autoMessage entry as
-        // a template only in that case.
         if (notif && notif.isClockIn) continue;
         const rec = map[notif.id];
         if (!rec || !rec.channelId || !Array.isArray(rec.ids) || rec.ids.length===0) continue;
@@ -111,15 +194,13 @@ async function refreshTrackedAutoMessages(client, ev, options = {}) {
           if (config.testingMode) content = sanitizeMentionsForTesting(content);
           payload = { content };
         }
-        // Handle role mentions if present; ensure allowedMentions to avoid accidental mass pings
         const mentionLine = Array.isArray(notif.mentions) && notif.mentions.length ? notif.mentions.map(r=>`<@&${r}>`).join(' ') : null;
         if (mentionLine) {
           if (payload.content) payload.content = `${mentionLine}\n${payload.content}`.slice(0,2000);
           else payload.content = mentionLine.slice(0,2000);
           payload.allowedMentions = { roles: notif.mentions.slice(0,20) };
         }
-        // Canonical live-content preservation: if the most recent existing message differs from the freshly built
-        // payload (indicating a manual/live edit or drift), prefer the live snapshot to avoid reverting on restart.
+
         try {
           const shouldForce = options && (options.forceAll === true || (Array.isArray(options.forceForIds) && options.forceForIds.map(String).includes(String(notif.id))));
           const latestId = rec.ids[rec.ids.length - 1];
@@ -134,7 +215,6 @@ async function refreshTrackedAutoMessages(client, ev, options = {}) {
               e: (payload.embeds||[]).map(e=>({ t:e.title, d:e.description, f:(e.fields||[]).map(f=>({n:f.name,v:f.value})) }))
             });
             if (!shouldForce && liveSig !== newSig) {
-              // Adopt live content/embeds (but keep allowedMentions we computed if any)
               payload.content = latestMsg.content || payload.content;
               if ((latestMsg.embeds||[]).length) {
                 payload.embeds = latestMsg.embeds.map(e=>({
@@ -145,11 +225,7 @@ async function refreshTrackedAutoMessages(client, ev, options = {}) {
                   fields: (e.fields||[]).map(f=>({ name: f.name, value: f.value, inline: f.inline }))
                 })).slice(0,10);
               }
-            } else {
-              // If forcing update we keep new payload; fallthrough
             }
-            // Ensure mention line is present when configured. If live content was adopted and lacks the mention
-            // prepend it so role pings configured by staff cannot be accidentally lost.
             try {
               if (mentionLine && payload && payload.content && !payload.content.startsWith(mentionLine)) {
                 payload.content = `${mentionLine}\n${payload.content}`.slice(0,2000);
@@ -158,134 +234,113 @@ async function refreshTrackedAutoMessages(client, ev, options = {}) {
             } catch {}
           }
         } catch {}
+
         for (const mid of rec.ids.slice(-3)) {
           try {
             const msg = await channel.messages.fetch(mid).catch(()=>null);
             if (msg) {
               const { retry } = require('../../utils/retry');
-              await retry(() => msg.edit(payload), { attempts: 3, baseMs: 50, maxMs: 300 }).catch((e)=>{ try { require('../../utils/logger').warn('[notif refresh] edit failed', { err: e?.message, mid, eventId: ev.id }); } catch{} });
+              await retry(() => msg.edit(payload), { attempts: 3, baseMs: 50, maxMs: 300 }).catch((e)=>{ try { logger && logger.warn && logger.warn('[notif refresh] edit failed', { err: e?.message, mid, eventId: ev.id }); } catch{} });
+              try { scheduleDeleteForMessage(client, channel, msg, notif, ev); } catch {}
             }
-          } catch (e) { try { require('../../utils/logger').warn('[notif refresh] fetch/edit failed', { err: e.message, mid, eventId: ev.id }); } catch {} }
+          } catch (e) { try { logger && logger.warn && logger.warn('[notif refresh] fetch/edit failed', { err: e.message, mid, eventId: ev.id }); } catch {} }
         }
       }
     }
+
+    // Clock-in messages: collect targets and refresh separately
     if (ev.__clockIn && (Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length || (ev.__notifMsgs && typeof ev.__notifMsgs === 'object'))) {
-      // Collect message targets from multiple runtime locations so startup rehydration
-      // edits every known posted clock-in message (some messages may live only in
-      // the per-notification mapping __notifMsgs).
       const msgTargets = [];
       try {
         if (Array.isArray(ev.__clockIn.messageIds)) {
-          for (const id of ev.__clockIn.messageIds) {
-            msgTargets.push({ id, channelId: ev.__clockIn.channelId || ev.channelId });
-          }
+          for (const id of ev.__clockIn.messageIds) msgTargets.push({ id, channelId: ev.__clockIn.channelId || ev.channelId });
         }
       } catch {}
 
       try {
         if (ev.__notifMsgs && typeof ev.__notifMsgs === 'object') {
-          for (const rec of Object.values(ev.__notifMsgs)) {
-            if (rec && Array.isArray(rec.ids)) {
-              for (const id of rec.ids) msgTargets.push({ id, channelId: rec.channelId || ev.__clockIn?.channelId || ev.channelId });
-            }
+          for (const [nid, rec] of Object.entries(ev.__notifMsgs)) {
+            try {
+              // Only include per-notification records that correspond to a clock-in autoMessage
+              const auto = (ev.autoMessages||[]).find(a => String(a.id) === String(nid));
+              if (!auto || !auto.isClockIn) continue;
+              if (rec && Array.isArray(rec.ids)) {
+                for (const id of rec.ids) msgTargets.push({ id, channelId: rec.channelId || ev.__clockIn?.channelId || ev.channelId });
+              }
+            } catch {}
           }
         }
       } catch {}
 
-      // De-duplicate and limit to recent targets to avoid excessive edits on large histories
       const seen = new Set();
       const uniqueTargets = msgTargets.filter(t => { if (!t || !t.id) return false; if (seen.has(t.id)) return false; seen.add(t.id); return true; }).slice(-20);
 
       for (const t of uniqueTargets) {
-        const chId = t.channelId || ev.__clockIn?.channelId || ev.channelId;
-        const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
-        if (!channel || !channel.messages) continue;
-        // Hydrate runtime clock-in state explicitly. In some restart scenarios the in-memory
-        // merged event passed into this function may not yet include the latest persisted
-        // runtime overlay (positions), causing the embed to show *None* for all roles until
-        // a user interacts again. We defensively re-load the runtime record and prefer any
-        // populated positions from there before rendering.
-        let hydrated = ev;
         try {
-          const { getRuntime } = require('../../utils/eventsRuntimeLog');
+          const chId = t.channelId || ev.__clockIn?.channelId || ev.channelId;
+          const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
+          if (!channel || !channel.messages) continue;
+
+          let hydrated = ev;
+          try {
+            const { getRuntime } = require('../../utils/eventsRuntimeLog');
             const rt = getRuntime(ev.id) || {};
             if (rt.__clockIn && rt.__clockIn.positions) {
-              // Only overwrite if we actually have at least one registered user recorded.
-              const hasAny = Object.values(rt.__clockIn.positions).some(arr => Array.isArray(arr) && arr.length);
-              if (hasAny) {
-                // Optionally prune users who have left the guild to prevent stale pings.
-                try {
-                  const guild = channel.guild;
-                  if (guild) {
-                    const prunedPositions = {};
-                    for (const [role, list] of Object.entries(rt.__clockIn.positions)) {
-                      if (!Array.isArray(list)) continue;
-                      const filtered = [];
-                      for (const uid of list) {
-                        const member = guild.members.cache.get(uid);
-                        if (member) filtered.push(uid);
-                      }
-                      prunedPositions[role] = filtered;
-                    }
-                    rt.__clockIn.positions = prunedPositions;
-                    // If pruning changed anything, persist runtime patch
-                    const changed = Object.entries(prunedPositions).some(([k,v]) => {
-                      const orig = (ev.__clockIn && ev.__clockIn.positions && ev.__clockIn.positions[k]) || [];
-                      return Array.isArray(v) && v.length !== orig.length;
-                    });
-                    if (changed) {
-                      try { const { updateEvent } = require('../../utils/eventsStorage'); updateEvent(ev.id, { __clockIn: { ...rt.__clockIn } }); } catch {}
-                    }
+              const guild = channel.guild;
+              if (guild) {
+                const prunedPositions = {};
+                for (const [role, list] of Object.entries(rt.__clockIn.positions)) {
+                  if (!Array.isArray(list)) continue;
+                  const filtered = [];
+                  for (const uid of list) {
+                    const member = guild.members.cache.get(uid);
+                    if (member) filtered.push(uid);
                   }
-                } catch {}
-                hydrated = { ...ev, __clockIn: { ...ev.__clockIn, ...rt.__clockIn } };
-                try { require('../../utils/logger').debug('[ClockIn Hydrate]', { eventId: ev.id, updated: true }); } catch {}
-              } else {
-                try { require('../../utils/logger').debug('[ClockIn Hydrate]', { eventId: ev.id, updated: false }); } catch {}
-              }
-            }
-        } catch {}
-        const { buildClockInEmbed } = require('../../utils/clockinTemplate');
-        const embed = buildClockInEmbed(hydrated);
-  // If this notification template configured role mentions, ensure mention line is present
-  let mentionLine = null;
-  try { mentionLine = Array.isArray(notif.mentions) && notif.mentions.length ? notif.mentions.map(r=>`<@&${r}>`).join(' ') : null; } catch {}
-        // Edit each unique target (limited above to recent 20). This mirrors the
-        // interaction-path re-render which considers both __clockIn.messageIds and __notifMsgs.
-        for (const t2 of uniqueTargets) {
-          try {
-            const msg = await channel.messages.fetch(t2.id).catch(()=>null);
-            if (msg) {
-              // Rate-limit guard: only edit if embed content changed (compare serialized fields)
-              let existingSig = '';
-              try {
-                const e0 = msg.embeds && msg.embeds[0];
-                if (e0) {
-                  existingSig = JSON.stringify({
-                    title: e0.title,
-                    desc: e0.description,
-                    fields: (e0.fields||[]).map(f=>({n:f.name,v:f.value})),
-                    footer: e0.footer?.text
-                  });
+                  prunedPositions[role] = filtered;
                 }
-              } catch {}
-              let nextSig = '';
-              try { nextSig = JSON.stringify({ title: embed.title, desc: embed.description, fields: embed.fields, footer: embed.footer?.text }); } catch {}
-              if (existingSig !== nextSig) {
-                try {
-                  const { retry } = require('../../utils/retry');
-                  const content = mentionLine ? `${mentionLine}\n` : '';
-                  const payload = { content, embeds:[embed] };
-                  if (mentionLine) payload.allowedMentions = { roles: notif.mentions.slice(0,20) };
-                  await retry(() => msg.edit(payload), { attempts: 3, baseMs: 50, maxMs: 300 }).catch((e)=>{ try { require('../../utils/logger').warn('[notif refresh] clockin edit failed', { err: e?.message, mid: t2.id, eventId: ev.id }); } catch{} });
-                } catch (e) { try { require('../../utils/logger').warn('[notif refresh] clockin edit outer failed', { err: e?.message, mid: t2.id, eventId: ev.id }); } catch {} }
+                rt.__clockIn.positions = prunedPositions;
+                const changed = Object.entries(prunedPositions).some(([k,v]) => {
+                  const orig = (ev.__clockIn && ev.__clockIn.positions && ev.__clockIn.positions[k]) || [];
+                  return Array.isArray(v) && v.length !== orig.length;
+                });
+                if (changed) {
+                  updateEvent(ev.id, { __clockIn: rt.__clockIn });
+                  try { logger && logger.debug && logger.debug('[ClockIn Hydrate]', { eventId: ev.id, updated: true }); } catch {}
+                }
+                hydrated = { ...ev, __clockIn: { ...ev.__clockIn, positions: rt.__clockIn.positions } };
               }
             }
           } catch {}
-        }
+
+          const { buildClockInEmbed } = require('../../utils/clockinTemplate');
+          const embed = buildClockInEmbed(hydrated);
+          const clkNotif = (ev.autoMessages||[]).find(n=>n.isClockIn) || null;
+          let mentionLine = null;
+          try { mentionLine = Array.isArray(clkNotif?.mentions) && clkNotif.mentions.length ? clkNotif.mentions.map(r=>`<@&${r}>`).join(' ') : null; } catch {}
+
+          const msg = await channel.messages.fetch(t.id).catch(()=>null);
+          if (!msg) continue;
+          let existingSig = '';
+          try {
+            const e0 = msg.embeds && msg.embeds[0];
+            if (e0) existingSig = JSON.stringify({ desc: e0.description, fields: (e0.fields||[]).map(f=>({n:f.name,v:f.value})), footer: e0.footer?.text });
+          } catch {}
+          let nextSig = '';
+          try { nextSig = JSON.stringify({ title: embed.title, desc: embed.description, fields: embed.fields, footer: embed.footer?.text }); } catch {}
+          if (existingSig !== nextSig) {
+            try {
+              const { retry } = require('../../utils/retry');
+              const content = mentionLine ? `${mentionLine}\n` : '';
+              const payload = { content, embeds:[embed] };
+              if (mentionLine && Array.isArray(clkNotif?.mentions)) payload.allowedMentions = { roles: clkNotif.mentions.slice(0,20) };
+              await retry(() => msg.edit(payload), { attempts: 3, baseMs: 50, maxMs: 300 }).catch((e)=>{ try { logger && logger.warn && logger.warn('[notif refresh] clockin edit failed', { err: e?.message, mid: t.id, eventId: ev.id }); } catch{} });
+              try { scheduleDeleteForMessage(client, channel, msg, clkNotif, ev); } catch (e) { logger && logger.warn && logger.warn('[notif refresh] schedule failed', { err: e && e.message }); }
+            } catch (e) { try { logger && logger.warn && logger.warn('[notif refresh] clockin edit outer failed', { err: e?.message, mid: t.id, eventId: ev.id }); } catch {} }
+          }
+        } catch {}
       }
     }
-  } catch {}
+  } catch (e) { try { logger && logger.warn && logger.warn('[refreshTrackedAutoMessages] failed', { err: e?.message }); } catch {} }
 }
 
 module.exports = {
@@ -294,4 +349,6 @@ module.exports = {
   notifSelectRows,
   notifDetailRows,
   refreshTrackedAutoMessages,
+  scheduleDeleteForMessage,
+  reconstructScheduledDeletes,
 };

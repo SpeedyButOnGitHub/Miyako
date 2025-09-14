@@ -283,6 +283,12 @@ client.once('clientReady', async () => {
   // Start the scheduler loop
   try { startScheduler(client); } catch (e) { logger.error('[Scheduler] start error', { err: e.message }); }
 
+  // Reconstruct persisted scheduled delete timers so message TTLs survive restarts
+  try {
+    const { reconstructScheduledDeletes } = require('./commands/schedule/notifications');
+    try { await reconstructScheduledDeletes(client); } catch (e) { logger.warn('[reconstructScheduledDeletes] failed', { err: e && e.message }); }
+  } catch (e) { logger.warn('[reconstructScheduledDeletes] require failed', { err: e && e.message }); }
+
   // Start voice leveling loop
   try { startVoiceLeveling(client); } catch (e) { logger.error('[VoiceLeveling] start error', { err: e.message }); }
 
@@ -307,7 +313,10 @@ client.once('clientReady', async () => {
     const evs = getEvents();
     for (const ev of evs) {
       // Light throttle to avoid rate limits on large sets
-      try { await refreshTrackedAutoMessages(client, ev); } catch {}
+      // Force refresh at startup so persisted auto messages are reconciled
+      // with the latest payloads (prevents stale or incorrect content from
+      // surviving a restart)
+      try { await refreshTrackedAutoMessages(client, ev, { forceAll: true }); } catch {}
       await new Promise((r) => setTimeout(r, 150));
     }
   } catch (e) { logger.error('[Startup Refresh] error', { err: e.message }); }

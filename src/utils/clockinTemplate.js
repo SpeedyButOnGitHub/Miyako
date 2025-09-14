@@ -54,19 +54,7 @@ function buildClockInEmbed(ev) {
     }
     return out;
   });
-  // Add legend if any starred users
-  try {
-    if (autoNext && Object.keys(autoNext).length) {
-      const anyStarred = Object.keys(autoNext).some(uid => {
-        const assignedRole = getAutoNextRole(autoNext[uid]);
-        return assignedRole && Object.entries(positions).some(([rk, arr]) => Array.isArray(arr) && arr.includes(uid) && assignedRole === rk);
-      });
-      if (anyStarred && tpl.fields.length < 25) {
-        // Updated legend format per UX request
-        tpl.fields.push({ name: 'Legend', value: '*** :**Auto registered next', inline: false });
-      }
-    }
-  } catch {}
+  // Legend removed per request: do not include a Legend field in the clock-in embed
   return tpl;
 }
 
