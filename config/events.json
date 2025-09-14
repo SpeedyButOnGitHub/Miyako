@@ -1,5 +1,5 @@
 {
-  "nextId": 273,
+  "nextId": 277,
   "events": [
     {
       "id": "3",
@@ -3035,6 +3035,52 @@
     },
     {
       "id": "271",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "273",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "274",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "275",
       "name": "E",
       "autoMessages": [
         {

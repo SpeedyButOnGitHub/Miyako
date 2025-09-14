@@ -70,3 +70,4 @@ legacy/
 
 # Data runtime: ignore everything under data (all JSON runtime state)
 data/
+config/events.json
