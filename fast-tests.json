@@ -6,4 +6,5 @@
   "tests/retryDelete.test.js",
   "tests/refreshEdit.edge.test.js",
   "tests/clockinDeletePrune.test.js"
+  ,"tests/schedule.delete.test.js"
 ]

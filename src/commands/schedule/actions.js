@@ -239,8 +239,7 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
 
         // Ensure scheduled deletion is registered for the posted clock-in message
         try {
-          const { scheduleDeleteForMessage } = require('./notifications');
-          try { scheduleDeleteForMessage(interaction.client, channel, sentClock, notif, ev); } catch {}
+          try { const { scheduleDeleteForMessage } = require('./notifications'); scheduleDeleteForMessage(interaction.client, channel, sentClock, notif, ev); } catch {}
         } catch {}
 
         if (!config.testingMode) {
@@ -260,13 +259,20 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
             const opts = { attempts: 3, baseMs: 50, maxMs: 300 };
             for (const mid of prevMessageIds || []) {
               if (!mid || mid === sentClock.id) continue;
-              try {
-                const oldMsg = await channel.messages.fetch(mid).catch(()=>null);
-                if (oldMsg && typeof oldMsg.delete === 'function') {
-                  // use retry so tests can mock retry
-                  await retry(() => oldMsg.delete(), opts).catch(()=>{});
-                }
-              } catch {}
+                try {
+                  const oldMsg = await channel.messages.fetch(mid).catch(()=>null);
+                  // Only delete previous messages that were created by this bot to avoid removing
+                  // user-posted or third-party messages that happen to be recorded here.
+                  if (oldMsg && oldMsg.author && oldMsg.author.id && oldMsg.author.id === interaction.client.user?.id && typeof oldMsg.delete === 'function') {
+                      try {
+                        const { newCorrelationId } = require('../../utils/correlation');
+                        const corrId = newCorrelationId();
+                        require('../../utils/logger').info('[manualTrigger] deleting previous clock-in message', { mid, eventId: ev.id, notifId: notif.id, correlationId: corrId });
+                      } catch {}
+                      // use retry so tests can mock retry
+                      await retry(() => oldMsg.delete(), opts).catch(()=>{});
+                    }
+                } catch {}
             }
             // prune any deleted ids from stored arrays
             ev.__clockIn.messageIds = (ev.__clockIn.messageIds || []).filter(id => id && id === sentClock.id);
@@ -310,11 +316,15 @@ async function manualTriggerAutoMessage(interaction, ev, notif) {
   if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
   const sent = await channel.send(payload).catch(()=>null);
   try {
-    const delMs = Number(notif.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
-    if (!config.testingMode && sent && delMs > 0) {
+    // Only schedule delete if notification explicitly requests one, or
+    // a non-clockin notification relies on the global default. Clock-in
+    // messages should not be auto-deleted by default.
+    // Only schedule deletes when notification explicitly sets deleteAfterMs (>0).
+    if (! (notif && Number.isFinite(notif.deleteAfterMs) && Number(notif.deleteAfterMs) > 0)) {
+      // Do not schedule any delete for this posted message
+    } else if (!config.testingMode && sent) {
       try {
-        const { scheduleDeleteForMessage } = require('./notifications');
-        try { scheduleDeleteForMessage(interaction.client, channel, sent, notif, ev); } catch {}
+        try { const { scheduleDeleteForMessage } = require('./notifications'); scheduleDeleteForMessage(interaction.client, channel, sent, notif, ev); } catch {}
       } catch {}
     }
   } catch {}

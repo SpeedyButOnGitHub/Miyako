@@ -41,7 +41,7 @@ const defaultConfig = {
 	moderatorLogChannelId: null,
 	// Auto-messages: default delete-after (ms); 0 disables auto-deletion
 	autoMessages: {
-		defaultDeleteMs: 0
+		// Per-notification TTLs are used; global defaults removed.
 	},
 	// Debug / verbose logging
 	debugMode: false,
@@ -101,9 +101,8 @@ function validateConfig(cfg) {
 	if (!cfg.commandLogging.logChannelId) cfg.commandLogging.logChannelId = null;
 	if (!Number.isFinite(cfg.commandLogging.sendIntervalMs)) cfg.commandLogging.sendIntervalMs = 5000;
 
-	// Auto-messages defaults
-	if (typeof cfg.autoMessages !== 'object' || cfg.autoMessages === null) cfg.autoMessages = { ...defaultConfig.autoMessages };
-	if (!Number.isFinite(cfg.autoMessages.defaultDeleteMs) || cfg.autoMessages.defaultDeleteMs < 0) cfg.autoMessages.defaultDeleteMs = 0;
+	// Auto-messages defaults: ensure object exists; per-notification TTLs are required
+	if (typeof cfg.autoMessages !== 'object' || cfg.autoMessages === null) cfg.autoMessages = { };
 
 	// Sanitize levelRewards to { "level": [roleIds] }
 	const cleanedRewards = {};

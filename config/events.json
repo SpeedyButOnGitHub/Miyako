@@ -1,5 +1,5 @@
 {
-  "nextId": 281,
+  "nextId": 605,
   "events": [
     {
       "id": "3",
@@ -3145,6 +3145,3762 @@
           "mentions": [
             "444"
           ]
+        }
+      ]
+    },
+    {
+      "id": "281",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "282",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "283",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "288",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "289",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "290",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "291",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "292",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "293",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "295",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "296",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "297",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "299",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "300",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "301",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "303",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "304",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "305",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "307",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "308",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "309",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "311",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "312",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "313",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "315",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "316",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "317",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "319",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "320",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "321",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "323",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "324",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "325",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "327",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "328",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "329",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "331",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "332",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "333",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "335",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "336",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "337",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "339",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "340",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "341",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "343",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "344",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "345",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "347",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "348",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "349",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "351",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "352",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "353",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "355",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "356",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "357",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "359",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "360",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "361",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "363",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "364",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "365",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "367",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "368",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "369",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "371",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "372",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "373",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "375",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "376",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "377",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "379",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "380",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "381",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "383",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "384",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "385",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "387",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "388",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "389",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "391",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "392",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "393",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "395",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "396",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "397",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "399",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "400",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "401",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "403",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "404",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "405",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "407",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "408",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "409",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "411",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "412",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "413",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "415",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "416",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "417",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "419",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "420",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "421",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "423",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "424",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true,
+          "offsetMinutes": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "425",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "13:46"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "426",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "427",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "428",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "429",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "430",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "431",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "432",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "433",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "434",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "435",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "437",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "438",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "439",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "440",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "441",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "442",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "443",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "13:47"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "444",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "445",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "446",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "447",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "448",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "450",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true,
+          "offsetMinutes": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "451",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "452",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "453",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "454",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "455",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "456",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "457",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "458",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "459",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "460",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "13:49"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "461",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "462",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "463",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "464",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "466",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true,
+          "offsetMinutes": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "467",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "468",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "469",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "470",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "471",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "472",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "473",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "474",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "475",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "13:51"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "476",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "477",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "478",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "480",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "481",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "482",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "483",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "484",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "485",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "486",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "487",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "13:52"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "488",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "489",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "490",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "491",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "493",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "494",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "495",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "496",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "497",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "498",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "499",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "500",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "13:53"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "501",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "502",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "503",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "504",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "506",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "507",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "508",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "509",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "510",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "511",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "512",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "513",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "514",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "515",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "13:56"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "516",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "517",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "518",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "519",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "521",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "522",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "523",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "524",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "525",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "526",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "527",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "528",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "529",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "13:57"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "530",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "531",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "532",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "533",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "535",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "536",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "537",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "538",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "539",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "540",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "541",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "542",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "543",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "13:59"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "544",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "545",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "546",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "547",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "549",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "550",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "551",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "552",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "553",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "554",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "555",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "14:00"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "556",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "557",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "558",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "559",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "560",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "561",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "563",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "564",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "565",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "566",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "567",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "568",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "569",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "570",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "571",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "14:02"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "572",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "573",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "574",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "575",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "577",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "578",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "579",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "580",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "581",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "582",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "583",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "14:03"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "584",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "585",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "586",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "587",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "588",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "589",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
+        }
+      ]
+    },
+    {
+      "id": "591",
+      "name": "ClockInReselect",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true,
+          "deleteAfterMs": 0
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "592",
+      "name": "RetryTest",
+      "autoMessages": [
+        {
+          "id": "n1",
+          "message": "CI",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "593",
+      "name": "PermTest",
+      "autoMessages": []
+    },
+    {
+      "id": "594",
+      "name": "CI Test",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "595",
+      "name": "ClockInTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "596",
+      "name": "MemFlow",
+      "autoMessages": [
+        {
+          "id": "10",
+          "message": "Clockin",
+          "isClockIn": true,
+          "deleteAfterMs": 0
+        }
+      ]
+    },
+    {
+      "id": "597",
+      "name": "Test Event",
+      "times": [
+        "12:00"
+      ],
+      "days": [
+        0
+      ],
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ],
+      "nextAutoId": 2
+    },
+    {
+      "id": "598",
+      "name": "SchedTest",
+      "autoMessages": [
+        {
+          "id": "a1",
+          "message": "Clockin",
+          "isClockIn": true
+        }
+      ]
+    },
+    {
+      "id": "599",
+      "name": "StartupWeekly",
+      "type": "weekly",
+      "days": [
+        0
+      ],
+      "times": [
+        "14:05"
+      ],
+      "enabled": true,
+      "autoMessages": [
+        {
+          "id": "c1",
+          "message": "Clockin",
+          "isClockIn": true,
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "600",
+      "name": "TestEv",
+      "autoMessages": [
+        {
+          "id": "1",
+          "message": "Hello",
+          "mentions": [
+            "111"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "601",
+      "name": "T",
+      "autoMessages": []
+    },
+    {
+      "id": "602",
+      "name": "E",
+      "autoMessages": [
+        {
+          "id": "7",
+          "messageJSON": {
+            "embeds": [
+              {
+                "title": "T1"
+              },
+              {
+                "title": "T2"
+              }
+            ],
+            "content": "body"
+          },
+          "mentions": [
+            "444"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "603",
+      "name": "PruneTest",
+      "autoMessages": [
+        {
+          "id": "1",
+          "isClockIn": true,
+          "deleteAfterMs": 1000
         }
       ]
     }

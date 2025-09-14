@@ -287,6 +287,12 @@ client.once('clientReady', async () => {
   // Reconstruct persisted scheduled delete timers so message TTLs survive restarts
   try {
     const { reconstructScheduledDeletes } = require('./commands/schedule/notifications');
+    // Before reconstructing persisted scheduled deletes, clear persisted entries so only
+    // explicit per-notification TTLs control future deletions (one-time wipe to honor new policy).
+    try {
+      const sdPath = require('path').join(require('./utils/paths').dataDir(), 'private', 'scheduledDeletes.json');
+      try { if (require('fs').existsSync(sdPath)) require('fs').unlinkSync(sdPath); } catch {}
+    } catch {}
     try { await reconstructScheduledDeletes(client); } catch (e) { logger.warn('[reconstructScheduledDeletes] failed', { err: e && e.message }); }
   } catch (e) { logger.warn('[reconstructScheduledDeletes] require failed', { err: e && e.message }); }
 

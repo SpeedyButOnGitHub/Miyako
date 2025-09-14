@@ -311,19 +311,12 @@ function startScheduler(client, opts = {}) {
 					} catch (e) { /* ignore anchor update errors */ }
 
 					// If the event is closed, ensure any lingering clock-in messages are removed
-					try {
-						if (status === 'closed' && ev.__clockIn && Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length) {
-							const chId = ev.__clockIn.channelId || ev.channelId;
-							const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
-							if (channel && channel.messages) {
-								for (const mid of ev.__clockIn.messageIds.slice()) {
-									try { const m = await channel.messages.fetch(mid).catch(()=>null); if (m && m.delete) await m.delete().catch(()=>{}); } catch {}
-								}
+						try {
+							if (status === 'closed' && ev.__clockIn && Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length) {
+								// Delegate to helper so we can unit-test and apply extra safety checks
+								try { await pruneClockInMessagesOnClose(client, ev); } catch (e) { logger && logger.warn && logger.warn('[scheduler] pruneClockInMessagesOnClose failed', { err: e && e.message, eventId: ev.id }); }
 							}
-							ev.__clockIn.messageIds = [];
-							try { updateEvent(ev.id, { __clockIn: ev.__clockIn }); } catch {}
-						}
-					} catch (e) {}
+						} catch (e) {}
 				}
 				try {
 					if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds)) {
@@ -357,8 +350,60 @@ function startScheduler(client, opts = {}) {
 	}, tickInterval);
 }
 
+// Helper: prune clock-in messages when an event closes.
+// Safety rules:
+// - Only delete messages if the message author is the bot (client.user.id),
+//   AND either the corresponding clock-in notification explicitly set a deleteAfterMs > 0,
+//   or the caller passed force=true.
+// - This is conservative to avoid removing user content.
+async function pruneClockInMessagesOnClose(client, ev, options = { force: false }) {
+	try {
+		if (!ev || !ev.__clockIn || !Array.isArray(ev.__clockIn.messageIds) || ev.__clockIn.messageIds.length === 0) return;
+		const chId = ev.__clockIn.channelId || ev.channelId;
+		const channel = chId ? await client.channels.fetch(chId).catch(() => null) : null;
+		if (!channel || !channel.messages) return;
+		// Resolve the clock-in notification (if any) to check deleteAfterMs
+		const clockNotif = (ev.autoMessages || []).find(n => n.isClockIn) || null;
+		const notifTTL = clockNotif && Number.isFinite(clockNotif.deleteAfterMs) ? Number(clockNotif.deleteAfterMs) : null;
+		const { newCorrelationId } = require('./correlation');
+		const corrId = newCorrelationId();
+
+		for (const mid of ev.__clockIn.messageIds.slice()) {
+			try {
+				const m = await channel.messages.fetch(mid).catch(() => null);
+				if (!m) continue;
+				// Only delete when explicit TTL requested or force flag set
+				const shouldDeleteByTTL = Number.isFinite(notifTTL) && notifTTL > 0;
+				const shouldForce = options && options.force === true;
+				// Also ensure we only delete our own messages
+				const isBotAuth = !!(m.author && m.author.id && client.user && client.user.id && m.author.id === client.user.id);
+				if ((shouldDeleteByTTL || shouldForce) && isBotAuth) {
+					try { require('./logger').info('[pruneClockIn] deleting message', { mid, eventId: ev.id, notifId: clockNotif && clockNotif.id ? clockNotif.id : null, correlationId: corrId }); } catch {}
+					try { await m.delete().catch(() => {}); } catch {}
+				}
+			} catch (e) { /* best-effort */ }
+		}
+		// After attempting deletes, clear recorded ids (keep any that still fetch)
+		const kept = [];
+		for (const mid of ev.__clockIn.messageIds.slice(-10)) {
+			const exists = await channel.messages.fetch(mid).then(() => true).catch(() => false);
+			if (exists) kept.push(mid);
+		}
+		ev.__clockIn.messageIds = kept;
+		try { updateEvent(ev.id, { __clockIn: ev.__clockIn }); } catch {}
+	} catch (e) { /* ignore */ }
+}
+
 module.exports = {
 	startScheduler,
 	computeNextRun,
-	computeAfterRun
+	computeAfterRun,
+	pruneClockInMessagesOnClose,
+};
+
+module.exports = {
+	startScheduler,
+	computeNextRun,
+	computeAfterRun,
+	pruneClockInMessagesOnClose,
 };

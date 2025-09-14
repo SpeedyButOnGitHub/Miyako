@@ -33,11 +33,8 @@ function buildNotifsEmbed(guild, ev) {
       const chanNote = m.channelId && m.channelId !== ev.channelId ? ` <#${m.channelId}>` : '';
       const clock = m.isClockIn ? ' ⏱️' : '';
       const hasOwn = Number.isFinite(m.deleteAfterMs);
-      let ttlDisp = 'off';
-      if (!m.isClockIn) {
-        if (hasOwn) ttlDisp = m.deleteAfterMs > 0 ? humanizeMs(m.deleteAfterMs) : 'off';
-        else if (config.autoMessages?.defaultDeleteMs > 0) ttlDisp = humanizeMs(config.autoMessages.defaultDeleteMs) + '*';
-      }
+      // Only display an explicit per-notification TTL; global defaults were removed.
+      const ttlDisp = hasOwn ? (m.deleteAfterMs > 0 ? humanizeMs(m.deleteAfterMs) : 'off') : 'off';
       const ttlLabel = ` [TTL ${ttlDisp}]`;
       const mentionNote = Array.isArray(m.mentions) && m.mentions.length ? ` [@${m.mentions.length}]` : '';
       return `${status} [${off}]${clock}${chanNote} ${preview}${ttlLabel}${mentionNote}`;
@@ -93,8 +90,15 @@ const scheduledDeleteTimers = new Map();
 function scheduleDeleteForMessage(client, channel, msg, notif, ev) {
   try {
     if (!msg || !msg.id) return;
-    const delMs = Number(notif.deleteAfterMs ?? (config.autoMessages?.defaultDeleteMs || 0));
-    if (config.testingMode || !delMs || delMs <= 0) return;
+    // Determine delete TTL. If a notification explicitly sets deleteAfterMs, honor it.
+    // Otherwise, do NOT apply the global default TTL to clock-in messages
+    // (clock-ins should persist unless explicitly configured).
+    // Only schedule deletes when notification explicitly sets deleteAfterMs (>0).
+    if (!(notif && Number.isFinite(notif.deleteAfterMs) && Number(notif.deleteAfterMs) > 0)) return;
+  const delMs = Number(notif.deleteAfterMs);
+  // Attach a correlation id to this scheduled delete so logs can be correlated
+  const { newCorrelationId } = require('../../utils/correlation');
+  const corrId = newCorrelationId();
   if (scheduledDeleteTimers.has(msg.id)) return;
     const age = Date.now() - (msg.createdTimestamp || Date.now());
     const remaining = delMs - age;
@@ -115,6 +119,7 @@ function scheduleDeleteForMessage(client, channel, msg, notif, ev) {
         }
       } catch {}
       try { removePersistedDelete(msg.id); } catch {}
+      try { require('../../utils/logger').info('[scheduleDelete] deleted immediately', { mid: msg.id, eventId: ev && ev.id ? ev.id : null, notifId: notif && notif.id ? notif.id : null, correlationId: corrId }); } catch {}
       return;
     }
 
@@ -122,7 +127,10 @@ function scheduleDeleteForMessage(client, channel, msg, notif, ev) {
       try { scheduledDeleteTimers.delete(msg.id); } catch {}
       try {
         const ch = channel || (client && client.channels ? await client.channels.fetch(msg.channelId).catch(()=>null) : null);
-        if (ch && ch.messages) await ch.messages.delete(msg.id).catch(()=>{});
+        if (ch && ch.messages) {
+          try { require('../../utils/logger').info('[scheduleDelete] deleting message', { mid: msg.id, eventId: ev && ev.id ? ev.id : null, notifId: notif && notif.id ? notif.id : null, correlationId: corrId }); } catch {}
+          await ch.messages.delete(msg.id).catch(()=>{});
+        }
       } catch {}
       try {
         if (ev && ev.id && notif && notif.id) {
@@ -140,7 +148,7 @@ function scheduleDeleteForMessage(client, channel, msg, notif, ev) {
     if (typeof t.unref === 'function') t.unref();
     scheduledDeleteTimers.set(msg.id, t);
     try {
-      const entry = { eventId: ev && ev.id ? ev.id : null, notifId: notif && notif.id ? notif.id : null, channelId: channel && channel.id ? channel.id : (msg.channelId||null), scheduledAt: Date.now(), deleteAfterMs: delMs, messageCreatedAt: msg.createdTimestamp || Date.now() };
+    const entry = { eventId: ev && ev.id ? ev.id : null, notifId: notif && notif.id ? notif.id : null, channelId: channel && channel.id ? channel.id : (msg.channelId||null), scheduledAt: Date.now(), deleteAfterMs: delMs, messageCreatedAt: msg.createdTimestamp || Date.now(), correlationId: corrId };
       try { persistDeleteForMessage(msg.id, entry); } catch (e) { logger && logger.warn && logger.warn('[scheduleDelete] persist failed', { err: e && e.message }); }
     } catch (e) { logger && logger.warn && logger.warn('[scheduleDelete] prepare persist failed', { err: e && e.message }); }
   } catch (e) { try { require('../../utils/logger').warn('[scheduleDelete] failed', { err: e && e.message }); } catch{} }

@@ -39,7 +39,7 @@ test('manualTriggerAutoMessage for clock-in deletes older message and applies au
   const ev = addEvent({ name: 'ClockInTest', channelId: 'chan-ci', autoMessages: [{ id: '1', message: 'Clockin', isClockIn: true, deleteAfterMs: 0 }] });
   // create fake channel with an older clock-in message
   const channel = makeChannel();
-  const oldMsg = { id: 'old-1', content: 'Old clockin', embeds: [], delete: async function(){ channel._deleted = channel._deleted || []; channel._deleted.push(this.id); return true; } };
+  const oldMsg = { id: 'old-1', content: 'Old clockin', embeds: [], author: { id: 'bot' }, delete: async function(){ channel._deleted = channel._deleted || []; channel._deleted.push(this.id); return true; } };
   channel._add(oldMsg);
   // set runtime: event had previous message
   updateEvent(ev.id, { __clockIn: { messageIds: ['old-1'], positions: { instance_manager: ['u-old'], manager: ['u-old2'] }, autoNext: { 'u-auto': 'manager' } } });

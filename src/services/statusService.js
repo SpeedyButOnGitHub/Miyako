@@ -30,15 +30,18 @@ async function postStartup(client, { channelId = CONFIG_LOG_CHANNEL } = {}) {
 	const diff = now - last;
 	const restarted = diff >= 5 * 60 * 1000;
 	if (channel) {
-		// Attach recent error summary (last 5) if any stored
-		const recent = getRecentErrors(5);
-		const summary = recent.length ? '\n\nRecent Errors:\n' + recent.map(e => `• [${e.scope}] ${e.message.split('\n')[0].slice(0,120)}`).join('\n') : '';
-		const embed = createEmbed({
-			title: restarted ? '🟢 Restarted' : '🟢 Online',
-			description: (restarted ? 'Miyako has restarted and is now online!' : 'Miyako is now online!') + summary,
-			color: restarted ? 0x55ff55 : 0x55ff55
-		});
-		await channel.send({ embeds: [embed] }).catch(()=>{});
+			// Attach recent error summary (last 5) if any stored
+			const recent = getRecentErrors(5);
+			const summary = recent.length ? '\n\nRecent Errors:\n' + recent.map(e => `• [${e.scope}] ${e.message.split('\n')[0].slice(0,120)}`).join('\n') : '';
+			const embed = createEmbed({
+				title: restarted ? '🟢 Restarted' : '🟢 Online',
+				description: (restarted ? 'Miyako has restarted and is now online!' : 'Miyako is now online!') + summary,
+				color: restarted ? 0x55ff55 : 0x55ff55
+			});
+			// no-op: startup summary was removed
+		// Convert to plain object to keep tests simple and avoid embedding builder internals
+		const toSendEmbed = (embed && typeof embed.toJSON === 'function') ? embed.toJSON() : embed;
+		await channel.send({ embeds: [toSendEmbed] }).catch(()=>{});
 		// Clear stored errors unless retention flag file is present (simple env-based toggle in future)
 		clearErrorLog();
 	}

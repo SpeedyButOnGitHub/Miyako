@@ -404,7 +404,7 @@ ActiveMenus.registerHandler('events', async (interaction, session) => {
     const ev = getEvent(evId); if (!ev) return interaction.reply({ content:'Missing event.', flags:1<<6 });
     const notif = (ev.autoMessages||[]).find(n=>String(n.id)===String(notifId));
     if (!notif) return interaction.reply({ content:'Not found.', flags:1<<6 });
-    const currentTTL = Number.isFinite(notif.deleteAfterMs) ? notif.deleteAfterMs : (config.autoMessages?.defaultDeleteMs || 0);
+  const currentTTL = Number.isFinite(notif.deleteAfterMs) ? notif.deleteAfterMs : 0;
     const suggestTTL = currentTTL<=0 ? '0' : (currentTTL%3600000===0 ? `${Math.floor(currentTTL/3600000)}h` : (currentTTL%60000===0 ? `${Math.floor(currentTTL/60000)}m` : `${Math.max(1,Math.floor(currentTTL/1000))}s`));
     const modal = new ModalBuilder().setCustomId(`notif_edit_modal_${evId}_${notifId}_${interaction.message.id}`).setTitle('Edit Auto Message')
       .addComponents(

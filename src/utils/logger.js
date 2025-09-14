@@ -22,8 +22,18 @@ function rotateIfNeeded() {
   } catch {}
 }
 
+let _overrideDebugUntil = null; // timestamp in ms until which debug logs are enabled
+
 function shouldLog(level) {
   try {
+    // If override window active, allow debug logs until that timestamp
+    const now = Date.now();
+    const envUntil = process.env.LOG_DEBUG_UNTIL ? Number(process.env.LOG_DEBUG_UNTIL) : null;
+    const until = Number.isFinite(envUntil) && envUntil > 0 ? envUntil : _overrideDebugUntil;
+    if (until && now <= until) {
+      // during override window allow all levels
+      return true;
+    }
     const min = config.logLevel || 'info';
     return (LEVEL_ORDER[level] || 999) >= (LEVEL_ORDER[min] || 20);
   } catch { return true; }
@@ -53,6 +63,15 @@ module.exports = {
   info: (m, meta) => baseWrite('info', m, meta),
   warn: (m, meta) => baseWrite('warn', m, meta),
   error: (m, meta) => baseWrite('error', m, meta),
-  debug: (m, meta) => { if (config.debugMode) baseWrite('debug', m, meta); },
-  file: LOG_FILE
+  debug: (m, meta) => { if (config.debugMode || shouldLog('debug')) baseWrite('debug', m, meta); },
+  file: LOG_FILE,
+  // programmatic control: enable debug logs for a short window (ms duration)
+  enableDebugWindow(durationMs) {
+    try {
+      if (!durationMs || durationMs <= 0) return;
+      _overrideDebugUntil = Date.now() + Number(durationMs);
+    } catch {}
+  },
+  // disable any programmatic override
+  disableDebugWindow() { _overrideDebugUntil = null; }
 };

@@ -18,7 +18,8 @@ describe('Schedule retry and permission edge cases', () => {
     const messages = new Map();
     const oldMsg = {
       id: 'oldmsg',
-      delete: jest.fn()
+      author: { id: 'bot' },
+      delete: jest.fn(async () => true)
     };
     messages.set('oldmsg', oldMsg);
 
@@ -40,8 +41,8 @@ describe('Schedule retry and permission edge cases', () => {
     const interaction = { client, guild: { id: 'g1' }, channel: { id: channel.id } };
   const ok = await manualTriggerAutoMessage(interaction, ev, ev.autoMessages[0]);
   expect(ok).toBeTruthy();
-  // allow any background deletion IIFE to run
-  await new Promise(r => setTimeout(r, 20));
+  // allow any background deletion IIFE to run (give a bit more time)
+  await new Promise(r => setTimeout(r, 50));
   expect(retryCalled).toBe(true);
   });
 
