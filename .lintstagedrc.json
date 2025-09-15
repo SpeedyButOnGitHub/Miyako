@@ -1,8 +1,5 @@
 {
-  "**/*": [
-    "node ./scripts/secret-scan.js"
-  ],
-  "*.{js,ts,jsx,tsx,json,md,css,scss,html}": [
-    "prettier --check --config .prettierrc.json"
-  ]
+	"**/*": ["node ./scripts/secret-scan.js"],
+	"*.{js,ts,jsx,tsx,json,md,css,scss,html}": ["prettier --check --config .prettierrc.json"],
+	"package-lock.json": []
 }
