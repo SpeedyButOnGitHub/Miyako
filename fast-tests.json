@@ -1,10 +1,10 @@
 [
-  "tests/env.setup.test.js",
-  "tests/clockinFlow.integration.test.js",
-  "tests/clockinEmbed.test.js",
-  "tests/schedule.notifications-and-clockin.test.js",
-  "tests/retryDelete.test.js",
-  "tests/refreshEdit.edge.test.js",
-  "tests/clockinDeletePrune.test.js"
-  ,"tests/schedule.delete.test.js"
+	"tests/env.setup.test.js",
+	"tests/clockinFlow.integration.test.js",
+	"tests/clockinEmbed.test.js",
+	"tests/schedule.notifications-and-clockin.test.js",
+	"tests/retryDelete.test.js",
+	"tests/refreshEdit.edge.test.js",
+	"tests/clockinDeletePrune.test.js",
+	"tests/schedule.delete.test.js"
 ]

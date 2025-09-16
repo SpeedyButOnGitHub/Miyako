@@ -1,8 +1,8 @@
-const { config } = require("../utils/storage");
-const { EmbedBuilder } = require("discord.js");
+const { config } = require('../utils/storage');
+const { EmbedBuilder } = require('discord.js');
 const { createEmbed } = require('../utils/embeds');
-const { EMOJI_SUCCESS, EMOJI_ERROR } = require("./moderation/replies");
-const fs = require("fs/promises");
+const { EMOJI_SUCCESS, EMOJI_ERROR } = require('./moderation/replies');
+const fs = require('fs/promises');
 // cfgPath not needed here
 const SNIPES_FILE = require('../utils/paths').runtimeFile('snipes.json');
 
@@ -13,7 +13,7 @@ const deletedSnipes = new Set();
 
 async function loadSnipes() {
 	try {
-		const raw = JSON.parse(await fs.readFile(SNIPES_FILE, "utf8"));
+		const raw = JSON.parse(await fs.readFile(SNIPES_FILE, 'utf8'));
 		for (const [channelId, snipe] of Object.entries(raw)) {
 			snipe.expiresAt = snipe.timestamp + 2 * 60 * 60 * 1000;
 			if (snipe.deleted) {
@@ -33,27 +33,33 @@ loadSnipes();
 async function saveSnipes() {
 	const obj = {};
 	for (const [channelId, snipe] of snipes.entries()) {
-		obj[channelId] = { ...snipe, deleted: false, embedData: lastSnipeEmbedData.get(channelId) || null };
+		obj[channelId] = {
+			...snipe,
+			deleted: false,
+			embedData: lastSnipeEmbedData.get(channelId) || null,
+		};
 	}
 	for (const channelId of deletedSnipes) {
 		if (!obj[channelId]) {
 			obj[channelId] = {
 				deleted: true,
-				embedData: lastSnipeEmbedData.get(channelId) || null
+				embedData: lastSnipeEmbedData.get(channelId) || null,
 			};
 		}
 	}
 	try {
 		await fs.writeFile(SNIPES_FILE, JSON.stringify(obj, null, 2));
 	} catch (err) {
-		try { require('../utils/logger').error('[Snipes save error]', { err: err.message }); } catch {}
+		try {
+			require('../utils/logger').error('[Snipes save error]', { err: err.message });
+		} catch {}
 	}
 }
 
 function formatTodayTime(date) {
 	const d = new Date(date);
-	const hours = d.getHours().toString().padStart(2, "0");
-	const minutes = d.getMinutes().toString().padStart(2, "0");
+	const hours = d.getHours().toString().padStart(2, '0');
+	const minutes = d.getMinutes().toString().padStart(2, '0');
 	return `Today at ${hours}:${minutes}`;
 }
 
@@ -75,14 +81,14 @@ function cleanupSnipes() {
 }
 // Run periodic cleanup, but don't keep the process alive solely for this timer
 const _snipeCleanupInterval = setInterval(cleanupSnipes, 60 * 1000);
-if (typeof _snipeCleanupInterval.unref === "function") {
+if (typeof _snipeCleanupInterval.unref === 'function') {
 	_snipeCleanupInterval.unref();
 }
 
 async function handleSnipeCommands(client, message, command, args) {
 	const content = message.content.toLowerCase();
 
-	if (content === ".ds") {
+	if (content === '.ds') {
 		let replyMsg;
 		if (snipes.has(message.channel.id) || deletedSnipes.has(message.channel.id)) {
 			snipes.delete(message.channel.id);
@@ -99,32 +105,38 @@ async function handleSnipeCommands(client, message, command, args) {
 							.setColor(0xff0000);
 						await snipeMsg.edit({
 							content: null,
-							embeds: [newEmbed]
+							embeds: [newEmbed],
 						});
 					} else {
 						await snipeMsg.edit({
 							content: `${EMOJI_ERROR} This snipe has been deleted.`,
-							embeds: []
+							embeds: [],
 						});
 					}
 				} catch (err) {
-					try { require('../utils/logger').warn('[Snipes edit error]', { err: err.message }); } catch {}
+					try {
+						require('../utils/logger').warn('[Snipes edit error]', { err: err.message });
+					} catch {}
 				}
 			}
 		} else {
 			replyMsg = await message.reply(`${EMOJI_ERROR} No snipe to delete.`).catch(() => null);
 		}
 		setTimeout(() => {
-			try { replyMsg?.delete().catch(() => {}); } catch {}
-			try { message.delete().catch(() => {}); } catch {}
+			try {
+				replyMsg?.delete().catch(() => {});
+			} catch {}
+			try {
+				message.delete().catch(() => {});
+			} catch {}
 		}, 3000);
 		return;
 	}
 
-	if (content === ".snipe" || content === ".s") {
+	if (content === '.snipe' || content === '.s') {
 		// Respect mode: blacklist uses snipingChannelList, whitelist uses snipingWhitelist
 		let allowed = true;
-		if (config.snipeMode === "blacklist") {
+		if (config.snipeMode === 'blacklist') {
 			allowed = !config.snipingChannelList.includes(message.channel.id);
 		} else {
 			const list = Array.isArray(config.snipingWhitelist) ? config.snipingWhitelist : [];
@@ -154,13 +166,17 @@ async function handleSnipeCommands(client, message, command, args) {
 
 		const snipe = snipes.get(message.channel.id);
 		if (!snipe || Date.now() > snipe.expiresAt) {
-			return message.reply(`${EMOJI_ERROR} No message has been deleted in the past 2 hours.`).catch(() => {});
+			return message
+				.reply(`${EMOJI_ERROR} No message has been deleted in the past 2 hours.`)
+				.catch(() => {});
 		}
 
 		const embed = createEmbed({
 			description: snipe.content || '*No content (attachment or embed only)*',
-			color: 0x5865F2
-		}).setAuthor({ name: snipe.nickname, iconURL: snipe.avatarURL }).setFooter({ text: formatTodayTime(snipe.timestamp) });
+			color: 0x5865f2,
+		})
+			.setAuthor({ name: snipe.nickname, iconURL: snipe.avatarURL })
+			.setFooter({ text: formatTodayTime(snipe.timestamp) });
 
 		if (snipe.attachments && snipe.attachments.length > 0) {
 			embed.setImage(snipe.attachments[0]);
@@ -180,18 +196,21 @@ function handleMessageDelete(message) {
 			message.partial ||
 			message.author?.bot ||
 			(message.client && message.author?.id === message.client.user?.id) ||
-			(typeof message.content === "string" && message.content.trim().startsWith("."))
-		) return;
+			(typeof message.content === 'string' && message.content.trim().startsWith('.'))
+		)
+			return;
 
 		const member = message.member || message.guild?.members?.cache?.get(message.author.id);
 		const timestamp = Date.now();
 		snipes.set(message.channel.id, {
-			content: message.content || "*No text content*",
+			content: message.content || '*No text content*',
 			nickname: member ? member.displayName : message.author.username,
-			avatarURL: member ? member.displayAvatarURL({ dynamic: true }) : message.author.displayAvatarURL({ dynamic: true }),
+			avatarURL: member
+				? member.displayAvatarURL({ dynamic: true })
+				: message.author.displayAvatarURL({ dynamic: true }),
 			timestamp,
-			attachments: Array.from(message.attachments?.values?.() || []).map(a => a.url),
-			expiresAt: timestamp + 2 * 60 * 60 * 1000
+			attachments: Array.from(message.attachments?.values?.() || []).map((a) => a.url),
+			expiresAt: timestamp + 2 * 60 * 60 * 1000,
 		});
 		saveSnipes();
 	} catch {}
@@ -199,5 +218,5 @@ function handleMessageDelete(message) {
 
 module.exports = {
 	handleSnipeCommands,
-	handleMessageDelete
+	handleMessageDelete,
 };

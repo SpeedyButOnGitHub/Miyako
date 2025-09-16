@@ -13,12 +13,12 @@ function computeEntries(levelsObj = {}) {
 }
 
 function sortEntries(entries) {
-	return entries.sort((a, b) => (b.level - a.level) || (b.xp - a.xp));
+	return entries.sort((a, b) => b.level - a.level || b.xp - a.xp);
 }
 
 function computeRank(levelsObj, viewerId) {
 	const entries = sortEntries(computeEntries(levelsObj));
-	const idx = entries.findIndex(e => String(e.userId) === String(viewerId));
+	const idx = entries.findIndex((e) => String(e.userId) === String(viewerId));
 	return idx === -1 ? null : idx + 1;
 }
 
@@ -41,22 +41,31 @@ function buildLeaderboardEmbed(guild, levelsObj, viewerId, page = 1, pageSize = 
 	const pageEntries = entries.slice(start, start + pageSize);
 	const lines = pageEntries.map((e, i) => {
 		const rankNum = start + i + 1;
-		const medal = rankNum === 1 ? '🥇' : rankNum === 2 ? '🥈' : rankNum === 3 ? '🥉' : `#${rankNum}`;
+		const medal =
+			rankNum === 1 ? '🥇' : rankNum === 2 ? '🥈' : rankNum === 3 ? '🥉' : `#${rankNum}`;
 		const isYou = String(e.userId) === String(viewerId);
 		const line = `${medal} <@${e.userId}> — Lv. ${e.level}`;
 		return isYou ? `**${line} ← You**` : line;
 	});
 	const rank = computeRank(levelsObj, viewerId);
-	const viewerOnPage = pageEntries.some(e => String(e.userId) === String(viewerId));
+	const viewerOnPage = pageEntries.some((e) => String(e.userId) === String(viewerId));
 	const extraLine = !viewerOnPage && rank ? `\n— —\nYou: **#${rank}** <@${viewerId}>` : '';
 	const bankSection = buildBankSection();
 	const embed = createEmbed({
-		title: mode === 'text' ? `${theme.emojis.leaderboard} Leaderboard` : `${theme.emojis.vc} VC Leaderboard`,
+		title:
+			mode === 'text'
+				? `${theme.emojis.leaderboard} Leaderboard`
+				: `${theme.emojis.vc} VC Leaderboard`,
 		description: (lines.length ? lines.join('\n') + extraLine : 'No data yet.') + bankSection,
-		color: mode === 'text' ? theme.colors.warning : theme.colors.danger
+		color: mode === 'text' ? theme.colors.warning : theme.colors.danger,
 	});
 	const extraFooter = rank ? `Your rank: #${rank}` : null;
-	applyFooterWithPagination(embed, guild, { testingMode: false, page: safePage, totalPages, extra: extraFooter });
+	applyFooterWithPagination(embed, guild, {
+		testingMode: false,
+		page: safePage,
+		totalPages,
+		extra: extraFooter,
+	});
 	return embed;
 }
 

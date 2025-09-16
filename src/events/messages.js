@@ -1,66 +1,76 @@
-const { handleHelpCommand } = require("../commands/help");
+const { handleHelpCommand } = require('../commands/help');
 const path = require('path'); // needed for restart spawn entry resolution
-const { handleModerationCommands } = require("../commands/moderation/moderationCommands");
-const { handlePurgeCommand } = require("../commands/moderation/purge");
-const { handleWarningsCommand } = require("../commands/moderation/warnings");
-const { handleSnipeCommands } = require("../commands/snipes");
-const { handleMessageCreate } = require("../commands/configMenu");
+const { handleModerationCommands } = require('../commands/moderation/moderationCommands');
+const { handlePurgeCommand } = require('../commands/moderation/purge');
+const { handleWarningsCommand } = require('../commands/moderation/warnings');
+const { handleSnipeCommands } = require('../commands/snipes');
+const { handleMessageCreate } = require('../commands/configMenu');
 // Rank/profile consolidated in profile command
-const { handleRankCommand } = require("../commands/profile");
-const { handleTestCommand } = require("../commands/test");
-const { handleLeaderboardCommand } = require("../commands/leaderboard");
-const { handleProfileCommand } = require("../commands/profile");
-const { handleDiagnosticsCommand } = require("../commands/diagnostics");
-const { handleLeveling } = require("../utils/leveling");
-const { handleScheduleCommand } = require("../commands/schedule");
-const { handleScriptsCommand } = require("../commands/scripts");
-const { maybeSpawnDrop, tryClaimDrop } = require("../utils/cashDrops");
-const { EmbedBuilder } = require("discord.js");
+const { handleRankCommand } = require('../commands/profile');
+const { handleTestCommand } = require('../commands/test');
+const { handleLeaderboardCommand } = require('../commands/leaderboard');
+const { handleProfileCommand } = require('../commands/profile');
+const { handleDiagnosticsCommand } = require('../commands/diagnostics');
+const { handleLeveling } = require('../utils/leveling');
+const { handleScheduleCommand } = require('../commands/schedule');
+const { handleScriptsCommand } = require('../commands/scripts');
+const { maybeSpawnDrop, tryClaimDrop } = require('../utils/cashDrops');
+const { EmbedBuilder } = require('discord.js');
 const { semanticButton, buildNavRow } = require('../ui');
-const { config } = require("../utils/storage");
+const { config } = require('../utils/storage');
 // cash command import removed to avoid unused import warning; handled by separate module when needed
-const { handleBalanceCommand } = require("../commands/balance");
-const { handleMetricsCommand } = require("../commands/metrics");
-const { handleClockInStateCommand } = require("../commands/clockin");
+const { handleBalanceCommand } = require('../commands/balance');
+const { handleMetricsCommand } = require('../commands/metrics');
+const { handleClockInStateCommand } = require('../commands/clockin');
 const { handleApplicationsCommand } = require('../commands/applications');
 const { handleMyAppsCommand } = require('../commands/myapps');
 const { handleAppStatsCommand } = require('../commands/appstats');
 const { markCommand } = require('../services/metricsService');
 const { checkPolicy } = require('../utils/policy');
 const { getOwnerId } = require('../commands/moderation/permissions');
-const theme = require("../utils/theme");
+const theme = require('../utils/theme');
 // Unused imports removed to reduce ESLint noise
 const { getRecentErrors, clearErrorLog } = require('../utils/errorUtil');
 // Simple in-memory command cooldowns
 const _cooldowns = new Map(); // key cmd:user -> lastTs
-function cdOk(userId, cmd, ms=2000) {
-	const k = cmd+':'+userId; const now = Date.now(); const prev = _cooldowns.get(k)||0; if (now - prev < ms) return false; _cooldowns.set(k, now); return true;
+function cdOk(userId, cmd, ms = 2000) {
+	const k = cmd + ':' + userId;
+	const now = Date.now();
+	const prev = _cooldowns.get(k) || 0;
+	if (now - prev < ms) return false;
+	_cooldowns.set(k, now);
+	return true;
 }
 const ActiveMenus = require('../utils/activeMenus');
 
 const LEVEL_ROLES = {
-	5: "1232701768362754147",
-	10: "1232701768362754148",
-	16: "1232701768375210145",
-	20: "1232701768375210146",
-	25: "1232701768375210147",
-	40: "1232701768375210149",
-	75: "1382911184058978454",
-	100: "1232701768375210148"
+	5: '1232701768362754147',
+	10: '1232701768362754148',
+	16: '1232701768375210145',
+	20: '1232701768375210146',
+	25: '1232701768375210147',
+	40: '1232701768375210149',
+	75: '1382911184058978454',
+	100: '1232701768375210148',
 };
 
 function attachMessageEvents(client) {
 	if (client.__messageListenerAttached) return; // prevent multiple registrations
 	client.__messageListenerAttached = true;
-	client.on("messageCreate", async (message) => {
+	client.on('messageCreate', async (message) => {
 		if (message.author.bot) return;
 		// Global duplicate guard (prevents double XP, drops, and command replies if listener attached twice)
 		try {
 			const set = (client.__handledMessages = client.__handledMessages || new Set());
 			if (set.has(message.id)) return; // already fully processed
 			set.add(message.id);
-			if (set.size > 10000) { // prune oldest ~20%
-				let i = 0; for (const id of set) { set.delete(id); if (++i > 2000) break; }
+			if (set.size > 10000) {
+				// prune oldest ~20%
+				let i = 0;
+				for (const id of set) {
+					set.delete(id);
+					if (++i > 2000) break;
+				}
 			}
 		} catch {}
 		// Award leveling XP for all non-bot messages (gated in handleLeveling by channel rules)
@@ -68,25 +78,43 @@ function attachMessageEvents(client) {
 		// Cash drops: first check if a drop can be claimed by this message
 		const claimed = tryClaimDrop(message);
 		if (claimed) {
-			const testTag = claimed.testing ? " [TEST]" : "";
+			const testTag = claimed.testing ? ' [TEST]' : '';
 			const claimEmbed = new EmbedBuilder()
 				.setTitle(`🎉 Cash Claimed${testTag}`)
 				.setColor(theme.colors.success)
-				.setDescription(`Looks like someone snagged the bag! You received **$${claimed.amount.toLocaleString()}**.`)
-				.addFields({ name: "New Balance", value: `${claimed.testing ? "(test) " : ""}$${Number(claimed.newBalance || 0).toLocaleString()}` , inline: true })
-				.setFooter({ text: "Keep chatting for more surprise drops!" });
+				.setDescription(
+					`Looks like someone snagged the bag! You received **$${claimed.amount.toLocaleString()}**.`,
+				)
+				.addFields({
+					name: 'New Balance',
+					value: `${claimed.testing ? '(test) ' : ''}$${Number(claimed.newBalance || 0).toLocaleString()}`,
+					inline: true,
+				})
+				.setFooter({ text: 'Keep chatting for more surprise drops!' });
 			const row = buildNavRow([
-				semanticButton('primary', { id: claimed.testing ? 'cash:check:test' : 'cash:check', label: 'Balance', emoji: '💳' })
+				semanticButton('primary', {
+					id: claimed.testing ? 'cash:check:test' : 'cash:check',
+					label: 'Balance',
+					emoji: '💳',
+				}),
 			]);
 			try {
-				const sentReply = await message.reply({ embeds: [claimEmbed], components: [row], allowedMentions: { repliedUser: false } }).catch(() => null);
+				const sentReply = await message
+					.reply({
+						embeds: [claimEmbed],
+						components: [row],
+						allowedMentions: { repliedUser: false },
+					})
+					.catch(() => null);
 				try {
 					// If we have a recorded spawn message, delete it so channel doesn't keep the unused spawn
 					const { activeDrops } = require('../utils/cashDrops');
 					const dropNow = activeDrops.get(message.channel.id);
 					if (dropNow) {
 						// remove the drop entry
-						try { activeDrops.delete(message.channel.id); } catch {}
+						try {
+							activeDrops.delete(message.channel.id);
+						} catch {}
 						if (dropNow.messageId) {
 							try {
 								const ch = message.channel;
@@ -97,154 +125,327 @@ function attachMessageEvents(client) {
 					}
 				} catch {}
 				// Delete the claim reply after 60s to reduce clutter
-				if (sentReply) setTimeout(() => { try { sentReply.delete().catch(() => {}); } catch {} }, 60 * 1000);
+				if (sentReply)
+					setTimeout(() => {
+						try {
+							sentReply.delete().catch(() => {});
+						} catch {}
+					}, 60 * 1000);
 			} catch {}
 		} else {
 			const drop = maybeSpawnDrop(message, config);
 			if (drop) {
 				const isTest = !!drop.testing;
 				const spawnEmbed = new EmbedBuilder()
-					.setTitle(`${isTest ? "🧪 " : ""}💸 A Wild Cash Drop Appeared!`)
+					.setTitle(`${isTest ? '🧪 ' : ''}💸 A Wild Cash Drop Appeared!`)
 					.setColor(theme.colors.warning)
 					.setDescription(
 						`It looks like someone dropped some cash!\n` +
-						`Type this word to claim it first:\n\n` +
-						`→ \`${drop.word}\``
+							`Type this word to claim it first:\n\n` +
+							`→ \`${drop.word}\``,
 					)
 					.addFields(
-						{ name: "Reward", value: `**$${drop.amount.toLocaleString()}**`, inline: true },
-						{ name: "How", value: "Send the word exactly as shown.", inline: true }
+						{ name: 'Reward', value: `**$${drop.amount.toLocaleString()}**`, inline: true },
+						{ name: 'How', value: 'Send the word exactly as shown.', inline: true },
 					)
-					.setFooter({ text: "First correct message wins. Good luck!" });
-				try { await message.reply({ embeds: [spawnEmbed], allowedMentions: { repliedUser: false } }); } catch {}
+					.setFooter({ text: 'First correct message wins. Good luck!' });
+				try {
+					await message.reply({ embeds: [spawnEmbed], allowedMentions: { repliedUser: false } });
+				} catch {}
 			}
 		}
 
-		if (!message.content.startsWith(".")) return;
+		if (!message.content.startsWith('.')) return;
 
 		const args = message.content.slice(1).trim().split(/\s+/);
 		const command = args.shift().toLowerCase();
 
-		const { start: logStart, finish: logFinish, normalizeMsgShape, diffExpected } = require('../utils/commandLogger');
-		let _logCtx = null; let _sentMsg = null; let _expected = null;
+		const {
+			start: logStart,
+			finish: logFinish,
+			normalizeMsgShape,
+			diffExpected,
+		} = require('../utils/commandLogger');
+		let _logCtx = null;
+		let _sentMsg = null;
+		let _expected = null;
 		try {
-			if (command === "help") {
-				_logCtx = logStart({ name: 'help', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleHelpCommand(client, message); markCommand();
-			} else if (["mute", "unmute", "timeout", "untimeout", "ban", "kick", "warn", "removewarn"].includes(command)) {
+			if (command === 'help') {
+				_logCtx = logStart({
+					name: 'help',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleHelpCommand(client, message);
+				markCommand();
+			} else if (
+				['mute', 'unmute', 'timeout', 'untimeout', 'ban', 'kick', 'warn', 'removewarn'].includes(
+					command,
+				)
+			) {
 				if (!checkPolicy(command, message)) return;
 				if (!cdOk(message.author.id, command, 2500)) return;
-				_logCtx = logStart({ name: command, userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
-				_sentMsg = await handleModerationCommands(client, message, command, args); markCommand();
+				_logCtx = logStart({
+					name: command,
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content, args },
+				});
+				_sentMsg = await handleModerationCommands(client, message, command, args);
+				markCommand();
 			} else if (command === 'purge' || command === 'clean') {
 				if (!checkPolicy('purge', message)) return;
 				if (!cdOk(message.author.id, 'purge', 5000)) return;
-				_logCtx = logStart({ name: 'purge', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
-				_sentMsg = await handlePurgeCommand(client, message, args); markCommand();
-			} else if (["snipe", "s", "ds"].includes(command)) {
-				_logCtx = logStart({ name: 'snipe', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, alias: command, args } });
-				_sentMsg = await handleSnipeCommands(client, message, command, args); markCommand();
-			} else if (command === "warnings" || command === "warns") {
-				_logCtx = logStart({ name: 'warnings', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleWarningsCommand(client, message); markCommand();
-			} else if (command === "config") {
+				_logCtx = logStart({
+					name: 'purge',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content, args },
+				});
+				_sentMsg = await handlePurgeCommand(client, message, args);
+				markCommand();
+			} else if (['snipe', 's', 'ds'].includes(command)) {
+				_logCtx = logStart({
+					name: 'snipe',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content, alias: command, args },
+				});
+				_sentMsg = await handleSnipeCommands(client, message, command, args);
+				markCommand();
+			} else if (command === 'warnings' || command === 'warns') {
+				_logCtx = logStart({
+					name: 'warnings',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleWarningsCommand(client, message);
+				markCommand();
+			} else if (command === 'config') {
 				if (!checkPolicy('config', message)) return;
-				_logCtx = logStart({ name: 'config', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
+				_logCtx = logStart({
+					name: 'config',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
 				// handleConfigMenuCommand expects a message object only
-				_sentMsg = await handleMessageCreate(message); markCommand();
-			} else if (command === "level" || command === "rank") {
-				_logCtx = logStart({ name: 'rank', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleRankCommand(client, message); markCommand();
-			} else if (command === "profile" || command === "p") {
-				_logCtx = logStart({ name: 'profile', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleProfileCommand(client, message); markCommand();
-			} else if (command === "test") {
+				_sentMsg = await handleMessageCreate(message);
+				markCommand();
+			} else if (command === 'level' || command === 'rank') {
+				_logCtx = logStart({
+					name: 'rank',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleRankCommand(client, message);
+				markCommand();
+			} else if (command === 'profile' || command === 'p') {
+				_logCtx = logStart({
+					name: 'profile',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleProfileCommand(client, message);
+				markCommand();
+			} else if (command === 'test') {
 				if (!checkPolicy('test', message)) return;
-				_logCtx = logStart({ name: 'test', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleTestCommand(client, message); markCommand();
-			} else if (command === "leaderboard" || command === "lb") {
-				_logCtx = logStart({ name: 'leaderboard', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleLeaderboardCommand(client, message); markCommand();
-			} else if (command === "restart") {
+				_logCtx = logStart({
+					name: 'test',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleTestCommand(client, message);
+				markCommand();
+			} else if (command === 'leaderboard' || command === 'lb') {
+				_logCtx = logStart({
+					name: 'leaderboard',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleLeaderboardCommand(client, message);
+				markCommand();
+			} else if (command === 'restart') {
 				if (message.author.id !== getOwnerId()) return;
 				// Record restart timestamp for next boot to compute downtime
 				try {
-					const fs = require("fs");
-					fs.writeFileSync("./config/lastShutdown.json", JSON.stringify({ ts: Date.now() }));
+					const fs = require('fs');
+					fs.writeFileSync('./config/lastShutdown.json', JSON.stringify({ ts: Date.now() }));
 				} catch {}
-				await message.reply({ content: "🔄 Restarting bot...", allowedMentions: { repliedUser: false } }).catch(() => {});
+				await message
+					.reply({ content: '🔄 Restarting bot...', allowedMentions: { repliedUser: false } })
+					.catch(() => {});
 				// Spawn a tiny helper that waits for lock to clear, then starts index.js
 				try {
 					const { spawn } = require('child_process');
 					const nodeExec = process.argv[0];
-								if (message.author.id !== getOwnerId()) return;
+					if (message.author.id !== getOwnerId()) return;
 					const helper = path.resolve(process.cwd(), 'scripts', 'restartHelper.js');
 					const child = spawn(nodeExec, [helper], {
 						cwd: process.cwd(),
 						env: process.env,
 						detached: true,
 						stdio: 'ignore',
-						windowsHide: true
+						windowsHide: true,
 					});
 					child.unref();
 				} catch (e) {
-					try { require('../utils/logger').error('[restart spawn failed]', { err: e.message }); } catch {}
+					try {
+						require('../utils/logger').error('[restart spawn failed]', { err: e.message });
+					} catch {}
 					// Fall back to plain exit (expect external supervisor like pm2/systemd/VSCode to restart)
 				}
 				setTimeout(() => process.exit(0), 200);
-			} else if (command === "stop") {
+			} else if (command === 'stop') {
 				if (message.author.id !== getOwnerId()) return;
-				await message.reply("🛑 Stopping bot...");
+				await message.reply('🛑 Stopping bot...');
 				process.exit(0);
-			} else if (command === "schedule") {
-				_logCtx = logStart({ name: 'schedule', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
+			} else if (command === 'schedule') {
+				_logCtx = logStart({
+					name: 'schedule',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
 				_sentMsg = await handleScheduleCommand(client, message);
-			} else if (command === "scripts") {
-				_logCtx = logStart({ name: 'scripts', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleScriptsCommand(client, message); markCommand();
-			} else if (command === "cash") {
-				_logCtx = logStart({ name: 'cash', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-								if (message.author.id !== getOwnerId()) return;
-			} else if (command === "balance" || command === "bal") {
-				_logCtx = logStart({ name: 'balance', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleBalanceCommand(client, message); markCommand();
-								if (message.author.id !== getOwnerId()) return;
-				_logCtx = logStart({ name: 'diagnostics', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleDiagnosticsCommand(client, message); markCommand();
+			} else if (command === 'scripts') {
+				_logCtx = logStart({
+					name: 'scripts',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleScriptsCommand(client, message);
+				markCommand();
+			} else if (command === 'cash') {
+				_logCtx = logStart({
+					name: 'cash',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				if (message.author.id !== getOwnerId()) return;
+			} else if (command === 'balance' || command === 'bal') {
+				_logCtx = logStart({
+					name: 'balance',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleBalanceCommand(client, message);
+				markCommand();
+				if (message.author.id !== getOwnerId()) return;
+				_logCtx = logStart({
+					name: 'diagnostics',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleDiagnosticsCommand(client, message);
+				markCommand();
 			} else if (command === 'metrics') {
-				_logCtx = logStart({ name: 'metrics', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleMetricsCommand(client, message); markCommand();
+				_logCtx = logStart({
+					name: 'metrics',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleMetricsCommand(client, message);
+				markCommand();
 			} else if (command === 'clockinstate') {
-				_logCtx = logStart({ name: 'clockinstate', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleClockInStateCommand(client, message); markCommand();
+				_logCtx = logStart({
+					name: 'clockinstate',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleClockInStateCommand(client, message);
+				markCommand();
 			} else if (command === 'applications' || command === 'apps') {
-				_logCtx = logStart({ name: 'applications', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleApplicationsCommand(client, message); markCommand();
+				_logCtx = logStart({
+					name: 'applications',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleApplicationsCommand(client, message);
+				markCommand();
 			} else if (command === 'myapps' || command === 'myapp') {
-				_logCtx = logStart({ name: 'myapps', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleMyAppsCommand(client, message); markCommand();
+				_logCtx = logStart({
+					name: 'myapps',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleMyAppsCommand(client, message);
+				markCommand();
 			} else if (command === 'appstats' || command === 'appstat') {
-				_logCtx = logStart({ name: 'appstats', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await handleAppStatsCommand(client, message); markCommand();
+				_logCtx = logStart({
+					name: 'appstats',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await handleAppStatsCommand(client, message);
+				markCommand();
 			} else if (command === 'errors' || command === 'err') {
 				if (message.author.id !== getOwnerId()) return;
-				_logCtx = logStart({ name: 'errors', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
+				_logCtx = logStart({
+					name: 'errors',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content, args },
+				});
 				// Accept patterns: .errors, .errors 25, .errors embed 25, .errors 25 embed
-				const embedMode = args.some(a => a.toLowerCase() === 'embed');
-				const numArg = args.find(a => /^(\d+)$/.test(a));
+				const embedMode = args.some((a) => a.toLowerCase() === 'embed');
+				const numArg = args.find((a) => /^(\d+)$/.test(a));
 				const limit = Math.min(50, Number(numArg) || 15);
 				const recent = getRecentErrors(limit);
-				if (!recent.length) return message.reply({ content: '✅ No recent errors recorded.', allowedMentions: { repliedUser: false } });
-				const rows = recent.map((e,i) => ({
+				if (!recent.length)
+					return message.reply({
+						content: '✅ No recent errors recorded.',
+						allowedMentions: { repliedUser: false },
+					});
+				const rows = recent.map((e, i) => ({
 					idx: i,
-					ts: new Date(e.ts).toISOString().replace('T',' ').replace('Z',''),
+					ts: new Date(e.ts).toISOString().replace('T', ' ').replace('Z', ''),
 					scope: e.scope,
-					first: (e.message||'').split('\n')[0].slice(0, 200)
+					first: (e.message || '').split('\n')[0].slice(0, 200),
 				}));
 				if (!embedMode) {
-					const lines = rows.map(r => `#${r.idx} ${r.ts.split(' ')[1]} [${r.scope}] ${r.first}`);
+					const lines = rows.map((r) => `#${r.idx} ${r.ts.split(' ')[1]} [${r.scope}] ${r.first}`);
 					const content = '🧾 Recent Errors (newest last)\n' + lines.join('\n');
-					_sentMsg = await message.reply({ content: content.slice(0, 1900), allowedMentions: { repliedUser: false } });
+					_sentMsg = await message.reply({
+						content: content.slice(0, 1900),
+						allowedMentions: { repliedUser: false },
+					});
 					return;
 				}
 				// Embed mode
@@ -252,44 +453,103 @@ function attachMessageEvents(client) {
 				const pageSize = 10;
 				const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
 				const buildPage = (page) => {
-					const embed = createEmbed({ title: '🧾 Recent Errors', description: `Page ${page+1}/${totalPages} • ${rows.length} item(s)`, color: 'danger' });
+					const embed = createEmbed({
+						title: '🧾 Recent Errors',
+						description: `Page ${page + 1}/${totalPages} • ${rows.length} item(s)`,
+						color: 'danger',
+					});
 					const start = page * pageSize;
 					const slice = rows.slice(start, start + pageSize);
 					for (const r of slice) {
-						safeAddField(embed, `#${r.idx} [${r.scope}] ${r.ts.split(' ')[1]}`, r.first || '(no message)');
+						safeAddField(
+							embed,
+							`#${r.idx} [${r.scope}] ${r.ts.split(' ')[1]}`,
+							r.first || '(no message)',
+						);
 					}
 					return embed;
 				};
-				const row = (page) => buildNavRow([
-					semanticButton('nav', { id: 'err_prev', label: 'Prev', enabled: page!==0 }),
-					semanticButton('nav', { id: 'err_next', label: 'Next', enabled: page < totalPages-1 }),
-					semanticButton('primary', { id: 'err_refresh', label: 'Refresh' })
-				]);
-				_sentMsg = await message.reply({ embeds: [buildPage(0)], components: [row(0)], allowedMentions: { repliedUser: false } });
-				ActiveMenus.registerMessage(_sentMsg, { type: 'errors', userId: message.author.id, data: { page: 0, limit } });
+				const row = (page) =>
+					buildNavRow([
+						semanticButton('nav', { id: 'err_prev', label: 'Prev', enabled: page !== 0 }),
+						semanticButton('nav', {
+							id: 'err_next',
+							label: 'Next',
+							enabled: page < totalPages - 1,
+						}),
+						semanticButton('primary', { id: 'err_refresh', label: 'Refresh' }),
+					]);
+				_sentMsg = await message.reply({
+					embeds: [buildPage(0)],
+					components: [row(0)],
+					allowedMentions: { repliedUser: false },
+				});
+				ActiveMenus.registerMessage(_sentMsg, {
+					type: 'errors',
+					userId: message.author.id,
+					data: { page: 0, limit },
+				});
 			} else if (command === 'clearerrors' || command === 'cerr') {
 				const { getOwnerId } = require('../commands/moderation/permissions');
 				if (message.author.id !== String(getOwnerId())) return;
 				clearErrorLog();
-				_logCtx = logStart({ name: 'clearerrors', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content } });
-				_sentMsg = await message.reply({ content: '🧹 Error log cleared.', allowedMentions: { repliedUser: false } });
+				_logCtx = logStart({
+					name: 'clearerrors',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content },
+				});
+				_sentMsg = await message.reply({
+					content: '🧹 Error log cleared.',
+					allowedMentions: { repliedUser: false },
+				});
 			} else if (command === 'errdetail') {
 				const { getOwnerId } = require('../commands/moderation/permissions');
 				if (message.author.id !== String(getOwnerId())) return;
 				const idx = Number(args[0]);
-				_logCtx = logStart({ name: 'errdetail', userId: message.author.id, channelId: message.channelId, guildId: message.guildId, input: { content: message.content, args } });
-				if (!Number.isInteger(idx)) { _sentMsg = await message.reply({ content: 'Provide an index from .errors list.', allowedMentions:{repliedUser:false}}); return; }
+				_logCtx = logStart({
+					name: 'errdetail',
+					userId: message.author.id,
+					channelId: message.channelId,
+					guildId: message.guildId,
+					input: { content: message.content, args },
+				});
+				if (!Number.isInteger(idx)) {
+					_sentMsg = await message.reply({
+						content: 'Provide an index from .errors list.',
+						allowedMentions: { repliedUser: false },
+					});
+					return;
+				}
 				const full = getRecentErrors(100);
-				if (idx < 0 || idx >= full.length) { _sentMsg = await message.reply({ content: 'Index out of range.', allowedMentions:{repliedUser:false}}); return; }
+				if (idx < 0 || idx >= full.length) {
+					_sentMsg = await message.reply({
+						content: 'Index out of range.',
+						allowedMentions: { repliedUser: false },
+					});
+					return;
+				}
 				const entry = full[idx];
 				const { createEmbed, addChunkedField } = require('../utils/embeds');
-				const embed = createEmbed({ title: `Error #${idx} [${entry.scope}]`, description: new Date(entry.ts).toISOString(), color: 'danger' });
+				const embed = createEmbed({
+					title: `Error #${idx} [${entry.scope}]`,
+					description: new Date(entry.ts).toISOString(),
+					color: 'danger',
+				});
 				addChunkedField(embed, 'Stack / Message', entry.message, 950);
-				_sentMsg = await message.reply({ embeds:[embed], allowedMentions:{repliedUser:false}});
+				_sentMsg = await message.reply({
+					embeds: [embed],
+					allowedMentions: { repliedUser: false },
+				});
 			}
 		} catch (err) {
-			try { require('../utils/logger').error('Message command error', { err: err.message }); } catch {}
-			message.reply(`<:VRLSad:1413770577080094802> An error occurred while executing \`${command}\`.\nDetails: \`${err.message || err}\``);
+			try {
+				require('../utils/logger').error('Message command error', { err: err.message });
+			} catch {}
+			message.reply(
+				`<:VRLSad:1413770577080094802> An error occurred while executing \`${command}\`.\nDetails: \`${err.message || err}\``,
+			);
 		}
 
 		// finalize logging for commands we wrapped
@@ -314,17 +574,17 @@ try {
 	ActiveMenus.registerHandler('errors', async (interaction, session) => {
 		if (!interaction.isButton()) return;
 		if (interaction.user.id !== session.userId) {
-			return interaction.reply({ content: 'Not your session.', flags: 1<<6 }).catch(()=>{});
+			return interaction.reply({ content: 'Not your session.', flags: 1 << 6 }).catch(() => {});
 		}
 		const { customId } = interaction;
 		const { getRecentErrors } = require('../utils/errorUtil');
 		let page = session.data.page || 0;
 		const limit = session.data.limit || 15;
-		const rows = getRecentErrors(limit).map((e,i) => ({
+		const rows = getRecentErrors(limit).map((e, i) => ({
 			idx: i,
-			ts: new Date(e.ts).toISOString().replace('T',' ').replace('Z',''),
+			ts: new Date(e.ts).toISOString().replace('T', ' ').replace('Z', ''),
 			scope: e.scope,
-			first: (e.message||'').split('\n')[0].slice(0, 200)
+			first: (e.message || '').split('\n')[0].slice(0, 200),
 		}));
 		const pageSize = 10;
 		const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -334,17 +594,28 @@ try {
 		// Close button removed per design request
 		const start = page * pageSize;
 		const slice = rows.slice(start, start + pageSize);
-		const embed = createEmbed({ title: '🧾 Recent Errors', description: `Page ${page+1}/${totalPages} • ${rows.length} item(s)`, color: 'danger' });
-		for (const r of slice) safeAddField(embed, `#${r.idx} [${r.scope}] ${r.ts.split(' ')[1]}`, r.first || '(no message)');
+		const embed = createEmbed({
+			title: '🧾 Recent Errors',
+			description: `Page ${page + 1}/${totalPages} • ${rows.length} item(s)`,
+			color: 'danger',
+		});
+		for (const r of slice)
+			safeAddField(
+				embed,
+				`#${r.idx} [${r.scope}] ${r.ts.split(' ')[1]}`,
+				r.first || '(no message)',
+			);
 		const { buildNavRow, semanticButton } = require('../ui');
 		const row = buildNavRow([
-			semanticButton('nav', { id: 'err_prev', label: 'Prev', enabled: page!==0 }),
-			semanticButton('nav', { id: 'err_next', label: 'Next', enabled: page < totalPages-1 }),
+			semanticButton('nav', { id: 'err_prev', label: 'Prev', enabled: page !== 0 }),
+			semanticButton('nav', { id: 'err_next', label: 'Next', enabled: page < totalPages - 1 }),
 			semanticButton('primary', { id: 'err_refresh', label: 'Refresh' }),
-			semanticButton('danger', { id: 'err_close', label: 'Close' })
+			semanticButton('danger', { id: 'err_close', label: 'Close' }),
 		]);
 		session.data.page = page;
-		try { await interaction.update({ embeds: [embed], components: [row] }); } catch {}
+		try {
+			await interaction.update({ embeds: [embed], components: [row] });
+		} catch {}
 	});
 } catch {}
 
@@ -353,25 +624,36 @@ try {
 	ActiveMenus.registerHandler('purgeConfirm', async (interaction, session) => {
 		if (!interaction.isButton()) return;
 		if (interaction.user.id !== session.userId) {
-			return interaction.reply({ content: 'Not your confirmation.', flags: 1<<6 }).catch(()=>{});
+			return interaction
+				.reply({ content: 'Not your confirmation.', flags: 1 << 6 })
+				.catch(() => {});
 		}
 		const { customId } = interaction;
 		if (customId === 'purge_cancel') {
-			try { await interaction.update({ content: 'Purge cancelled.', embeds: [], components: [] }); } catch {}
+			try {
+				await interaction.update({ content: 'Purge cancelled.', embeds: [], components: [] });
+			} catch {}
 			return;
 		}
 		if (customId === 'purge_confirm') {
 			const { count, userFilter } = session.data || {};
-			try { await interaction.update({ content: 'Executing purge...', embeds: [], components: [] }); } catch {}
+			try {
+				await interaction.update({ content: 'Executing purge...', embeds: [], components: [] });
+			} catch {}
 			// Reconstruct a pseudo message object interface for executePurge (needs channel & reply)
 			const channel = interaction.channel;
 			const fakeMessage = {
 				channel,
 				author: interaction.user,
 				member: interaction.member,
-				reply: (opts) => interaction.followUp ? interaction.followUp(opts) : channel.send(opts)
+				reply: (opts) => (interaction.followUp ? interaction.followUp(opts) : channel.send(opts)),
 			};
-			await require('../commands/moderation/purge').executePurge(interaction.client, fakeMessage, count, userFilter);
+			await require('../commands/moderation/purge').executePurge(
+				interaction.client,
+				fakeMessage,
+				count,
+				userFilter,
+			);
 		}
 	});
 } catch {}

@@ -1,5 +1,5 @@
-const { updateSchedule, getSchedules } = require("./scheduleStorage");
-const { getEvents, updateEvent } = require("./eventsStorage");
+const { updateSchedule, getSchedules } = require('./scheduleStorage');
+const { getEvents, updateEvent } = require('./eventsStorage');
 const { applyTimestampPlaceholders } = require('./timestampPlaceholders');
 const { config } = require('./storage');
 // UI helpers not used in scheduler core
@@ -10,25 +10,29 @@ const logger = require('./logger');
 function applyPlaceholdersToJsonPayload(payload, ev) {
 	if (!payload || typeof payload !== 'object') return payload;
 	const repl = (s) => applyTimestampPlaceholders(String(s), ev);
-	const sanitize = (s) => (config.testingMode ? String(s).replace(/<@&?\d+>/g, m=>`\`${m}\``) : s);
+	const sanitize = (s) =>
+		config.testingMode ? String(s).replace(/<@&?\d+>/g, (m) => `\`${m}\``) : s;
 	const fixStr = (s) => sanitize(repl(s));
 	const copy = { ...payload };
 	if (typeof copy.content === 'string') copy.content = fixStr(copy.content).slice(0, 2000);
 	if (Array.isArray(copy.embeds)) {
-		copy.embeds = copy.embeds.map(e => {
+		copy.embeds = copy.embeds.map((e) => {
 			if (!e || typeof e !== 'object') return e;
 			const ee = { ...e };
 			if (typeof ee.title === 'string') ee.title = fixStr(ee.title);
 			if (typeof ee.description === 'string') ee.description = fixStr(ee.description);
-			if (ee.footer && typeof ee.footer.text === 'string') ee.footer = { ...ee.footer, text: fixStr(ee.footer.text) };
-			if (ee.author && typeof ee.author.name === 'string') ee.author = { ...ee.author, name: fixStr(ee.author.name) };
-			if (Array.isArray(ee.fields)) ee.fields = ee.fields.map(f => {
-				if (!f || typeof f !== 'object') return f;
-				const ff = { ...f };
-				if (typeof ff.name === 'string') ff.name = fixStr(ff.name).slice(0, 256);
-				if (typeof ff.value === 'string') ff.value = fixStr(ff.value).slice(0, 1024);
-				return ff;
-			});
+			if (ee.footer && typeof ee.footer.text === 'string')
+				ee.footer = { ...ee.footer, text: fixStr(ee.footer.text) };
+			if (ee.author && typeof ee.author.name === 'string')
+				ee.author = { ...ee.author, name: fixStr(ee.author.name) };
+			if (Array.isArray(ee.fields))
+				ee.fields = ee.fields.map((f) => {
+					if (!f || typeof f !== 'object') return f;
+					const ff = { ...f };
+					if (typeof ff.name === 'string') ff.name = fixStr(ff.name).slice(0, 256);
+					if (typeof ff.value === 'string') ff.value = fixStr(ff.value).slice(0, 1024);
+					return ff;
+				});
 			return ee;
 		});
 	}
@@ -39,7 +43,7 @@ function applyPlaceholdersToJsonPayload(payload, ev) {
 
 function computeNextRun(schedule) {
 	const now = Date.now();
-	const type = schedule.type || "once";
+	const type = schedule.type || 'once';
 
 	// const timeMsOfDay = (() => {
 	//     if (!schedule.time) return 0;
@@ -47,10 +51,10 @@ function computeNextRun(schedule) {
 	//     return hh * 3600000 + (mm || 0) * 60000;
 	// })();
 
-	if (type === "once") {
+	if (type === 'once') {
 		if (schedule.date && schedule.time) {
-			const [y, m, d] = schedule.date.split("-").map(Number);
-			const [hh = 0, mm = 0] = (schedule.time || "00:00").split(":").map(Number);
+			const [y, m, d] = schedule.date.split('-').map(Number);
+			const [hh = 0, mm = 0] = (schedule.time || '00:00').split(':').map(Number);
 			const next = new Date(y, (m || 1) - 1, d || 1, hh, mm, 0, 0);
 			const ts = next.getTime();
 			return ts > now ? ts : null; // if time is in the past, do not reschedule
@@ -58,24 +62,24 @@ function computeNextRun(schedule) {
 		return schedule.nextRun || null;
 	}
 
-	if (type === "daily") {
+	if (type === 'daily') {
 		let candidate = new Date();
-		candidate.setHours(...((schedule.time || "00:00").split(":").map(Number)), 0, 0);
+		candidate.setHours(...(schedule.time || '00:00').split(':').map(Number), 0, 0);
 		if (candidate.getTime() <= now) candidate = new Date(candidate.getTime() + 24 * 3600000);
 		return candidate.getTime();
 	}
 
-	if (type === "interval") {
+	if (type === 'interval') {
 		if (schedule.nextRun && schedule.nextRun > now) return schedule.nextRun;
 		const days = Math.max(1, Number(schedule.intervalDays) || 1);
 		const base = schedule.nextRun && schedule.nextRun > 0 ? schedule.nextRun : now;
 		return new Date(base + days * 24 * 3600000).getTime();
 	}
 
-	if (type === "weekly") {
+	if (type === 'weekly') {
 		const days = Array.isArray(schedule.days) && schedule.days.length ? schedule.days : [1];
 		const nowDate = new Date();
-		const [hh = 0, mm = 0] = (schedule.time || "00:00").split(":").map(Number);
+		const [hh = 0, mm = 0] = (schedule.time || '00:00').split(':').map(Number);
 		for (let offset = 0; offset < 14; offset++) {
 			const d = new Date(nowDate.getTime() + offset * 24 * 3600000);
 			const wd = d.getDay();
@@ -87,9 +91,9 @@ function computeNextRun(schedule) {
 		return now + 24 * 3600000;
 	}
 
-	if (type === "monthly") {
+	if (type === 'monthly') {
 		const day = Math.max(1, Number(schedule.dayOfMonth) || 1);
-		const [hh = 0, mm = 0] = (schedule.time || "00:00").split(":").map(Number);
+		const [hh = 0, mm = 0] = (schedule.time || '00:00').split(':').map(Number);
 		const base = new Date();
 		const year = base.getFullYear();
 		const month = base.getMonth();
@@ -113,11 +117,13 @@ let _started = false; // idempotent guard to prevent multiple scheduler loops
 
 async function runScheduleOnce(client, schedule) {
 	try {
-		const chId = config.testingMode ? (schedule.logChannelId || CONFIG_LOG_CHANNEL || schedule.channelId) : schedule.channelId;
+		const chId = config.testingMode
+			? schedule.logChannelId || CONFIG_LOG_CHANNEL || schedule.channelId
+			: schedule.channelId;
 		const channel = await client.channels.fetch(chId).catch(() => null);
-		if (!channel || !channel.send) throw new Error("Invalid channel");
+		if (!channel || !channel.send) throw new Error('Invalid channel');
 		try {
-			const { seenRecently } = require('./sendOnce'); // eslint-disable-line no-unused-vars
+			const { seenRecently } = require('./sendOnce');
 			const key = `sched:${schedule.id}:${chId}`;
 			if (seenRecently(key, 8000)) return;
 		} catch {}
@@ -130,7 +136,7 @@ async function runScheduleOnce(client, schedule) {
 		} else {
 			const raw = schedule.message || 'Scheduled message';
 			content = applyTimestampPlaceholders(raw, schedule.eventRef || {});
-			if (config.testingMode && content) content = content.replace(/<@&?\d+>/g, m=>`\`${m}\``);
+			if (config.testingMode && content) content = content.replace(/<@&?\d+>/g, (m) => `\`${m}\``);
 			await channel.send({ content });
 		}
 		const logger = require('./logger');
@@ -142,7 +148,7 @@ async function runScheduleOnce(client, schedule) {
 }
 
 function computeAfterRun(schedule) {
-	if (schedule.repeats !== null && typeof schedule.repeats !== "undefined") {
+	if (schedule.repeats !== null && typeof schedule.repeats !== 'undefined') {
 		schedule.repeats = Number(schedule.repeats) - 1;
 		if (schedule.repeats <= 0) {
 			schedule.enabled = false;
@@ -150,7 +156,7 @@ function computeAfterRun(schedule) {
 			return schedule;
 		}
 	}
-	if ((schedule.type || 'once') === 'once') { // eslint-disable-line no-unused-vars
+	if ((schedule.type || 'once') === 'once') {
 		schedule.enabled = false;
 		schedule.nextRun = null;
 		return schedule;
@@ -204,12 +210,12 @@ function startScheduler(client, opts = {}) {
 			const events = getEvents();
 			const nowDt = new Date();
 			const currentDay = nowDt.getDay();
-			const hh = nowDt.getHours().toString().padStart(2, "0");
-			const mm = nowDt.getMinutes().toString().padStart(2, "0");
+			const hh = nowDt.getHours().toString().padStart(2, '0');
+			const mm = nowDt.getMinutes().toString().padStart(2, '0');
 			const currentHM = `${hh}:${mm}`;
 			for (const ev of events) {
 				if (!ev.enabled) continue;
-				if (ev.type !== "multi-daily") continue;
+				if (ev.type !== 'multi-daily') continue;
 				if (Array.isArray(ev.days) && ev.days.length && !ev.days.includes(currentDay)) continue;
 				if (!Array.isArray(ev.times)) continue;
 				const now = Date.now();
@@ -218,14 +224,19 @@ function startScheduler(client, opts = {}) {
 				if (Array.isArray(ev.ranges) && ev.ranges.length) {
 					for (const r of ev.ranges) {
 						if (!r || !r.start || !r.end) continue;
-						const [sh, sm] = r.start.split(':').map(n=>parseInt(n,10));
-						const [eh, em] = r.end.split(':').map(n=>parseInt(n,10));
-						if ([sh,sm,eh,em].some(n => Number.isNaN(n))) continue;
-						const startMinutes = sh*60+sm;
-						const endMinutes = eh*60+em;
-						const curMinutes = parseInt(hh,10)*60+parseInt(mm,10);
-						if (curMinutes >= startMinutes && curMinutes < endMinutes) { status='open'; break; }
-						if (curMinutes >= endMinutes) { status='closed'; }
+						const [sh, sm] = r.start.split(':').map((n) => parseInt(n, 10));
+						const [eh, em] = r.end.split(':').map((n) => parseInt(n, 10));
+						if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) continue;
+						const startMinutes = sh * 60 + sm;
+						const endMinutes = eh * 60 + em;
+						const curMinutes = parseInt(hh, 10) * 60 + parseInt(mm, 10);
+						if (curMinutes >= startMinutes && curMinutes < endMinutes) {
+							status = 'open';
+							break;
+						}
+						if (curMinutes >= endMinutes) {
+							status = 'closed';
+						}
 					}
 				} else {
 					if (ev.times.includes(currentHM)) {
@@ -236,56 +247,87 @@ function startScheduler(client, opts = {}) {
 								if (channel && channel.send && !hasAnchor) {
 									if (ev.messageJSON && typeof ev.messageJSON === 'object') {
 										const payload = { ...ev.messageJSON };
-										if (!payload.content && !payload.embeds) payload.content = ev.message || `Event: ${ev.name}`;
-										if (payload.content && payload.content.length > 2000) payload.content = payload.content.slice(0,1997)+'...';
-										if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
-										await channel.send(payload).catch(()=>{});
+										if (!payload.content && !payload.embeds)
+											payload.content = ev.message || `Event: ${ev.name}`;
+										if (payload.content && payload.content.length > 2000)
+											payload.content = payload.content.slice(0, 1997) + '...';
+										if (payload.embeds && !Array.isArray(payload.embeds))
+											payload.embeds = [payload.embeds];
+										await channel.send(payload).catch(() => {});
 									} else {
-										await channel.send({ content: ev.message || `Event: ${ev.name}` }).catch(()=>{});
+										await channel
+											.send({ content: ev.message || `Event: ${ev.name}` })
+											.catch(() => {});
 									}
 								}
-							} catch (e) { logger.error('Event dispatch failed', { eventId: ev.id, err: e.message }); }
-							ev[lastKey] = now; updateEvent(ev.id, { [lastKey]: now });
+							} catch (e) {
+								logger.error('Event dispatch failed', { eventId: ev.id, err: e.message });
+							}
+							ev[lastKey] = now;
+							updateEvent(ev.id, { [lastKey]: now });
 						}
 					}
 				}
 				if (hasAnchor) {
 					try {
-						const channel = await client.channels.fetch(ev.anchorChannelId).catch(()=>null);
+						const channel = await client.channels.fetch(ev.anchorChannelId).catch(() => null);
 						if (channel) {
-							const msg = await channel.messages.fetch(ev.anchorMessageId).catch(()=>null);
-								if (msg) {
-									// Protect: do not treat clock-in embeds as anchor event messages.
-									// Some events incorrectly had their anchorMessageId point at the
-									// Staff Clock In message; we must avoid editing those.
-									try {
-										const firstEmbed = msg.embeds && msg.embeds[0];
-										const embedTitle = firstEmbed && firstEmbed.title ? String(firstEmbed.title) : '';
-										const embedFooter = firstEmbed && firstEmbed.footer && firstEmbed.footer.text ? String(firstEmbed.footer.text) : '';
-										if (embedTitle.includes('Staff Clock In') || embedFooter.includes('Staff clock in')) {
-											// Skip anchor update for clock-in UI messages
-											continue;
-										}
-									} catch (e) { /* ignore guard failures and continue */ }
+							const msg = await channel.messages.fetch(ev.anchorMessageId).catch(() => null);
+							if (msg) {
+								// Protect: do not treat clock-in embeds as anchor event messages.
+								// Some events incorrectly had their anchorMessageId point at the
+								// Staff Clock In message; we must avoid editing those.
+								try {
+									const firstEmbed = msg.embeds && msg.embeds[0];
+									const embedTitle = firstEmbed && firstEmbed.title ? String(firstEmbed.title) : '';
+									const embedFooter =
+										firstEmbed && firstEmbed.footer && firstEmbed.footer.text
+											? String(firstEmbed.footer.text)
+											: '';
+									if (
+										embedTitle.includes('Staff Clock In') ||
+										embedFooter.includes('Staff clock in')
+									) {
+										// Skip anchor update for clock-in UI messages
+										continue;
+									}
+								} catch (e) {
+									/* ignore guard failures and continue */
+								}
 
-									let baseContent = ev.dynamicBaseContent || ev.messageJSON?.content || ev.message || '';
+								let baseContent =
+									ev.dynamicBaseContent || ev.messageJSON?.content || ev.message || '';
 								baseContent = applyTimestampPlaceholders(baseContent, ev);
 								if (!baseContent) baseContent = `Event: ${ev.name}`;
 								let newContent = baseContent;
-								const OPEN_TOKEN = /^(# The Midnight bar is.*|🍷The Midnight Bar is currently open!🍷|The Midnight Bar is closed for now\.)$/im;
+								const OPEN_TOKEN =
+									/^(# The Midnight bar is.*|🍷The Midnight Bar is currently open!🍷|The Midnight Bar is closed for now\.)$/im;
 								if (status === 'open') {
-									newContent = newContent.replace(OPEN_TOKEN, '🍷The Midnight Bar is currently open!🍷');
+									newContent = newContent.replace(
+										OPEN_TOKEN,
+										'🍷The Midnight Bar is currently open!🍷',
+									);
 								} else if (status === 'closed') {
 									try {
 										const { computeNextRange } = require('./timestampPlaceholders');
 										const next = computeNextRange(ev);
 										if (next && OPEN_TOKEN.test(newContent)) {
-											newContent = newContent.replace(OPEN_TOKEN, `# The Midnight bar is opening: <t:${next.startSec}:R>`);
+											newContent = newContent.replace(
+												OPEN_TOKEN,
+												`# The Midnight bar is opening: <t:${next.startSec}:R>`,
+											);
 										} else if (OPEN_TOKEN.test(newContent)) {
-											newContent = newContent.replace(OPEN_TOKEN, '# The Midnight bar is opening: (soon)');
+											newContent = newContent.replace(
+												OPEN_TOKEN,
+												'# The Midnight bar is opening: (soon)',
+											);
 										}
 									} catch {
-										if (OPEN_TOKEN.test(newContent)) newContent = newContent.replace(OPEN_TOKEN, '# The Midnight bar is opening: (soon)');
+										if (OPEN_TOKEN.test(newContent))
+											newContent = newContent.replace(
+												OPEN_TOKEN,
+												'# The Midnight bar is opening: (soon)',
+											);
 									}
 								} else if (status === 'upcoming') {
 									try {
@@ -293,42 +335,65 @@ function startScheduler(client, opts = {}) {
 										const range = computeNextRange(ev);
 										if (range && OPEN_TOKEN.test(newContent)) {
 											const relTs = `<t:${range.startSec}:R>`;
-											newContent = newContent.replace(OPEN_TOKEN, `# The Midnight bar is opening in ${relTs}`);
+											newContent = newContent.replace(
+												OPEN_TOKEN,
+												`# The Midnight bar is opening in ${relTs}`,
+											);
 										}
 									} catch {}
 								}
 								if (newContent !== msg.content) {
 									if (ev.messageJSON) {
 										const payload = { ...ev.messageJSON, content: newContent };
-										if (payload.embeds && !Array.isArray(payload.embeds)) payload.embeds = [payload.embeds];
-										await msg.edit(payload).catch(()=>{});
+										if (payload.embeds && !Array.isArray(payload.embeds))
+											payload.embeds = [payload.embeds];
+										await msg.edit(payload).catch(() => {});
 									} else {
-										await msg.edit({ content: newContent }).catch(()=>{});
+										await msg.edit({ content: newContent }).catch(() => {});
 									}
 								}
 							}
 						}
-					} catch (e) { /* ignore anchor update errors */ }
+					} catch (e) {
+						/* ignore anchor update errors */
+					}
 
 					// If the event is closed, ensure any lingering clock-in messages are removed
-						try {
-							if (status === 'closed' && ev.__clockIn && Array.isArray(ev.__clockIn.messageIds) && ev.__clockIn.messageIds.length) {
-								// Delegate to helper so we can unit-test and apply extra safety checks
-								try { await pruneClockInMessagesOnClose(client, ev); } catch (e) { logger && logger.warn && logger.warn('[scheduler] pruneClockInMessagesOnClose failed', { err: e && e.message, eventId: ev.id }); }
+					try {
+						if (
+							status === 'closed' &&
+							ev.__clockIn &&
+							Array.isArray(ev.__clockIn.messageIds) &&
+							ev.__clockIn.messageIds.length
+						) {
+							// Delegate to helper so we can unit-test and apply extra safety checks
+							try {
+								await pruneClockInMessagesOnClose(client, ev);
+							} catch (e) {
+								logger &&
+									logger.warn &&
+									logger.warn('[scheduler] pruneClockInMessagesOnClose failed', {
+										err: e && e.message,
+										eventId: ev.id,
+									});
 							}
-						} catch (e) {}
+						}
+					} catch (e) {}
 				}
 				try {
 					if (ev.__clockIn && Array.isArray(ev.__clockIn.messageIds)) {
 						const pruneInterval = 5 * 60 * 1000;
 						const nowTs = Date.now();
-						if (!ev.__clockIn.lastPruneTs || (nowTs - ev.__clockIn.lastPruneTs) > pruneInterval) {
+						if (!ev.__clockIn.lastPruneTs || nowTs - ev.__clockIn.lastPruneTs > pruneInterval) {
 							const chId = ev.__clockIn.channelId || ev.channelId;
-							const channel = chId ? await client.channels.fetch(chId).catch(()=>null) : null;
+							const channel = chId ? await client.channels.fetch(chId).catch(() => null) : null;
 							if (channel && channel.messages) {
 								const kept = [];
 								for (const mid of ev.__clockIn.messageIds.slice(-10)) {
-									const exists = await channel.messages.fetch(mid).then(()=>true).catch(()=>false);
+									const exists = await channel.messages
+										.fetch(mid)
+										.then(() => true)
+										.catch(() => false);
 									if (exists) kept.push(mid);
 								}
 								if (kept.length !== ev.__clockIn.messageIds.length) {
@@ -344,7 +409,9 @@ function startScheduler(client, opts = {}) {
 					}
 				} catch {}
 			}
-		} catch (e) { /* ignore event errors */ }
+		} catch (e) {
+			/* ignore event errors */
+		}
 		const dur = Date.now() - loopStart;
 		if (dur > 2000 || ran > 0) logger.debug(`[scheduler] tick ran=${ran} durMs=${dur}`);
 	}, tickInterval);
@@ -358,13 +425,22 @@ function startScheduler(client, opts = {}) {
 // - This is conservative to avoid removing user content.
 async function pruneClockInMessagesOnClose(client, ev, options = { force: false }) {
 	try {
-		if (!ev || !ev.__clockIn || !Array.isArray(ev.__clockIn.messageIds) || ev.__clockIn.messageIds.length === 0) return;
+		if (
+			!ev ||
+			!ev.__clockIn ||
+			!Array.isArray(ev.__clockIn.messageIds) ||
+			ev.__clockIn.messageIds.length === 0
+		)
+			return;
 		const chId = ev.__clockIn.channelId || ev.channelId;
 		const channel = chId ? await client.channels.fetch(chId).catch(() => null) : null;
 		if (!channel || !channel.messages) return;
 		// Resolve the clock-in notification (if any) to check deleteAfterMs
-		const clockNotif = (ev.autoMessages || []).find(n => n.isClockIn) || null;
-		const notifTTL = clockNotif && Number.isFinite(clockNotif.deleteAfterMs) ? Number(clockNotif.deleteAfterMs) : null;
+		const clockNotif = (ev.autoMessages || []).find((n) => n.isClockIn) || null;
+		const notifTTL =
+			clockNotif && Number.isFinite(clockNotif.deleteAfterMs)
+				? Number(clockNotif.deleteAfterMs)
+				: null;
 		const { newCorrelationId } = require('./correlation');
 		const corrId = newCorrelationId();
 
@@ -376,22 +452,46 @@ async function pruneClockInMessagesOnClose(client, ev, options = { force: false 
 				const shouldDeleteByTTL = Number.isFinite(notifTTL) && notifTTL > 0;
 				const shouldForce = options && options.force === true;
 				// Also ensure we only delete our own messages
-				const isBotAuth = !!(m.author && m.author.id && client.user && client.user.id && m.author.id === client.user.id);
+				const isBotAuth = !!(
+					m.author &&
+					m.author.id &&
+					client.user &&
+					client.user.id &&
+					m.author.id === client.user.id
+				);
 				if ((shouldDeleteByTTL || shouldForce) && isBotAuth) {
-					try { require('./logger').info('[pruneClockIn] deleting message', { mid, eventId: ev.id, notifId: clockNotif && clockNotif.id ? clockNotif.id : null, correlationId: corrId }); } catch {}
-					try { await m.delete().catch(() => {}); } catch {}
+					try {
+						require('./logger').info('[pruneClockIn] deleting message', {
+							mid,
+							eventId: ev.id,
+							notifId: clockNotif && clockNotif.id ? clockNotif.id : null,
+							correlationId: corrId,
+						});
+					} catch {}
+					try {
+						await m.delete().catch(() => {});
+					} catch {}
 				}
-			} catch (e) { /* best-effort */ }
+			} catch (e) {
+				/* best-effort */
+			}
 		}
 		// After attempting deletes, clear recorded ids (keep any that still fetch)
 		const kept = [];
 		for (const mid of ev.__clockIn.messageIds.slice(-10)) {
-			const exists = await channel.messages.fetch(mid).then(() => true).catch(() => false);
+			const exists = await channel.messages
+				.fetch(mid)
+				.then(() => true)
+				.catch(() => false);
 			if (exists) kept.push(mid);
 		}
 		ev.__clockIn.messageIds = kept;
-		try { updateEvent(ev.id, { __clockIn: ev.__clockIn }); } catch {}
-	} catch (e) { /* ignore */ }
+		try {
+			updateEvent(ev.id, { __clockIn: ev.__clockIn });
+		} catch {}
+	} catch (e) {
+		/* ignore */
+	}
 }
 
 module.exports = {

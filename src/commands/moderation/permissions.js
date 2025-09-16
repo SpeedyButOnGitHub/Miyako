@@ -38,11 +38,20 @@ function isModerator(member) {
 	const roleCache = member.roles?.cache || new Map();
 	const hasRole = (rid) => roleCache.has(rid);
 	const configured = Array.isArray(config.moderatorRoles) ? config.moderatorRoles : [];
-	if (configured.some(hasRole)) { setCached(member.guild?.id || 'global', member.id, true); return true; }
-	if (ALLOWED_ROLES.some(hasRole)) { setCached(member.guild?.id || 'global', member.id, true); return true; }
+	if (configured.some(hasRole)) {
+		setCached(member.guild?.id || 'global', member.id, true);
+		return true;
+	}
+	if (ALLOWED_ROLES.some(hasRole)) {
+		setCached(member.guild?.id || 'global', member.id, true);
+		return true;
+	}
 
 	if (member.permissions && typeof member.permissions.has === 'function') {
-		if (member.permissions.has(PermissionFlagsBits.Administrator) || member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+		if (
+			member.permissions.has(PermissionFlagsBits.Administrator) ||
+			member.permissions.has(PermissionFlagsBits.ModerateMembers)
+		) {
 			setCached(member.guild?.id || 'global', member.id, true);
 			return true;
 		}

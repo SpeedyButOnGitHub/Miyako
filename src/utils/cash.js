@@ -1,4 +1,4 @@
-const fs = require("fs");
+const fs = require('fs');
 const { runtimeFile } = require('./paths');
 
 const CASH_FILE = runtimeFile('cash.json');
@@ -7,7 +7,11 @@ const { enqueueWrite } = require('./writeQueue');
 let cash = {};
 try {
 	if (fs.existsSync(CASH_FILE)) {
-		try { cash = JSON.parse(fs.readFileSync(CASH_FILE, "utf8")); } catch { cash = {}; }
+		try {
+			cash = JSON.parse(fs.readFileSync(CASH_FILE, 'utf8'));
+		} catch {
+			cash = {};
+		}
 	}
 } catch {
 	cash = {};
@@ -18,9 +22,11 @@ const TEST_CASH_FILE = runtimeFile('testingCash.json');
 let testingCash = {};
 try {
 	if (fs.existsSync(TEST_CASH_FILE)) {
-		testingCash = JSON.parse(fs.readFileSync(TEST_CASH_FILE, "utf8") || "{}");
+		testingCash = JSON.parse(fs.readFileSync(TEST_CASH_FILE, 'utf8') || '{}');
 	}
-} catch { testingCash = {}; }
+} catch {
+	testingCash = {};
+}
 
 function scheduleSave() {
 	enqueueWrite(CASH_FILE, () => JSON.stringify(cash, null, 2));
@@ -44,7 +50,10 @@ function addCash(userId, delta) {
 }
 
 function getTopCash(limit = 10) {
-	const entries = Object.entries(cash).map(([id, v]) => ({ id, amount: Math.max(0, Number(v?.amount || 0)) }));
+	const entries = Object.entries(cash).map(([id, v]) => ({
+		id,
+		amount: Math.max(0, Number(v?.amount || 0)),
+	}));
 	entries.sort((a, b) => b.amount - a.amount);
 	return entries.slice(0, limit);
 }
@@ -63,13 +72,17 @@ function addTestingCash(userId, delta) {
 	const cur = getTestingCash(userId);
 	const next = Math.max(0, cur + Math.floor(Number(delta) || 0));
 	testingCash[userId] = { amount: next };
-	try { enqueueWrite(TEST_CASH_FILE, () => JSON.stringify(testingCash, null, 2)); } catch {}
+	try {
+		enqueueWrite(TEST_CASH_FILE, () => JSON.stringify(testingCash, null, 2));
+	} catch {}
 	return next;
 }
 
 function clearTestingCash() {
 	testingCash = {};
-	try { enqueueWrite(TEST_CASH_FILE, () => JSON.stringify(testingCash, null, 2)); } catch {}
+	try {
+		enqueueWrite(TEST_CASH_FILE, () => JSON.stringify(testingCash, null, 2));
+	} catch {}
 }
 
 module.exports = {

@@ -18,21 +18,56 @@ const projectRoot = findProjectRoot(__dirname);
 
 // Allow tests or CI to override the runtime data directory via environment variable
 // e.g. MIYAKO_RUNTIME_DIR=C:\some\tmp\dir
-function cfgPath(...parts) { return path.join(projectRoot, 'config', ...parts); }
+function cfgPath(...parts) {
+	return path.join(projectRoot, 'config', ...parts);
+}
 function dataDir() {
 	if (process.env.MIYAKO_RUNTIME_DIR && String(process.env.MIYAKO_RUNTIME_DIR).trim()) {
-		try { const p = String(process.env.MIYAKO_RUNTIME_DIR); if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); return p; } catch {}
+		try {
+			const p = String(process.env.MIYAKO_RUNTIME_DIR);
+			if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+			return p;
+		} catch {}
 	}
 	return path.join(projectRoot, 'data');
 }
-function logsDir() { return path.join(projectRoot, 'logs'); }
-function ensureDir(p) { try { if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); } catch {} }
-function logPath(...parts) { const dir = logsDir(); ensureDir(dir); return path.join(dir, ...parts); }
-function dataPath(...parts) { const dir = dataDir(); ensureDir(dir); return path.join(dir, ...parts); }
+function logsDir() {
+	return path.join(projectRoot, 'logs');
+}
+function ensureDir(p) {
+	try {
+		if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+	} catch {}
+}
+function logPath(...parts) {
+	const dir = logsDir();
+	ensureDir(dir);
+	return path.join(dir, ...parts);
+}
+function dataPath(...parts) {
+	const dir = dataDir();
+	ensureDir(dir);
+	return path.join(dir, ...parts);
+}
 
 // Runtime (mutable) JSON files historically lived in /config; we remap them to /data with fallback.
 const RUNTIME_JSON = new Set([
-	'bank.json','cash.json','events.json','schedules.json','levels.json','depositProgress.json','buttonSessions.json','activeMenus.json','testingBank.json','testingCash.json','changelogSnapshot.json','snipes.json','errorLog.json','crash-latest.json','lastShutdown.json','settingMeta.json'
+	'bank.json',
+	'cash.json',
+	'events.json',
+	'schedules.json',
+	'levels.json',
+	'depositProgress.json',
+	'buttonSessions.json',
+	'activeMenus.json',
+	'testingBank.json',
+	'testingCash.json',
+	'changelogSnapshot.json',
+	'snipes.json',
+	'errorLog.json',
+	'crash-latest.json',
+	'lastShutdown.json',
+	'settingMeta.json',
 ]); // vcLevels.json & process-heartbeat.json treated as volatile (ignored) and handled separately
 
 function runtimeFile(name) {

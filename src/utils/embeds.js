@@ -7,7 +7,14 @@ const { toTitleCase } = require('./text');
 const theme = require('./theme');
 
 // Base factory
-function createEmbed({ title = null, description = null, color = 'primary', fields = [], footer = null, timestamp = true } = {}) {
+function createEmbed({
+	title = null,
+	description = null,
+	color = 'primary',
+	fields = [],
+	footer = null,
+	timestamp = true,
+} = {}) {
 	const embed = new EmbedBuilder();
 	if (title) embed.setTitle(toTitleCase(title));
 	// Normalize description to a string when possible to avoid invalid types reaching
@@ -21,14 +28,20 @@ function createEmbed({ title = null, description = null, color = 'primary', fiel
 		try {
 			if (typeof desc === 'string' && desc.length > 4096) {
 				const preview = desc.slice(0, 200);
-				try { require('./logger').info('[createEmbed] description truncated', { length: desc.length, preview }); } catch {}
+				try {
+					require('./logger').info('[createEmbed] description truncated', {
+						length: desc.length,
+						preview,
+					});
+				} catch {}
 				desc = desc.slice(0, 4096);
 			}
 		} catch (e) {}
 		if (desc) embed.setDescription(desc);
 	}
 	// Allow passing numeric color or theme key
-	const resolvedColor = typeof color === 'number' ? color : theme.color(color, theme.colors.neutral);
+	const resolvedColor =
+		typeof color === 'number' ? color : theme.color(color, theme.colors.neutral);
 	embed.setColor(resolvedColor);
 	if (Array.isArray(fields) && fields.length) embed.addFields(fields.slice(0, 25));
 	if (footer) embed.setFooter(typeof footer === 'string' ? { text: footer } : footer);
@@ -36,10 +49,18 @@ function createEmbed({ title = null, description = null, color = 'primary', fiel
 	return embed;
 }
 
-function infoEmbed(opts = {}) { return createEmbed({ color: 'primary', ...opts }); }
-function successEmbed(opts = {}) { return createEmbed({ color: 'success', ...opts }); }
-function warnEmbed(opts = {}) { return createEmbed({ color: 'warning', ...opts }); }
-function errorEmbed(opts = {}) { return createEmbed({ color: 'danger', ...opts }); }
+function infoEmbed(opts = {}) {
+	return createEmbed({ color: 'primary', ...opts });
+}
+function successEmbed(opts = {}) {
+	return createEmbed({ color: 'success', ...opts });
+}
+function warnEmbed(opts = {}) {
+	return createEmbed({ color: 'warning', ...opts });
+}
+function errorEmbed(opts = {}) {
+	return createEmbed({ color: 'danger', ...opts });
+}
 
 // Convenience to append fields safely (auto truncation per field 1024 chars)
 function safeAddField(embed, name, value, inline = false) {
@@ -65,7 +86,9 @@ function addChunkedField(embed, baseName, text, chunkSize = 1000) {
 		current += line + '\n';
 	}
 	if (current.trim().length) chunks.push(current.trim());
-	chunks.slice(0, 3).forEach((c, i) => safeAddField(embed, i === 0 ? baseName : `${baseName} (${i + 1})`, c));
+	chunks
+		.slice(0, 3)
+		.forEach((c, i) => safeAddField(embed, i === 0 ? baseName : `${baseName} (${i + 1})`, c));
 	return embed;
 }
 
@@ -76,5 +99,5 @@ module.exports = {
 	warnEmbed,
 	errorEmbed,
 	safeAddField,
-	addChunkedField
+	addChunkedField,
 };

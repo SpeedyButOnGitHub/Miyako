@@ -4,7 +4,7 @@ function toTitleCase(str) {
 	return String(str)
 		.replace(/[-_]+/g, ' ')
 		.split(/\s+/)
-		.map(w => w.length ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w)
+		.map((w) => (w.length ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w))
 		.join(' ')
 		.trim();
 }

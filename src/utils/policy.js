@@ -1,6 +1,8 @@
 // Declarative permission policies for commands
 const { isModerator, getOwnerId } = require('../commands/moderation/permissions');
-function isOwnerId(id) { return String(id) === String(getOwnerId()); }
+function isOwnerId(id) {
+	return String(id) === String(getOwnerId());
+}
 const policies = {
 	config: (ctx) => isOwnerId(ctx.author?.id || ctx.user?.id),
 	test: (ctx) => isOwnerId(ctx.author?.id || ctx.user?.id),
@@ -12,11 +14,15 @@ const policies = {
 	ban: (ctx) => isModerator(ctx.member),
 	kick: (ctx) => isModerator(ctx.member),
 	warn: (ctx) => isModerator(ctx.member),
-	removewarn: (ctx) => isModerator(ctx.member)
+	removewarn: (ctx) => isModerator(ctx.member),
 };
 function checkPolicy(command, ctx) {
 	const fn = policies[command];
 	if (!fn) return true; // permissive by default
-	try { return !!fn(ctx); } catch { return false; }
+	try {
+		return !!fn(ctx);
+	} catch {
+		return false;
+	}
 }
 module.exports = { checkPolicy };

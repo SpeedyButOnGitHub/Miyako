@@ -10,7 +10,11 @@ function validateConfig(guild) {
 		return issues;
 	}
 	// Channels
-	const channelIds = [config.modLogChannelId, ...(config.levelingChannelList||[]), ...(config.snipingChannelList||[])];
+	const channelIds = [
+		config.modLogChannelId,
+		...(config.levelingChannelList || []),
+		...(config.snipingChannelList || []),
+	];
 	for (const id of channelIds) {
 		if (!id) continue;
 		if (!guild.channels.cache.has(id)) issues.push(`Missing channel: ${id}`);
@@ -22,19 +26,26 @@ function validateConfig(guild) {
 	// Level rewards shape
 	if (config.levelRewards && typeof config.levelRewards === 'object') {
 		for (const [lvl, roleIds] of Object.entries(config.levelRewards)) {
-			const arr = Array.isArray(roleIds) ? roleIds : (roleIds ? [roleIds] : []);
+			const arr = Array.isArray(roleIds) ? roleIds : roleIds ? [roleIds] : [];
 			for (const rid of arr) {
-				if (!guild.roles.cache.has(rid)) issues.push(`Level reward role missing (level ${lvl} -> ${rid})`);
+				if (!guild.roles.cache.has(rid))
+					issues.push(`Level reward role missing (level ${lvl} -> ${rid})`);
 			}
 		}
 	}
 	// Modes
-	const snipeModes = ['whitelist','blacklist'];
-	if (config.snipeMode && !snipeModes.includes(config.snipeMode)) issues.push(`Invalid snipeMode: ${config.snipeMode}`);
-	const levelingModes = ['whitelist','blacklist'];
-	if (config.levelingMode && !levelingModes.includes(config.levelingMode)) issues.push(`Invalid levelingMode: ${config.levelingMode}`);
+	const snipeModes = ['whitelist', 'blacklist'];
+	if (config.snipeMode && !snipeModes.includes(config.snipeMode))
+		issues.push(`Invalid snipeMode: ${config.snipeMode}`);
+	const levelingModes = ['whitelist', 'blacklist'];
+	if (config.levelingMode && !levelingModes.includes(config.levelingMode))
+		issues.push(`Invalid levelingMode: ${config.levelingMode}`);
 	// Escalation thresholds
-	if (config.escalation && config.escalation.kickThreshold && config.escalation.kickThreshold <= 0) {
+	if (
+		config.escalation &&
+		config.escalation.kickThreshold &&
+		config.escalation.kickThreshold <= 0
+	) {
 		issues.push('Escalation kickThreshold must be > 0');
 	}
 	return issues;

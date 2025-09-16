@@ -9,12 +9,16 @@ async function updateTestingStatus(client, enabled, actor) {
 		if (!channel) return;
 
 		const embed = new EmbedBuilder()
-			.setTitle(enabled ? `${theme.emojis.warn} Testing Mode Enabled` : `${theme.emojis.success} Testing Mode Disabled`)
+			.setTitle(
+				enabled
+					? `${theme.emojis.warn} Testing Mode Enabled`
+					: `${theme.emojis.success} Testing Mode Disabled`,
+			)
 			.setColor(enabled ? theme.colors.warning : theme.colors.primary)
 			.setDescription(
 				enabled
 					? `Certain logs will be routed to the test channel. The warnings UI may use seeded data.${actor ? `\nTriggered by: <@${actor.id}>` : ''}`
-					: `Bot has returned to normal operation.${actor ? `\nTriggered by: <@${actor.id}>` : ''}`
+					: `Bot has returned to normal operation.${actor ? `\nTriggered by: <@${actor.id}>` : ''}`,
 			)
 			.setTimestamp();
 

@@ -1,9 +1,9 @@
-const { Message, BaseInteraction } = require("discord.js");
-const theme = require("../../utils/theme");
+const { Message, BaseInteraction } = require('discord.js');
+const theme = require('../../utils/theme');
 
 // Centralize via theme; retain exported constants for downstream compatibility
 const EMOJI_SUCCESS = theme.emojis.success;
-const EMOJI_ERROR = theme.emojis.error || "❌";
+const EMOJI_ERROR = theme.emojis.error || '❌';
 
 function replySuccess(target, text) {
 	if (target instanceof Message || target instanceof BaseInteraction) {

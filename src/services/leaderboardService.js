@@ -9,15 +9,20 @@ const { levels, vcLevels } = require('./levelingService');
 const { getTopBank } = require('../utils/bank');
 
 const CACHE_TTL_MS = 5000; // 5s window; can also be explicitly invalidated when XP changes
-const caches = { text: { expires: 0, entries: [], dirty: false }, vc: { expires: 0, entries: [], dirty: false } };
+const caches = {
+	text: { expires: 0, entries: [], dirty: false },
+	vc: { expires: 0, entries: [], dirty: false },
+};
 
 function buildEntries(mode) {
 	const src = mode === 'vc' ? vcLevels : levels;
-	return Object.entries(src || {}).map(([userId, data]) => ({
-		userId,
-		xp: data?.xp || 0,
-		level: data?.level || 0
-	})).sort((a,b) => (b.level - a.level) || (b.xp - a.xp));
+	return Object.entries(src || {})
+		.map(([userId, data]) => ({
+			userId,
+			xp: data?.xp || 0,
+			level: data?.level || 0,
+		}))
+		.sort((a, b) => b.level - a.level || b.xp - a.xp);
 }
 
 function getEntries(mode = 'text') {
@@ -34,7 +39,7 @@ function getEntries(mode = 'text') {
 
 function computeRank(mode, viewerId) {
 	const entries = getEntries(mode);
-	const idx = entries.findIndex(e => String(e.userId) === String(viewerId));
+	const idx = entries.findIndex((e) => String(e.userId) === String(viewerId));
 	return idx === -1 ? null : idx + 1;
 }
 
@@ -56,22 +61,31 @@ function buildLeaderboardEmbed(guild, viewerId, page = 1, pageSize = 10, mode = 
 	const pageEntries = entries.slice(start, start + pageSize);
 	const lines = pageEntries.map((e, i) => {
 		const rankNum = start + i + 1;
-		const medal = rankNum === 1 ? '🥇' : rankNum === 2 ? '🥈' : rankNum === 3 ? '🥉' : `#${rankNum}`;
+		const medal =
+			rankNum === 1 ? '🥇' : rankNum === 2 ? '🥈' : rankNum === 3 ? '🥉' : `#${rankNum}`;
 		const isYou = String(e.userId) === String(viewerId);
 		const line = `${medal} <@${e.userId}> — Lv. ${e.level}`;
 		return isYou ? `**${line} ← You**` : line;
 	});
 	const rank = computeRank(mode, viewerId);
-	const viewerOnPage = pageEntries.some(e => String(e.userId) === String(viewerId));
+	const viewerOnPage = pageEntries.some((e) => String(e.userId) === String(viewerId));
 	const extraLine = !viewerOnPage && rank ? `\n— —\nYou: **#${rank}** <@${viewerId}>` : '';
 	const bankSection = buildBankSection();
 	const embed = createEmbed({
-		title: mode === 'vc' ? `${theme.emojis.vc} VC Leaderboard` : `${theme.emojis.leaderboard} Leaderboard`,
+		title:
+			mode === 'vc'
+				? `${theme.emojis.vc} VC Leaderboard`
+				: `${theme.emojis.leaderboard} Leaderboard`,
 		description: (lines.length ? lines.join('\n') + extraLine : 'No data yet.') + bankSection,
-		color: mode === 'vc' ? theme.colors.danger : theme.colors.warning
+		color: mode === 'vc' ? theme.colors.danger : theme.colors.warning,
 	});
 	const extraFooter = rank ? `Your rank: #${rank}` : null;
-	applyFooterWithPagination(embed, guild, { testingMode: false, page: safePage, totalPages, extra: extraFooter });
+	applyFooterWithPagination(embed, guild, {
+		testingMode: false,
+		page: safePage,
+		totalPages,
+		extra: extraFooter,
+	});
 	return embed;
 }
 

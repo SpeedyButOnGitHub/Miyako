@@ -7,7 +7,10 @@ function getCached(guildId, userId) {
 	const key = guildId + ':' + userId;
 	const v = cache.get(key);
 	if (!v) return null;
-	if (v.expires < Date.now()) { cache.delete(key); return null; }
+	if (v.expires < Date.now()) {
+		cache.delete(key);
+		return null;
+	}
 	return v.ok;
 }
 
@@ -17,7 +20,7 @@ function setCached(guildId, userId, ok) {
 
 function sweep() {
 	const now = Date.now();
-	for (const [k,v] of cache.entries()) if (v.expires < now) cache.delete(k);
+	for (const [k, v] of cache.entries()) if (v.expires < now) cache.delete(k);
 }
 setInterval(sweep, TTL).unref?.();
 

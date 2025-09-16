@@ -1,13 +1,13 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 const { runtimeFile } = require('./paths');
-const crypto = require("crypto");
+const crypto = require('crypto');
 const { createEmbed } = require('./embeds');
 
 const SNAPSHOT_FILE = runtimeFile('changelogSnapshot.json');
 
 function sha1(buf) {
-	return crypto.createHash("sha1").update(buf).digest("hex");
+	return crypto.createHash('sha1').update(buf).digest('hex');
 }
 
 function walkDir(dir, fileList = []) {
@@ -16,14 +16,14 @@ function walkDir(dir, fileList = []) {
 		const full = path.join(dir, entry.name);
 		// Ignore noisy or external folders
 		if (entry.isDirectory()) {
-			if (["node_modules", ".git", ".vscode", "scripts"].includes(entry.name)) continue;
+			if (['node_modules', '.git', '.vscode', 'scripts'].includes(entry.name)) continue;
 			walkDir(full, fileList);
 		} else {
 			// Only include code files; skip JSON configs which change frequently
-	const rel = path.relative(path.resolve(__dirname, ".."), full).replace(/\\/g, "/");
+			const rel = path.relative(path.resolve(__dirname, '..'), full).replace(/\\/g, '/');
 			const ext = path.extname(entry.name).toLowerCase();
-			const isCode = [".js", ".ts", ".mjs", ".cjs"].includes(ext);
-			const isConfigJson = rel.startsWith("config/") && ext === ".json";
+			const isCode = ['.js', '.ts', '.mjs', '.cjs'].includes(ext);
+			const isConfigJson = rel.startsWith('config/') && ext === '.json';
 			if (!isCode || isConfigJson) continue;
 			fileList.push(rel);
 		}
@@ -39,7 +39,7 @@ function createSnapshot(rootDir) {
 		try {
 			const abs = path.join(base, rel);
 			const buf = fs.readFileSync(abs);
-			const content = buf.toString("utf8");
+			const content = buf.toString('utf8');
 			snap[rel] = {
 				hash: sha1(buf),
 				bytes: buf.length,
@@ -53,7 +53,7 @@ function createSnapshot(rootDir) {
 function loadSnapshot() {
 	try {
 		if (fs.existsSync(SNAPSHOT_FILE)) {
-			return JSON.parse(fs.readFileSync(SNAPSHOT_FILE, "utf8"));
+			return JSON.parse(fs.readFileSync(SNAPSHOT_FILE, 'utf8'));
 		}
 	} catch {}
 	return null;
@@ -63,7 +63,10 @@ function saveSnapshot(snap) {
 	try {
 		const dir = path.dirname(SNAPSHOT_FILE);
 		if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-		fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify({ createdAt: Date.now(), files: snap }, null, 2));
+		fs.writeFileSync(
+			SNAPSHOT_FILE,
+			JSON.stringify({ createdAt: Date.now(), files: snap }, null, 2),
+		);
 	} catch {}
 }
 
@@ -98,7 +101,7 @@ function compareSnapshots(prev, curr) {
 }
 
 function formatBytes(n) {
-	const sign = n < 0 ? "-" : "+";
+	const sign = n < 0 ? '-' : '+';
 	const abs = Math.abs(n);
 	if (abs < 1024) return `${sign}${abs} B`;
 	if (abs < 1024 * 1024) return `${sign}${(abs / 1024).toFixed(1)} KB`;
@@ -109,36 +112,39 @@ function buildChangelogEmbed(result) {
 	const { added, removed, modified } = result;
 	const total = added.length + removed.length + modified.length;
 	const embed = createEmbed({
-		title: "📜 Changelog since last start",
-		color: 0x00b894
+		title: '📜 Changelog since last start',
+		color: 0x00b894,
 	});
 
 	if (total === 0) {
-		embed.setDescription("No code changes detected.");
+		embed.setDescription('No code changes detected.');
 		return embed;
 	}
 
 	embed.setDescription(
 		`Files changed: ${total} (➕ ${added.length}, ✖️ ${removed.length}, 🔧 ${modified.length})\n` +
-		"Showing up to 15 entries."
+			'Showing up to 15 entries.',
 	);
 
 	const lines = [];
 	for (const it of added.slice(0, 5)) lines.push(`➕ ${it.path}`);
 	for (const it of removed.slice(0, 5)) lines.push(`✖️ ${it.path}`);
 	for (const it of modified.slice(0, 5)) {
-		const ld = it.linesDelta === 0 ? "±0" : (it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`);
+		const ld =
+			it.linesDelta === 0 ? '±0' : it.linesDelta > 0 ? `+${it.linesDelta}` : `${it.linesDelta}`;
 		lines.push(`🔧 ${it.path} (${ld} lines, ${formatBytes(it.bytesDelta)})`);
 	}
-	if (lines.length > 0) embed.addFields({ name: "Changes", value: lines.join("\n").slice(0, 1024) });
+	if (lines.length > 0)
+		embed.addFields({ name: 'Changes', value: lines.join('\n').slice(0, 1024) });
 
-	const more = total - Math.min(5, added.length) - Math.min(5, removed.length) - Math.min(5, modified.length);
-	if (more > 0) embed.addFields({ name: "More", value: `…and ${more} more file(s).` });
+	const more =
+		total - Math.min(5, added.length) - Math.min(5, removed.length) - Math.min(5, modified.length);
+	if (more > 0) embed.addFields({ name: 'More', value: `…and ${more} more file(s).` });
 
 	return embed;
 }
 
-async function postStartupChangelog(client, channelId, rootDir = path.resolve(__dirname, "..")) {
+async function postStartupChangelog(client, channelId, rootDir = path.resolve(__dirname, '..')) {
 	const prev = loadSnapshot();
 	const currentFiles = createSnapshot(rootDir);
 	const result = compareSnapshots(prev, currentFiles);

@@ -4,12 +4,14 @@ const { cfgPath } = require('./paths');
 let external = null;
 try {
 	const ext = cfgPath('theme.json');
-	if (fs.existsSync(ext)) external = JSON.parse(fs.readFileSync(ext,'utf8'));
-} catch { external = null; }
+	if (fs.existsSync(ext)) external = JSON.parse(fs.readFileSync(ext, 'utf8'));
+} catch {
+	external = null;
+}
 
 const baseTheme = {
 	colors: {
-		primary: 0x5865F2,
+		primary: 0x5865f2,
 		success: 0x00ff00,
 		warning: 0xffd700,
 		danger: 0xff5555,
@@ -17,51 +19,55 @@ const baseTheme = {
 	},
 	emojis: {
 		// Generic status
-		info: "ℹ️",
-		success: "✅",
-		warn: "⚠️",
-		danger: "🚨",
-		error: "❌",
+		info: 'ℹ️',
+		success: '✅',
+		warn: '⚠️',
+		danger: '🚨',
+		error: '❌',
 		// Time / meta
-		duration: "⏰",
-		counter: "🧮",
-		id: "🆔",
+		duration: '⏰',
+		counter: '🧮',
+		id: '🆔',
 		// CRUD / navigation
-		create: "➕",
-		delete: "➖",
-		back: "⬅️",
-		select: "🎯",
-		events: "📅",
-		times: "🕒",
-		days: "📅",
-		message: "📝",
-		enable: "✅",
-		disable: "🛑",
-		toggle: "🔁",
-		settings: "⚙️",
-		edit: "✏️",
+		create: '➕',
+		delete: '➖',
+		back: '⬅️',
+		select: '🎯',
+		events: '📅',
+		times: '🕒',
+		days: '📅',
+		message: '📝',
+		enable: '✅',
+		disable: '🛑',
+		toggle: '🔁',
+		settings: '⚙️',
+		edit: '✏️',
 		// Profile / leveling / economy
-		profile: "👤",
-		rank: "📊",
-		leaderboard: "🏆",
-		bank: "🏦",
-		cash: "💸",
-		deposit: "📈",
-		withdraw: "📉",
-		vc: "🎙️",
-		text: "💬",
+		profile: '👤',
+		rank: '📊',
+		leaderboard: '🏆',
+		bank: '🏦',
+		cash: '💸',
+		deposit: '📈',
+		withdraw: '📉',
+		vc: '🎙️',
+		text: '💬',
 		// Moderation / targets
-		action: "🧰",
-		target: "🎯",
-		moderator: "🛡️",
-		mute: "🔇",
-		unmute: "🔊",
-		kick: "👢",
-		ban: "🔨"
-	}
+		action: '🧰',
+		target: '🎯',
+		moderator: '🛡️',
+		mute: '🔇',
+		unmute: '🔊',
+		kick: '👢',
+		ban: '🔨',
+	},
 };
 
 const theme = Object.assign({}, baseTheme, external || {});
-theme.color = function(name, fallback = 0x2f3136) { return (theme.colors||{})[name] ?? fallback; };
-theme.emoji = function(name, fallback = '❔') { return (theme.emojis||{})[name] ?? fallback; };
+theme.color = function (name, fallback = 0x2f3136) {
+	return (theme.colors || {})[name] ?? fallback;
+};
+theme.emoji = function (name, fallback = '❔') {
+	return (theme.emojis || {})[name] ?? fallback;
+};
 module.exports = theme;

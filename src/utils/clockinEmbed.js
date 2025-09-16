@@ -9,11 +9,11 @@ const { computeNextRange } = require('./timestampPlaceholders');
 // Standard role meta used for consistent labeling/emojis
 const ROLE_META = {
 	instance_manager: { label: 'Instance Manager', emoji: '📝' },
-	manager:          { label: 'Manager',          emoji: '🛠️' },
-	bouncer:          { label: 'Bouncer',          emoji: '🛡️' },
-	bartender:        { label: 'Bartender',        emoji: '🍸' },
-	backup:           { label: 'Backup',           emoji: '🎯' },
-	maybe:            { label: 'Maybe/Late',       emoji: '⏳' }
+	manager: { label: 'Manager', emoji: '🛠️' },
+	bouncer: { label: 'Bouncer', emoji: '🛡️' },
+	bartender: { label: 'Bartender', emoji: '🍸' },
+	backup: { label: 'Backup', emoji: '🎯' },
+	maybe: { label: 'Maybe/Late', emoji: '⏳' },
 };
 
 // Build a tiny capacity bar using simple squares for broad device support
@@ -32,21 +32,27 @@ function capacityBar(count, cap, cells = 5) {
 // - options: { compact?: boolean }
 function buildClockInEmbed(ev, positions = {}, capacities = {}, options = {}) {
 	const name = ev?.name || 'Event';
-	const color = theme.colors?.primary || 0x5865F2;
+	const color = theme.colors?.primary || 0x5865f2;
 	const title = `🕒 Staff Clock-In — ${name}`;
-	const description = 'Select your role from the menu. One slot per staff. Updates apply instantly.';
+	const description =
+		'Select your role from the menu. One slot per staff. Updates apply instantly.';
 
 	const embed = createEmbed({ title, description, color, timestamp: true });
 
-	const order = ['instance_manager','manager','bouncer','bartender','backup','maybe'];
+	const order = ['instance_manager', 'manager', 'bouncer', 'bartender', 'backup', 'maybe'];
 	for (const key of order) {
 		const meta = ROLE_META[key] || { label: key, emoji: '' };
 		const arr = Array.isArray(positions[key]) ? positions[key] : [];
 		const cap = Number.isFinite(capacities[key]) ? Number(capacities[key]) : null;
 		const count = arr.length;
 		const countText = cap ? `${count}/${cap}` : `${count}`;
-		const fieldName = `${meta.emoji ? meta.emoji+ ' ' : ''}${meta.label} (${countText})`;
-		const mentions = count ? arr.map(id => `<@${id}>`).join(', ').slice(0, 1024) : '—';
+		const fieldName = `${meta.emoji ? meta.emoji + ' ' : ''}${meta.label} (${countText})`;
+		const mentions = count
+			? arr
+					.map((id) => `<@${id}>`)
+					.join(', ')
+					.slice(0, 1024)
+			: '—';
 		const bar = cap ? capacityBar(count, cap) : null;
 		const fieldValue = bar ? `${bar}\n${mentions}` : mentions;
 		safeAddField(embed, fieldName, fieldValue, true);

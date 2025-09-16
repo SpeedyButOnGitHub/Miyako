@@ -1,6 +1,6 @@
-const { addCash, addTestingCash } = require("./cash");
-const { config } = require("./storage");
-const { TEST_LOG_CHANNEL } = require("./logChannels");
+const { addCash, addTestingCash } = require('./cash');
+const { config } = require('./storage');
+const { TEST_LOG_CHANNEL } = require('./logChannels');
 
 // Simple in-memory drop store per channel
 // channelId -> { amount, word, createdAt, expiresAt, claimedBy, testing?: boolean }
@@ -8,11 +8,56 @@ const activeDrops = new Map();
 
 // Fun claim words list
 const FUN_WORDS = [
-	"mochi", "uwu", "sparkle", "vibes", "zoomies", "bonk", "boba", "pudding", "noot", "boop",
-	"meow", "purr", "senpai", "neko", "comfy", "snacc", "pog", "yeet", "glow", "shiny",
-	"cosmic", "starlit", "sprout", "cozy", "sugar", "sprinkle", "waffle", "pancake", "taco", "nugget",
-	"gizmo", "pebble", "bean", "blossom", "bubbles", "crunch", "bling", "zesty", "pep", "swirl",
-	"spark", "fizz", "whisk", "minty", "sunny", "honey", "echo", "nova", "ripple", "plush"
+	'mochi',
+	'uwu',
+	'sparkle',
+	'vibes',
+	'zoomies',
+	'bonk',
+	'boba',
+	'pudding',
+	'noot',
+	'boop',
+	'meow',
+	'purr',
+	'senpai',
+	'neko',
+	'comfy',
+	'snacc',
+	'pog',
+	'yeet',
+	'glow',
+	'shiny',
+	'cosmic',
+	'starlit',
+	'sprout',
+	'cozy',
+	'sugar',
+	'sprinkle',
+	'waffle',
+	'pancake',
+	'taco',
+	'nugget',
+	'gizmo',
+	'pebble',
+	'bean',
+	'blossom',
+	'bubbles',
+	'crunch',
+	'bling',
+	'zesty',
+	'pep',
+	'swirl',
+	'spark',
+	'fizz',
+	'whisk',
+	'minty',
+	'sunny',
+	'honey',
+	'echo',
+	'nova',
+	'ripple',
+	'plush',
 ];
 
 function pickFunWord() {
@@ -28,10 +73,10 @@ function maybeSpawnDrop(message) {
 	if (!message.guild || !message.channel || message.author.bot) return null;
 	const channelId = message.channel.id;
 	// Respect blacklist/whitelist leveling mode
-	const mode = config.levelingMode || "blacklist";
+	const mode = config.levelingMode || 'blacklist';
 	const list = config.levelingChannelList || [];
-	if (mode === "blacklist" && list.includes(channelId)) return null;
-	if (mode === "whitelist" && !list.includes(channelId)) return null;
+	if (mode === 'blacklist' && list.includes(channelId)) return null;
+	if (mode === 'whitelist' && !list.includes(channelId)) return null;
 
 	// Don't spawn if a drop is already active in the channel
 	const existing = activeDrops.get(channelId);
@@ -54,8 +99,12 @@ function maybeSpawnDrop(message) {
 }
 
 function normalizeContent(s) {
-	if (!s) return "";
-	return String(s).trim().toLowerCase().replace(/^`+|`+$/g, '').replace(/^"+|"+$/g, '');
+	if (!s) return '';
+	return String(s)
+		.trim()
+		.toLowerCase()
+		.replace(/^`+|`+$/g, '')
+		.replace(/^"+|"+$/g, '');
 }
 
 function tryClaimDrop(message) {
@@ -70,7 +119,7 @@ function tryClaimDrop(message) {
 	}
 	// Require the user to type the correct fun word to claim
 	const content = normalizeContent(message.content);
-	if (!content || content !== String(drop.word || "").toLowerCase()) {
+	if (!content || content !== String(drop.word || '').toLowerCase()) {
 		return null; // incorrect message, no claim
 	}
 	drop.claimedBy = message.author.id;
@@ -91,7 +140,14 @@ function spawnTestDrop(amount) {
 	const life = Math.max(5000, Math.floor(e.lifetimeMs ?? 60000));
 	const amt = Math.max(1, Math.floor(Number(amount) || Math.max(0, Math.floor(e.minAmount ?? 25))));
 	const word = pickFunWord();
-	const drop = { amount: amt, word, createdAt: now, expiresAt: now + life, claimedBy: null, testing: true };
+	const drop = {
+		amount: amt,
+		word,
+		createdAt: now,
+		expiresAt: now + life,
+		claimedBy: null,
+		testing: true,
+	};
 	activeDrops.set(channelId, drop);
 	return drop;
 }
@@ -109,7 +165,7 @@ let interval = null;
 function startCashDrops() {
 	if (interval) return;
 	interval = setInterval(cleanupExpiredDrops, 30 * 1000);
-	if (typeof interval.unref === "function") interval.unref();
+	if (typeof interval.unref === 'function') interval.unref();
 }
 
 module.exports = {

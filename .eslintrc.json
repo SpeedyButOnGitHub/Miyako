@@ -1,14 +1,14 @@
 {
-  "env": { "es2022": true, "node": true, "jest": true },
-  "parserOptions": { "ecmaVersion": 2022, "sourceType": "script" },
-  "extends": ["eslint:recommended"],
-  "plugins": ["unused-imports"],
-  "rules": {
-    "no-unused-vars": ["warn", { "args": "none", "ignoreRestSiblings": true }],
-    "unused-imports/no-unused-imports": "error",
-    "no-constant-condition": ["error", { "checkLoops": false }],
-    "no-empty": ["warn", { "allowEmptyCatch": true }],
-    "no-useless-escape": "warn",
-    "no-misleading-character-class": "warn"
-  }
+	"env": { "es2022": true, "node": true, "jest": true },
+	"parserOptions": { "ecmaVersion": 2022, "sourceType": "script" },
+	"extends": ["eslint:recommended"],
+	"plugins": ["unused-imports"],
+	"rules": {
+		"no-unused-vars": ["warn", { "args": "none", "ignoreRestSiblings": true }],
+		"unused-imports/no-unused-imports": "error",
+		"no-constant-condition": ["error", { "checkLoops": false }],
+		"no-empty": ["warn", { "allowEmptyCatch": true }],
+		"no-useless-escape": "warn",
+		"no-misleading-character-class": "warn"
+	}
 }

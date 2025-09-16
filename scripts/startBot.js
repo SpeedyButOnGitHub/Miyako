@@ -7,15 +7,17 @@ const root = path.join(__dirname, '..');
 const pidFile = path.join(root, '.bot.pid');
 
 if (fs.existsSync(pidFile)) {
-  console.error('Refusing to start: .bot.pid already exists. If the bot is not running, delete .bot.pid.');
-  process.exit(1);
+	console.error(
+		'Refusing to start: .bot.pid already exists. If the bot is not running, delete .bot.pid.',
+	);
+	process.exit(1);
 }
 
 const child = spawn(process.execPath, ['index.js'], {
-  cwd: root,
-  detached: true,
-  stdio: 'ignore',
-  windowsHide: true
+	cwd: root,
+	detached: true,
+	stdio: 'ignore',
+	windowsHide: true,
 });
 
 child.unref();

@@ -5,7 +5,7 @@ const cash = require('../utils/cash');
 function getUserBalances(userId) {
 	return {
 		cash: cash.getCash(userId),
-		bank: bank.getBank(userId)
+		bank: bank.getBank(userId),
 	};
 }
 
@@ -23,5 +23,5 @@ module.exports = {
 	withdraw,
 	// expose underlying for advanced use
 	bank,
-	cash
+	cash,
 };

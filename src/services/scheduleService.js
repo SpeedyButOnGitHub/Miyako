@@ -30,5 +30,5 @@ module.exports = {
 	getEvent: eventsStorage.getEvent,
 	addEvent: eventsStorage.addEvent,
 	updateEvent: eventsStorage.updateEvent,
-	removeEvent: eventsStorage.removeEvent
+	removeEvent: eventsStorage.removeEvent,
 };

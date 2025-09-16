@@ -15,8 +15,10 @@ function loadExisting() {
 		const parsed = JSON.parse(raw || '[]');
 		if (!Array.isArray(parsed)) return;
 		// Drop any historical spam from console scope, retain only last MAX_ERRORS of other scopes
-		inMemoryErrors = parsed.filter(e => e && e.scope !== 'console').slice(-MAX_ERRORS);
-	} catch { /* ignore */ }
+		inMemoryErrors = parsed.filter((e) => e && e.scope !== 'console').slice(-MAX_ERRORS);
+	} catch {
+		/* ignore */
+	}
 }
 
 loadExisting();
@@ -24,13 +26,19 @@ loadExisting();
 function persist() {
 	try {
 		fs.writeFileSync(ERROR_LOG_FILE, JSON.stringify(inMemoryErrors.slice(-MAX_ERRORS), null, 2));
-	} catch { /* ignore */ }
+	} catch {
+		/* ignore */
+	}
 }
 
 function formatError(err) {
 	if (err && err.stack) return err.stack;
 	if (typeof err === 'object') {
-		try { return JSON.stringify(err); } catch { return String(err); }
+		try {
+			return JSON.stringify(err);
+		} catch {
+			return String(err);
+		}
 	}
 	return String(err);
 }
@@ -53,12 +61,18 @@ function logError(scope, err) {
 	if (originalConsoleError) {
 		originalConsoleError(`[${scope}]`, msg);
 	} else {
-		try { process.stderr.write(`[${scope}] ${msg}\n`); } catch {}
+		try {
+			process.stderr.write(`[${scope}] ${msg}\n`);
+		} catch {}
 	}
 	const entry = appendEntry(scope, msg);
 	if (entry) {
 		for (const fn of errorListeners) {
-			try { fn(entry); } catch { /* listener errors ignored */ }
+			try {
+				fn(entry);
+			} catch {
+				/* listener errors ignored */
+			}
 		}
 	}
 }
@@ -69,9 +83,13 @@ function recordExternalError(scope, errLike) {
 	appendEntry(scope, msg);
 }
 
-function setOriginalConsoleError(fn) { originalConsoleError = fn; }
+function setOriginalConsoleError(fn) {
+	originalConsoleError = fn;
+}
 
-function registerErrorListener(fn) { if (typeof fn === 'function') errorListeners.push(fn); }
+function registerErrorListener(fn) {
+	if (typeof fn === 'function') errorListeners.push(fn);
+}
 
 function getRecentErrors(limit = 50) {
 	return inMemoryErrors.slice(-limit);
@@ -85,4 +103,12 @@ function clearErrorLog() {
 // Deprecated inline safeReply; use unified implementation
 const { safeReply } = require('./safeReply');
 
-module.exports = { logError, recordExternalError, setOriginalConsoleError, safeReply, getRecentErrors, clearErrorLog, registerErrorListener };
+module.exports = {
+	logError,
+	recordExternalError,
+	setOriginalConsoleError,
+	safeReply,
+	getRecentErrors,
+	clearErrorLog,
+	registerErrorListener,
+};

@@ -1,5 +1,5 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 const { runtimeFile } = require('./paths');
 
 const SCHEDULES_FILE = runtimeFile('schedules.json');
@@ -17,10 +17,10 @@ function ensureFile() {
 function loadObj() {
 	ensureFile();
 	try {
-		const data = JSON.parse(fs.readFileSync(SCHEDULES_FILE, "utf8"));
+		const data = JSON.parse(fs.readFileSync(SCHEDULES_FILE, 'utf8'));
 		if (Array.isArray(data)) return { nextId: 1, schedules: data };
 		if (!Array.isArray(data.schedules)) data.schedules = [];
-		if (typeof data.nextId !== "number") data.nextId = 1;
+		if (typeof data.nextId !== 'number') data.nextId = 1;
 		return data;
 	} catch {
 		return { nextId: 1, schedules: [] };
@@ -32,13 +32,25 @@ function saveObj(obj) {
 	enqueueWrite(SCHEDULES_FILE, () => JSON.stringify(obj, null, 2));
 }
 
-function getSchedules() { return loadObj().schedules; }
-function getSchedule(id) { id = String(id); return loadObj().schedules.find(s => String(s.id) === id) || null; }
-function addSchedule(schedule) { const obj = loadObj(); const id = String(obj.nextId++); const withId = { id, ...schedule }; obj.schedules.push(withId); saveObj(obj); return withId; }
+function getSchedules() {
+	return loadObj().schedules;
+}
+function getSchedule(id) {
+	id = String(id);
+	return loadObj().schedules.find((s) => String(s.id) === id) || null;
+}
+function addSchedule(schedule) {
+	const obj = loadObj();
+	const id = String(obj.nextId++);
+	const withId = { id, ...schedule };
+	obj.schedules.push(withId);
+	saveObj(obj);
+	return withId;
+}
 function updateSchedule(id, patch) {
 	id = String(id);
 	const obj = loadObj();
-	const i = obj.schedules.findIndex(x => String(x.id) === id);
+	const i = obj.schedules.findIndex((x) => String(x.id) === id);
 	if (i === -1) return null;
 	obj.schedules[i] = { ...obj.schedules[i], ...patch };
 	saveObj(obj);
@@ -47,7 +59,7 @@ function updateSchedule(id, patch) {
 function removeSchedule(id) {
 	id = String(id);
 	const obj = loadObj();
-	const i = obj.schedules.findIndex(x => String(x.id) === id);
+	const i = obj.schedules.findIndex((x) => String(x.id) === id);
 	if (i === -1) return false;
 	obj.schedules.splice(i, 1);
 	saveObj(obj);

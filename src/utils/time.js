@@ -1,4 +1,4 @@
-const ms = require("ms");
+const ms = require('ms');
 
 function parseDurationAndReason(args) {
 	let duration = null;
@@ -11,11 +11,11 @@ function parseDurationAndReason(args) {
 			reasonParts.push(arg);
 		}
 	}
-	const reason = reasonParts.join(" ").trim() || null;
+	const reason = reasonParts.join(' ').trim() || null;
 	return { duration, reason };
 }
 
 module.exports = {
 	parseDurationAndReason,
-	ms
+	ms,
 };

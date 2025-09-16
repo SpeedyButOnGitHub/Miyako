@@ -16,17 +16,21 @@ function load() {
 }
 
 function save() {
-	try { fs.writeFileSync(FILE, JSON.stringify(data, null, 2)); } catch {}
+	try {
+		fs.writeFileSync(FILE, JSON.stringify(data, null, 2));
+	} catch {}
 }
 
 function todayUTC() {
 	const d = new Date();
-	return d.toISOString().slice(0,10); // YYYY-MM-DD
+	return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 function nextMidnightUTC() {
 	const now = new Date();
-	const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0,0,0,0));
+	const next = new Date(
+		Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0),
+	);
 	return next.getTime();
 }
 

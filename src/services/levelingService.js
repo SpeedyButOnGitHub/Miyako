@@ -24,5 +24,5 @@ module.exports = {
 	// VC leveling exports
 	vcLevels: vcLevelsModule.vcLevels,
 	getVCXP: vcLevelsModule.getVCXP,
-	getVCLevel: vcLevelsModule.getVCLevel
+	getVCLevel: vcLevelsModule.getVCLevel,
 };

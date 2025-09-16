@@ -1,5 +1,5 @@
-const { addVCXP, saveVCLevels } = require("./vcLevels");
-const { addCash } = require("./cash");
+const { addVCXP, saveVCLevels } = require('./vcLevels');
+const { addCash } = require('./cash');
 
 // Track join times and periodic ticks
 const voiceStates = new Map(); // userId -> { joinedAt: number, channelId: string }
@@ -12,7 +12,7 @@ const XP_PER_MIN = 10; // base XP per minute
 function startVoiceLeveling(client) {
 	if (interval) clearInterval(interval);
 
-	client.on("voiceStateUpdate", (oldState, newState) => {
+	client.on('voiceStateUpdate', (oldState, newState) => {
 		const userId = newState.id || oldState.id;
 		const wasInVC = !!oldState?.channelId;
 		const nowInVC = !!newState?.channelId;
@@ -46,7 +46,7 @@ function startVoiceLeveling(client) {
 		// persist occasionally
 		saveVCLevels();
 	}, TICK_MS);
-	if (typeof interval.unref === "function") interval.unref();
+	if (typeof interval.unref === 'function') interval.unref();
 }
 
 function flushUser(userId) {

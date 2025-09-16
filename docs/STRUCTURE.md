@@ -18,6 +18,7 @@ Miyako/
 ```
 
 ## Key Concepts
+
 - runtimeFile(name): Resolves mutable JSON to /data with backward-compatible read from /config until migrated.
 - logger: Structured JSONL logging with size-based rotation; debug gated by config.debugMode.
 - ActiveMenus: Central ephemeral UI/session tracking with persistent state.
@@ -25,11 +26,16 @@ Miyako/
 - Testing Mode: Overlay economies (testingCash/testingBank), seeded warnings, sanitized mention outputs.
 
 ## Migration Notes
+
 On startup, `scripts/migrate-runtime-data.js` copies first-time runtime JSON from `config/` to `data/` if not already present. Safe & idempotent.
 
 ## Next Planned Steps (Phase 3+)
+
 - Move additional presentation helpers from utils/ui.js fully into src/ui.
 - Centralize command logging & scheduler instrumentation using logger (partial).
 - Consolidate leaderboard & XP bar builders.
 - Expand docs with service-specific READMEs.
+
+```
+
 ```

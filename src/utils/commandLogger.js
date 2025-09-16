@@ -14,7 +14,8 @@ const state = {
 
 function getLimit() {
 	const cfg = config.commandLogging || {};
-	const max = Number(cfg.maxEntries); return Number.isFinite(max) && max > 0 ? Math.min(max, 5000) : 500;
+	const max = Number(cfg.maxEntries);
+	return Number.isFinite(max) && max > 0 ? Math.min(max, 5000) : 500;
 }
 
 function enabled() {
@@ -60,16 +61,18 @@ function sanitizeString(s) {
 		// Redact token-like strings: long base64ish strings
 		let out = s.replace(/[A-Za-z0-9_-]{24,}/g, '[redacted]');
 		// Remove common secrets keys if present (defense-in-depth)
-		out = out.replace(/(token|apikey|api_key|authorization)\s*[:=]\s*[^\s]+/ig, '$1: [redacted]');
+		out = out.replace(/(token|apikey|api_key|authorization)\s*[:=]\s*[^\s]+/gi, '$1: [redacted]');
 		// collapse long runs of dashes/backticks to avoid formatting blocks
 		return out.replace(/-{3,}|`{3,}/g, '');
-	} catch { return s; }
+	} catch {
+		return s;
+	}
 }
 
 function mapEmbeds(embeds) {
 	try {
 		if (!Array.isArray(embeds)) return [];
-		return embeds.map(e => {
+		return embeds.map((e) => {
 			const raw = typeof e?.toJSON === 'function' ? e.toJSON() : e;
 			// Shallow sanitize content-like fields
 			const safe = {};
@@ -79,37 +82,41 @@ function mapEmbeds(embeds) {
 			}
 			return safe;
 		});
-	} catch { return []; }
+	} catch {
+		return [];
+	}
 }
 
 function mapComponents(components) {
 	try {
 		if (!Array.isArray(components)) return [];
 		// Keep a summarised but useful shape
-		return components.map(row => {
-			const comps = Array.isArray(row?.components) ? row.components : (row?.data?.components || []);
+		return components.map((row) => {
+			const comps = Array.isArray(row?.components) ? row.components : row?.data?.components || [];
 			return {
 				type: row?.type || row?.data?.type || 'row',
-				components: comps.map(c => ({
+				components: comps.map((c) => ({
 					type: c?.type || c?.data?.type,
 					custom_id: c?.customId || c?.data?.custom_id,
 					label: c?.label || c?.data?.label,
 					style: c?.style || c?.data?.style,
 					disabled: !!(c?.disabled || c?.data?.disabled),
-				}))
+				})),
 			};
 		});
-	} catch { return []; }
+	} catch {
+		return [];
+	}
 }
 
 function normalizeMsgShape(msg) {
 	if (!msg) return null;
-	const embeds = Array.isArray(msg.embeds) ? msg.embeds : (msg.embeds ? [msg.embeds] : []);
+	const embeds = Array.isArray(msg.embeds) ? msg.embeds : msg.embeds ? [msg.embeds] : [];
 	const comps = Array.isArray(msg.components) ? msg.components : [];
 	return {
 		id: msg.id,
 		type: 'message',
-		content: sanitizeString((msg.content || '')).slice(0, 1800),
+		content: sanitizeString(msg.content || '').slice(0, 1800),
 		embeds: mapEmbeds(embeds),
 		components: mapComponents(comps),
 		embedsCount: embeds.length,
@@ -122,17 +129,22 @@ function diffExpected(actual, expected) {
 	try {
 		const diffs = [];
 		if (typeof expected.content === 'string') {
-			const a = (actual.content || '').trim(); const e = expected.content.trim();
+			const a = (actual.content || '').trim();
+			const e = expected.content.trim();
 			if (e && a !== e) diffs.push(`content mismatch`);
 		}
 		if (typeof expected.embedsCount === 'number') {
-			if ((actual.embedsCount || 0) !== expected.embedsCount) diffs.push(`embedsCount ${actual.embedsCount} != ${expected.embedsCount}`);
+			if ((actual.embedsCount || 0) !== expected.embedsCount)
+				diffs.push(`embedsCount ${actual.embedsCount} != ${expected.embedsCount}`);
 		}
 		if (typeof expected.componentsCount === 'number') {
-			if ((actual.componentsCount || 0) !== expected.componentsCount) diffs.push(`componentsCount ${actual.componentsCount} != ${expected.componentsCount}`);
+			if ((actual.componentsCount || 0) !== expected.componentsCount)
+				diffs.push(`componentsCount ${actual.componentsCount} != ${expected.componentsCount}`);
 		}
 		return diffs.length ? diffs : null;
-	} catch { return null; }
+	} catch {
+		return null;
+	}
 }
 
 async function maybeReport(client, entry) {
@@ -148,19 +160,30 @@ async function maybeReport(client, entry) {
 		state.lastSendTs = now;
 		const channelId = cfg.logChannelId || CONFIG_LOG_CHANNEL;
 		if (!channelId) return;
-		const ch = await client.channels.fetch(channelId).catch(()=>null);
+		const ch = await client.channels.fetch(channelId).catch(() => null);
 		if (!ch || !ch.send) return;
 		const parts = [];
-		parts.push(`🧪 Cmd: ${entry.name} • by <@${entry.userId}> in <#${entry.channelId}> • ${entry.dt}ms`);
+		parts.push(
+			`🧪 Cmd: ${entry.name} • by <@${entry.userId}> in <#${entry.channelId}> • ${entry.dt}ms`,
+		);
 		if (entry.diff && entry.diff.length) parts.push(`Diff: ${entry.diff.join('; ')}`);
-		if (entry.params && Object.keys(entry.params).length) parts.push(`Args: ${JSON.stringify(entry.params).slice(0, 300)}`);
-		await ch.send({ content: parts.join('\n') }).catch(()=>{});
+		if (entry.params && Object.keys(entry.params).length)
+			parts.push(`Args: ${JSON.stringify(entry.params).slice(0, 300)}`);
+		await ch.send({ content: parts.join('\n') }).catch(() => {});
 	} catch {}
 }
 
-function getLogs() { return state.logs.slice(-getLimit()); }
-function clearLogs() { state.logs = []; }
-function ensureLogDir() { try { if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true }); } catch {} }
+function getLogs() {
+	return state.logs.slice(-getLimit());
+}
+function clearLogs() {
+	state.logs = [];
+}
+function ensureLogDir() {
+	try {
+		if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+	} catch {}
+}
 function persist(entry) {
 	try {
 		ensureLogDir();
@@ -176,7 +199,7 @@ function persist(entry) {
 			output: entry.actual || entry.output || null,
 			dt: entry.dt,
 			meta: entry.meta || null,
-			...(verbose ? { expected: entry.expected || null, diff: entry.diff || null } : {})
+			...(verbose ? { expected: entry.expected || null, diff: entry.diff || null } : {}),
 		};
 		const safe = JSON.stringify(record, null, 2);
 		fs.appendFile(LOG_FILE, safe + '\n', () => {}); // async append; ignore errors
@@ -201,19 +224,30 @@ function instrumentInteractionLogging(interaction) {
 				if (typeof interaction.isButton === 'function' && interaction.isButton()) {
 					base.kind = 'button';
 					base.messageId = interaction.message?.id || null;
-				} else if (typeof interaction.isStringSelectMenu === 'function' && interaction.isStringSelectMenu()) {
+				} else if (
+					typeof interaction.isStringSelectMenu === 'function' &&
+					interaction.isStringSelectMenu()
+				) {
 					base.kind = 'string_select';
 					base.messageId = interaction.message?.id || null;
-					base.values = Array.isArray(interaction.values) ? interaction.values.slice(0, 25).map(v => sanitizeString(String(v)).slice(0, 200)) : undefined;
+					base.values = Array.isArray(interaction.values)
+						? interaction.values.slice(0, 25).map((v) => sanitizeString(String(v)).slice(0, 200))
+						: undefined;
 				}
 			} catch {}
 			// Slash/chat input options
 			try {
-				if (typeof interaction.isChatInputCommand === 'function' && interaction.isChatInputCommand()) {
+				if (
+					typeof interaction.isChatInputCommand === 'function' &&
+					interaction.isChatInputCommand()
+				) {
 					const data = interaction.options?.data;
 					if (Array.isArray(data)) {
 						base.kind = 'chat_input';
-						base.options = data.map(d => ({ name: d?.name, value: sanitizeString(String(d?.value ?? '')).slice(0, 500) }));
+						base.options = data.map((d) => ({
+							name: d?.name,
+							value: sanitizeString(String(d?.value ?? '')).slice(0, 500),
+						}));
 					}
 				}
 			} catch {}
@@ -222,21 +256,27 @@ function instrumentInteractionLogging(interaction) {
 				if (typeof interaction.isModalSubmit === 'function' && interaction.isModalSubmit()) {
 					base.kind = 'modal_submit';
 					const fields = [];
-					const coll = interaction.fields && interaction.fields.fields ? interaction.fields.fields : null;
+					const coll =
+						interaction.fields && interaction.fields.fields ? interaction.fields.fields : null;
 					if (coll && typeof coll.forEach === 'function') {
 						coll.forEach((comp, key) => {
 							let val = null;
-							try { if (typeof interaction.fields.getTextInputValue === 'function') val = interaction.fields.getTextInputValue(key); } catch {}
-							if (val != null) fields.push({ id: key, value: sanitizeString(String(val)).slice(0, 1000) });
+							try {
+								if (typeof interaction.fields.getTextInputValue === 'function')
+									val = interaction.fields.getTextInputValue(key);
+							} catch {}
+							if (val != null)
+								fields.push({ id: key, value: sanitizeString(String(val)).slice(0, 1000) });
 						});
 					}
 					// Fallback: try common ids if collection not enumerable
 					if (!fields.length && typeof interaction.fields?.getTextInputValue === 'function') {
-						const common = ['reason','amount','notes','input','value'];
+						const common = ['reason', 'amount', 'notes', 'input', 'value'];
 						for (const k of common) {
 							try {
 								const v = interaction.fields.getTextInputValue(k);
-								if (v != null && v !== '') fields.push({ id: k, value: sanitizeString(String(v)).slice(0, 1000) });
+								if (v != null && v !== '')
+									fields.push({ id: k, value: sanitizeString(String(v)).slice(0, 1000) });
 							} catch {}
 						}
 					}
@@ -256,49 +296,76 @@ function instrumentInteractionLogging(interaction) {
 					if (dn) base.memberDisplayName = sanitizeString(String(dn)).slice(0, 100);
 					const rolesCache = interaction.member?.roles?.cache;
 					if (rolesCache && typeof rolesCache.map === 'function') {
-						const arr = rolesCache.map(r => ({ id: r.id, name: sanitizeString(String(r.name || '')).slice(0, 100) }));
+						const arr = rolesCache.map((r) => ({
+							id: r.id,
+							name: sanitizeString(String(r.name || '')).slice(0, 100),
+						}));
 						base.memberRoles = Array.isArray(arr) ? arr.slice(0, 25) : undefined;
 					}
 				}
 			} catch {}
 			return base;
-		} catch { return {}; }
+		} catch {
+			return {};
+		}
 	};
 	const meta = {
 		userId: interaction.user?.id,
 		channelId: interaction.channelId,
 		guildId: interaction.guildId,
 	};
-	const makeStart = (name) => start({ name, userId: meta.userId, channelId: meta.channelId, guildId: meta.guildId, input: safeInput() });
+	const makeStart = (name) =>
+		start({
+			name,
+			userId: meta.userId,
+			channelId: meta.channelId,
+			guildId: meta.guildId,
+			input: safeInput(),
+		});
 	const wrap = (methodName) => {
 		if (typeof interaction[methodName] !== 'function') return;
 		const fn = interaction[methodName];
 		// Try to capture any existing mock implementation to avoid recursive mock calls
 		let existingImpl = null;
 		try {
-			if (fn && fn.mock && typeof fn.getMockImplementation === 'function') existingImpl = fn.getMockImplementation();
+			if (fn && fn.mock && typeof fn.getMockImplementation === 'function')
+				existingImpl = fn.getMockImplementation();
 		} catch (e) {}
 		try {
-			if (!existingImpl && fn && fn.mock && typeof fn._getMockImplementation === 'function') existingImpl = fn._getMockImplementation();
+			if (!existingImpl && fn && fn.mock && typeof fn._getMockImplementation === 'function')
+				existingImpl = fn._getMockImplementation();
 		} catch (e) {}
 		const original = fn.bind(interaction);
 		interaction[methodName] = async function wrapped(options, ...rest) {
 			let ctx = null;
 			try {
-				const baseName = interaction.commandName ? `slash:${interaction.commandName}` : (interaction.customId ? `ui:${interaction.customId}` : `interaction:${methodName}`);
+				const baseName = interaction.commandName
+					? `slash:${interaction.commandName}`
+					: interaction.customId
+						? `ui:${interaction.customId}`
+						: `interaction:${methodName}`;
 				ctx = makeStart(baseName);
 			} catch {}
 			let result;
-			try { result = await original(options, ...rest); } catch (e) {
+			try {
+				result = await original(options, ...rest);
+			} catch (e) {
 				// Log the failure as well
-				try { finish(interaction.client, ctx, { output: shapeFromOptions(options), error: String(e && e.message || e) }); } catch {}
+				try {
+					finish(interaction.client, ctx, {
+						output: shapeFromOptions(options),
+						error: String((e && e.message) || e),
+					});
+				} catch {}
 				throw e;
 			}
-			try { finish(interaction.client, ctx, { output: shapeFromOptions(options) }); } catch {}
+			try {
+				finish(interaction.client, ctx, { output: shapeFromOptions(options) });
+			} catch {}
 			return result;
 		};
 	};
-	['reply','followUp','editReply','update'].forEach(wrap);
+	['reply', 'followUp', 'editReply', 'update'].forEach(wrap);
 }
 
 function shapeFromOptions(options) {
@@ -309,7 +376,18 @@ function shapeFromOptions(options) {
 		const embeds = options.embeds ? mapEmbeds(options.embeds) : undefined;
 		const components = options.components ? mapComponents(options.components) : undefined;
 		return { content, embeds, components };
-	} catch { return null; }
+	} catch {
+		return null;
+	}
 }
 
-module.exports = { start, finish, getLogs, clearLogs, normalizeMsgShape, diffExpected, instrumentInteractionLogging, shapeFromOptions };
+module.exports = {
+	start,
+	finish,
+	getLogs,
+	clearLogs,
+	normalizeMsgShape,
+	diffExpected,
+	instrumentInteractionLogging,
+	shapeFromOptions,
+};

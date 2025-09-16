@@ -1,7 +1,7 @@
-const fs = require("fs");
+const fs = require('fs');
 const { runtimeFile } = require('./paths');
-const { getCash, addCash, getTestingCash, addTestingCash } = require("./cash");
-const { config } = require("./storage");
+const { getCash, addCash, getTestingCash, addTestingCash } = require('./cash');
+const { config } = require('./storage');
 
 const BANK_FILE = runtimeFile('bank.json');
 const { enqueueWrite } = require('./writeQueue');
@@ -13,13 +13,15 @@ const TEST_BANK_FILE = runtimeFile('testingBank.json');
 let testingBank = {};
 try {
 	if (fs.existsSync(TEST_BANK_FILE)) {
-		testingBank = JSON.parse(fs.readFileSync(TEST_BANK_FILE, "utf8") || "{}");
+		testingBank = JSON.parse(fs.readFileSync(TEST_BANK_FILE, 'utf8') || '{}');
 	}
-} catch { testingBank = {}; }
+} catch {
+	testingBank = {};
+}
 try {
 	if (fs.existsSync(BANK_FILE)) {
-		const raw = fs.readFileSync(BANK_FILE, "utf8");
-		bank = JSON.parse(raw || "{}");
+		const raw = fs.readFileSync(BANK_FILE, 'utf8');
+		bank = JSON.parse(raw || '{}');
 	}
 } catch {
 	bank = {};
@@ -49,7 +51,9 @@ function setBank(userId, amount) {
 	const n = Math.max(0, Math.floor(Number(amount) || 0));
 	if (config.testingMode) {
 		testingBank[userId] = { amount: n };
-		try { enqueueWrite(TEST_BANK_FILE, () => JSON.stringify(testingBank, null, 2)); } catch {}
+		try {
+			enqueueWrite(TEST_BANK_FILE, () => JSON.stringify(testingBank, null, 2));
+		} catch {}
 		return n;
 	}
 	bank[userId] = n;
@@ -87,7 +91,7 @@ function computeTaxForDeposit(currentBank, deposit, L) {
 		// Average of marginal rate at start and end (linear within bands by our definition)
 		const r1 = marginalTaxRate(start, L);
 		const r2 = marginalTaxRate(end, L);
-		return segLen * (r1 + r2) / 2;
+		return (segLen * (r1 + r2)) / 2;
 	};
 
 	// Iterate bands up to 4L
@@ -120,12 +124,19 @@ function computeMaxAffordableDeposit(userId) {
 	const bankBal = getBank(uid);
 	const cash = config.testingMode ? getTestingCash(uid) : getCash(uid);
 	if (cash <= 0) return { deposit: 0, tax: 0, totalCost: 0 };
-	let lo = 0, hi = cash, ans = 0;
+	let lo = 0,
+		hi = cash,
+		ans = 0;
 	while (lo <= hi) {
 		const mid = Math.floor((lo + hi) / 2);
 		const tax = computeTaxForDeposit(bankBal, mid, L);
 		const total = mid + tax;
-		if (total <= cash) { ans = mid; lo = mid + 1; } else { hi = mid - 1; }
+		if (total <= cash) {
+			ans = mid;
+			lo = mid + 1;
+		} else {
+			hi = mid - 1;
+		}
 	}
 	const tax = computeTaxForDeposit(bankBal, ans, L);
 	return { deposit: ans, tax, totalCost: ans + tax, bankAfter: bankBal + ans, baseLimit: L };
@@ -144,8 +155,19 @@ function quoteDeposit(userId, amount) {
 	const crossesSoftCap = bankBal < L && newBank > L;
 	const alreadyAbove = bankBal >= L;
 	const requiresConfirmation = crossesSoftCap || alreadyAbove;
-	const activeCash = (config.testingMode ? getTestingCash(uid) : getCash(uid));
-	return { ok: deposit > 0, deposit, tax, totalCost, newBank, bank: newBank, cashAfter: activeCash - totalCost, baseLimit: L, nextThreshold, requiresConfirmation };
+	const activeCash = config.testingMode ? getTestingCash(uid) : getCash(uid);
+	return {
+		ok: deposit > 0,
+		deposit,
+		tax,
+		totalCost,
+		newBank,
+		bank: newBank,
+		cashAfter: activeCash - totalCost,
+		baseLimit: L,
+		nextThreshold,
+		requiresConfirmation,
+	};
 }
 
 // Compute amount to reach next threshold (no wallet check here)
@@ -163,7 +185,7 @@ function depositToBank(userId, amount, { allowAboveLimit = false } = {}) {
 	const uid = String(userId);
 	const cash = config.testingMode ? getTestingCash(uid) : getCash(uid);
 	const q = quoteDeposit(uid, amount);
-	if (!q.ok) return { ok: false, error: "Enter a valid positive amount." };
+	if (!q.ok) return { ok: false, error: 'Enter a valid positive amount.' };
 	if (!allowAboveLimit && q.requiresConfirmation) {
 		return { ok: false, requiresConfirmation: true, quote: q };
 	}
@@ -171,26 +193,39 @@ function depositToBank(userId, amount, { allowAboveLimit = false } = {}) {
 		return { ok: false, error: "You don't have enough cash for this deposit and tax." };
 	}
 	// Apply
-	if (config.testingMode) addTestingCash(uid, -q.totalCost); else addCash(uid, -q.totalCost);
+	if (config.testingMode) addTestingCash(uid, -q.totalCost);
+	else addCash(uid, -q.totalCost);
 	addBank(uid, q.deposit);
 	const newCash = config.testingMode ? getTestingCash(uid) : getCash(uid);
-	return { ok: true, moved: q.deposit, tax: q.tax, totalCost: q.totalCost, cash: newCash, bank: getBank(uid), baseLimit: q.baseLimit };
+	return {
+		ok: true,
+		moved: q.deposit,
+		tax: q.tax,
+		totalCost: q.totalCost,
+		cash: newCash,
+		bank: getBank(uid),
+		baseLimit: q.baseLimit,
+	};
 }
 
 function withdrawFromBank(userId, amount) {
 	const uid = String(userId);
 	const amt = Math.max(0, Math.floor(Number(amount) || 0));
 	const cur = getBank(uid);
-	if (amt <= 0) return { ok: false, error: "Enter a valid positive amount." };
+	if (amt <= 0) return { ok: false, error: 'Enter a valid positive amount.' };
 	if (amt > cur) return { ok: false, error: "You don't have that much in the bank." };
 	addBank(uid, -amt);
-	if (config.testingMode) addTestingCash(uid, amt); else addCash(uid, amt);
+	if (config.testingMode) addTestingCash(uid, amt);
+	else addCash(uid, amt);
 	const newCash = config.testingMode ? getTestingCash(uid) : getCash(uid);
 	return { ok: true, moved: amt, cash: newCash, bank: getBank(uid), baseLimit: getBaseLimit() };
 }
 
 function getTopBank(limit = 10) {
-	const entries = Object.entries(bank || {}).map(([userId, amount]) => ({ userId, amount: Math.max(0, Math.floor(Number(amount) || 0)) }));
+	const entries = Object.entries(bank || {}).map(([userId, amount]) => ({
+		userId,
+		amount: Math.max(0, Math.floor(Number(amount) || 0)),
+	}));
 	entries.sort((a, b) => b.amount - a.amount);
 	return entries.slice(0, Math.max(0, Math.floor(limit || 10)));
 }

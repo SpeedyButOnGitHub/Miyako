@@ -7,34 +7,38 @@
 // Additional forms can be added easily.
 
 function parseHM(str) {
-	if (!str) return { h:0, m:0, ok:false };
-	const [h,m] = str.split(':').map(x=>parseInt(x,10));
-	if (Number.isNaN(h) || Number.isNaN(m)) return { h:0, m:0, ok:false };
-	return { h, m, ok:true };
+	if (!str) return { h: 0, m: 0, ok: false };
+	const [h, m] = str.split(':').map((x) => parseInt(x, 10));
+	if (Number.isNaN(h) || Number.isNaN(m)) return { h: 0, m: 0, ok: false };
+	return { h, m, ok: true };
 }
 
 function computeNextRange(ev) {
 	const now = new Date();
 	// Determine days list; if empty treat all days
-	const days = Array.isArray(ev.days) && ev.days.length ? ev.days : [0,1,2,3,4,5,6];
-	let startDate = null, endDate = null;
+	const days = Array.isArray(ev.days) && ev.days.length ? ev.days : [0, 1, 2, 3, 4, 5, 6];
+	let startDate = null,
+		endDate = null;
 	if (Array.isArray(ev.ranges) && ev.ranges.length) {
 		const r = ev.ranges[0];
 		if (r && r.start && r.end) {
-			const { h:sh, m:sm, ok:okS } = parseHM(r.start);
-			const { h:eh, m:em, ok:okE } = parseHM(r.end);
+			const { h: sh, m: sm, ok: okS } = parseHM(r.start);
+			const { h: eh, m: em, ok: okE } = parseHM(r.end);
 			if (okS && okE) {
-				for (let offset=0; offset<30; offset++) {
-					const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()+offset, 0,0,0,0);
-						if (!days.includes(d.getDay())) continue;
-						const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), sh, sm, 0, 0);
-						const e = new Date(d.getFullYear(), d.getMonth(), d.getDate(), eh, em, 0, 0);
-						// If end <= start (overnight), push end to next day
-						if (e <= s) e.setDate(e.getDate()+1);
-						// Accept first future start or ongoing range today
-						if (s.getTime() >= now.getTime() - 5*60*1000) { // allow slight past for current range
-							startDate = s; endDate = e; break;
-						}
+				for (let offset = 0; offset < 30; offset++) {
+					const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 0, 0, 0, 0);
+					if (!days.includes(d.getDay())) continue;
+					const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), sh, sm, 0, 0);
+					const e = new Date(d.getFullYear(), d.getMonth(), d.getDate(), eh, em, 0, 0);
+					// If end <= start (overnight), push end to next day
+					if (e <= s) e.setDate(e.getDate() + 1);
+					// Accept first future start or ongoing range today
+					if (s.getTime() >= now.getTime() - 5 * 60 * 1000) {
+						// allow slight past for current range
+						startDate = s;
+						endDate = e;
+						break;
+					}
 				}
 			}
 		}
@@ -43,23 +47,37 @@ function computeNextRange(ev) {
 		// Fallback to times
 		const times = Array.isArray(ev.times) ? ev.times.filter(Boolean) : [];
 		if (times.length) {
-			const { h:sh, m:sm, ok:okS } = parseHM(times[0]);
-			let eh=sh+2, em=sm; // +2h fallback
-			if (times[1]) { const t2 = parseHM(times[1]); if (t2.ok) { eh=t2.h; em=t2.m; } }
+			const { h: sh, m: sm, ok: okS } = parseHM(times[0]);
+			let eh = sh + 2,
+				em = sm; // +2h fallback
+			if (times[1]) {
+				const t2 = parseHM(times[1]);
+				if (t2.ok) {
+					eh = t2.h;
+					em = t2.m;
+				}
+			}
 			if (okS) {
-				for (let offset=0; offset<30; offset++) {
-					const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()+offset, 0,0,0,0);
+				for (let offset = 0; offset < 30; offset++) {
+					const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 0, 0, 0, 0);
 					if (!days.includes(d.getDay())) continue;
 					const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), sh, sm, 0, 0);
 					const e = new Date(d.getFullYear(), d.getMonth(), d.getDate(), eh, em, 0, 0);
-					if (e <= s) e.setHours(e.getHours()+2);
-					if (s.getTime() >= now.getTime() - 5*60*1000) { startDate = s; endDate = e; break; }
+					if (e <= s) e.setHours(e.getHours() + 2);
+					if (s.getTime() >= now.getTime() - 5 * 60 * 1000) {
+						startDate = s;
+						endDate = e;
+						break;
+					}
 				}
 			}
 		}
 	}
 	if (!startDate) return null;
-	return { startSec: Math.floor(startDate.getTime()/1000), endSec: Math.floor(endDate.getTime()/1000) };
+	return {
+		startSec: Math.floor(startDate.getTime() / 1000),
+		endSec: Math.floor(endDate.getTime() / 1000),
+	};
 }
 
 function buildTimestampMap(ev) {
@@ -70,11 +88,11 @@ function buildTimestampMap(ev) {
 		map.opening1 = map.timestamp_opening1;
 		map.closing1 = `<t:${r.endSec}:t>`;
 		map.timestamp_closing1 = map.closing1;
-	// Backwards compatible aliases (timestamp_* only; avoid bare common words)
-	map.timestamp_opening = map.timestamp_opening1;
-	map.timestamp_closing = map.timestamp_closing1;
-	// Additional close alias requested: timestamp_close -> timestamp_closing1
-	map.timestamp_close = map.timestamp_closing1;
+		// Backwards compatible aliases (timestamp_* only; avoid bare common words)
+		map.timestamp_opening = map.timestamp_opening1;
+		map.timestamp_closing = map.timestamp_closing1;
+		// Additional close alias requested: timestamp_close -> timestamp_closing1
+		map.timestamp_close = map.timestamp_closing1;
 	}
 	// Static placeholders for second opening per user instruction
 	map.timestamp_opening2 = '<t:1757412000:t>';
@@ -90,13 +108,16 @@ function applyTimestampPlaceholders(text, ev) {
 	let out = text;
 	// First, handle angle-bracket tokens like <timestamp_close:t> or <timestamp_closing:t>
 	// We only rewrite those we know, leaving others as-is.
-	out = out.replace(/<\s*(timestamp_(?:opening|closing|open|close)\d?|opening\d?|closing\d?|timestamp_(?:opening|closing)|timestamp_close)\s*:\s*t\s*>/g, (m, p1) => {
-		const key = String(p1).replace(/\s+/g, '');
-		const replacement = map[key] || null;
-		return replacement ? replacement : m; // preserve if unknown
-	});
+	out = out.replace(
+		/<\s*(timestamp_(?:opening|closing|open|close)\d?|opening\d?|closing\d?|timestamp_(?:opening|closing)|timestamp_close)\s*:\s*t\s*>/g,
+		(m, p1) => {
+			const key = String(p1).replace(/\s+/g, '');
+			const replacement = map[key] || null;
+			return replacement ? replacement : m; // preserve if unknown
+		},
+	);
 	// Then support bare tokens without angle brackets
-	for (const [k,v] of Object.entries(map)) {
+	for (const [k, v] of Object.entries(map)) {
 		if (!v) continue;
 		out = out.split(k).join(v);
 	}

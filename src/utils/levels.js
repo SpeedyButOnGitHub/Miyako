@@ -1,4 +1,4 @@
-const fs = require("fs");
+const fs = require('fs');
 const { runtimeFile } = require('./paths');
 const { enqueueWrite } = require('./writeQueue');
 
@@ -8,7 +8,7 @@ const LEVELS_FILE = runtimeFile('levels.json');
 let levels = {};
 try {
 	if (fs.existsSync(LEVELS_FILE)) {
-		levels = JSON.parse(fs.readFileSync(LEVELS_FILE, "utf8")) || {};
+		levels = JSON.parse(fs.readFileSync(LEVELS_FILE, 'utf8')) || {};
 	}
 } catch {
 	levels = {};
@@ -20,10 +20,14 @@ let pendingSave = false;
 function saveLevels() {
 	if (pendingSave) return; // coalesce rapid calls
 	pendingSave = true;
-	enqueueWrite(LEVELS_FILE, () => {
-		pendingSave = false;
-		return JSON.stringify(levels, null, 2);
-	}, { delay: 250 });
+	enqueueWrite(
+		LEVELS_FILE,
+		() => {
+			pendingSave = false;
+			return JSON.stringify(levels, null, 2);
+		},
+		{ delay: 250 },
+	);
 }
 
 function getXP(userId) {
@@ -55,7 +59,9 @@ function addXP(userId, amount) {
 
 	if (newLevel !== oldLevel) {
 		// Invalidate leaderboard cache for text leveling
-		try { require('../services/leaderboardService').invalidate('text'); } catch {}
+		try {
+			require('../services/leaderboardService').invalidate('text');
+		} catch {}
 	}
 	saveLevels(); // always schedule save (coalesced)
 	return newLevel > oldLevel ? newLevel : 0;
@@ -66,5 +72,5 @@ module.exports = {
 	saveLevels,
 	getXP,
 	getLevel,
-	addXP
+	addXP,
 };

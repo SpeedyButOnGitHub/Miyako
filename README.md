@@ -81,8 +81,8 @@ Note: The old root-level modules have been migrated; the temporary `legacy/` fol
 ### Dev mode
 
 - To auto-restart on changes (excluding config JSON), use:
-	- `npm run start:dev`
-	- Nodemon watches `src/` and ignores `config/*.json` to avoid restart storms while state files change.
+  - `npm run start:dev`
+  - Nodemon watches `src/` and ignores `config/*.json` to avoid restart storms while state files change.
 
 ## Startup summary and tests
 
@@ -150,4 +150,3 @@ npm run test:full
 ```
 
 The fast runner is driven by `fast-tests.json` and `scripts/fast-tests.js` so you can tweak which tests are included without editing `package.json` directly. If you need comments/descriptions for the curated tests we can switch the list to a small JS file for inline notes.
-

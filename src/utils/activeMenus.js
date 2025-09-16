@@ -1,5 +1,5 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 const { runtimeFile } = require('./paths');
 
 const SESSIONS_FILE = runtimeFile('buttonSessions.json');
@@ -13,32 +13,39 @@ const timers = new Map();
 
 // Build a single disabled "Timed out — use command again" row
 function timeoutRow() {
-	return [{
-		type: 1,
-		components: [{
-			type: 2,
-			custom_id: "timeout",
-			label: "Timed out — use command again",
-			style: 2,
-			disabled: true
-		}]
-	}];
+	return [
+		{
+			type: 1,
+			components: [
+				{
+					type: 2,
+					custom_id: 'timeout',
+					label: 'Timed out — use command again',
+					style: 2,
+					disabled: true,
+				},
+			],
+		},
+	];
 }
 
 function loadSessions() {
 	try {
 		if (!fs.existsSync(SESSIONS_FILE)) return {};
-		return JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf8")) || {};
-	} catch { return {}; }
+		return JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8')) || {};
+	} catch {
+		return {};
+	}
 }
 
 function saveSessions() {
 	try {
 		const obj = {};
 		for (const [messageId, s] of sessions.entries()) {
-			obj[messageId] = { ...s, // strip functions/timers
+			obj[messageId] = {
+				...s, // strip functions/timers
 				// keep only serializable data
-				client: undefined
+				client: undefined,
 			};
 		}
 		const dir = path.dirname(SESSIONS_FILE);
@@ -69,7 +76,7 @@ function scheduleTimer(client, messageId) {
 			saveSessions();
 		}
 	}, delay);
-	if (typeof t.unref === "function") t.unref();
+	if (typeof t.unref === 'function') t.unref();
 	timers.set(messageId, t);
 }
 
@@ -106,7 +113,7 @@ function registerMessage(message, session) {
 		guildId: message.guildId || null,
 		channelId: message.channelId,
 		expiresAt,
-		data: session.data || {}
+		data: session.data || {},
 	});
 	saveSessions();
 	// schedule when client attached via processInteraction
@@ -115,9 +122,15 @@ function registerMessage(message, session) {
 function snapshotSessions() {
 	const out = [];
 	for (const [id, s] of sessions.entries()) {
-		out.push({ id, type: s.type, userId: s.userId, channelId: s.channelId, expiresIn: s.expiresAt - Date.now() });
+		out.push({
+			id,
+			type: s.type,
+			userId: s.userId,
+			channelId: s.channelId,
+			expiresIn: s.expiresAt - Date.now(),
+		});
 	}
-	return out.sort((a,b)=>a.expiresIn - b.expiresIn);
+	return out.sort((a, b) => a.expiresIn - b.expiresIn);
 }
 
 // Sweep and disable orphaned sessions older than 1h beyond expiry
@@ -127,9 +140,9 @@ async function sweepOrphans(client) {
 		for (const [id, sess] of sessions.entries()) {
 			if (sess.expiresAt < cutoff) {
 				try {
-					const channel = await client.channels.fetch(sess.channelId).catch(()=>null);
-					const msg = channel ? await channel.messages.fetch(id).catch(()=>null) : null;
-					if (msg) await msg.edit({ components: timeoutRow() }).catch(()=>{});
+					const channel = await client.channels.fetch(sess.channelId).catch(() => null);
+					const msg = channel ? await channel.messages.fetch(id).catch(() => null) : null;
+					if (msg) await msg.edit({ components: timeoutRow() }).catch(() => {});
 				} catch {}
 				sessions.delete(id);
 			}
@@ -146,7 +159,12 @@ async function processInteraction(interaction) {
 	if (!sess) {
 		// Exemption: allow certain global/permanent buttons to function forever without being force-disabled
 		// Currently needed for event notification signup buttons (custom_id starts with 'event_notify_').
-		if (interaction.isButton && interaction.isButton() && interaction.customId && interaction.customId.startsWith('event_notify_')) {
+		if (
+			interaction.isButton &&
+			interaction.isButton() &&
+			interaction.customId &&
+			interaction.customId.startsWith('event_notify_')
+		) {
 			return { handled: false }; // let upstream interaction handler process it; do NOT timeout
 		}
 		// If message is older than 5 minutes AND was originally a managed session, we would normally disable it.
@@ -192,11 +210,14 @@ module.exports = {
 	snapshotSessions,
 	sweepOrphans,
 	// expose standardized timeout row for other ephemeral collectors
-	timeoutRow
+	timeoutRow,
 };
 
 // Test helpers (not part of public API but handy for unit tests)
 try {
-  module.exports._getHandler = (type) => handlers.get(type);
-  module.exports._getSessionForMessage = (message) => sessions.get(message.id) ? { ...sessions.get(message.id), id: message.id } : null;
-} catch (e) { /* ignore in constrained environments */ }
+	module.exports._getHandler = (type) => handlers.get(type);
+	module.exports._getSessionForMessage = (message) =>
+		sessions.get(message.id) ? { ...sessions.get(message.id), id: message.id } : null;
+} catch (e) {
+	/* ignore in constrained environments */
+}

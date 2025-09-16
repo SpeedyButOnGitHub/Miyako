@@ -1,4 +1,12 @@
-const { buildRootEmbed, buildCategorySelect, buildCategoryEmbed, buildSettingEmbed, buildSettingSelect, buildSettingRow, renderSettingEmbed } = require('./render');
+const {
+	buildRootEmbed,
+	buildCategorySelect,
+	buildCategoryEmbed,
+	buildSettingEmbed,
+	buildSettingSelect,
+	buildSettingRow,
+	renderSettingEmbed,
+} = require('./render');
 const { handleButton } = require('./handlers');
 // Note: read OWNER_ID at runtime to allow tests to set process.env before invocation
 const { config, saveConfig } = require('../../utils/storage');
@@ -22,11 +30,19 @@ async function handleConfigMenuCommand(message) {
 	try {
 		sent = await message.channel.send({ embeds: [embed], components });
 	} catch (e) {
-		try { require('../../utils/logger').error('[configMenu] send failed', { err: e.message }); } catch {}
-		try { await message.reply({ content: 'Failed to open config menu (logged).', flags: 1<<6 }); } catch {}
+		try {
+			require('../../utils/logger').error('[configMenu] send failed', { err: e.message });
+		} catch {}
+		try {
+			await message.reply({ content: 'Failed to open config menu (logged).', flags: 1 << 6 });
+		} catch {}
 		return;
 	}
-	ActiveMenus.registerMessage(sent, { type: 'configMenu', userId: message.author.id, data: { view: 'root' } });
+	ActiveMenus.registerMessage(sent, {
+		type: 'configMenu',
+		userId: message.author.id,
+		data: { view: 'root' },
+	});
 	return sent;
 }
 
@@ -34,7 +50,8 @@ async function handleConfigMenuCommand(message) {
 ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
 	if (!interaction.isButton() && !interaction.isModalSubmit()) return;
 	if (interaction.user.id !== session.userId) {
-		if (interaction.isRepliable()) return interaction.reply({ content: 'Not your session.', flags: 1<<6 }).catch(()=>{});
+		if (interaction.isRepliable())
+			return interaction.reply({ content: 'Not your session.', flags: 1 << 6 }).catch(() => {});
 		return;
 	}
 	try {
@@ -47,15 +64,22 @@ ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
 				session.data.category = categoryName;
 				const catRows = buildCategorySelect(categoryName);
 				const setRows = buildSettingSelect(categoryName);
-				return interaction.update({ embeds: [buildCategoryEmbed(categoryName)], components: [...catRows, ...setRows].slice(0,5) });
+				return interaction.update({
+					embeds: [buildCategoryEmbed(categoryName)],
+					components: [...catRows, ...setRows].slice(0, 5),
+				});
 			}
 			if (id.startsWith('cfg:set:')) {
 				const [, , catName, settingName] = id.split(':');
 				session.data.view = 'setting';
-				session.data.category = catName; session.data.setting = settingName;
+				session.data.category = catName;
+				session.data.setting = settingName;
 				const catRows = buildCategorySelect(catName);
 				const settingRows = buildSettingRow(catName, settingName);
-				return interaction.update({ embeds: [buildSettingEmbed(catName, settingName)], components: [...catRows, ...settingRows].slice(0,5) });
+				return interaction.update({
+					embeds: [buildSettingEmbed(catName, settingName)],
+					components: [...catRows, ...settingRows].slice(0, 5),
+				});
 			}
 			if (id.startsWith('config:')) {
 				// legacy setting action buttons
@@ -67,17 +91,41 @@ ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
 				const [, cat, key, mode] = id.split('_');
 				if (cat === 'Sniping' && key === 'ChannelList') {
 					const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
-					if (config.snipeMode !== newMode) { config.snipeMode = newMode; await saveConfig(); try { await logConfigChange(interaction.client, { user: interaction.user, change: `Set Sniping mode to ${newMode}.` }); } catch {} }
+					if (config.snipeMode !== newMode) {
+						config.snipeMode = newMode;
+						await saveConfig();
+						try {
+							await logConfigChange(interaction.client, {
+								user: interaction.user,
+								change: `Set Sniping mode to ${newMode}.`,
+							});
+						} catch {}
+					}
 					const catRows = buildCategorySelect(cat);
 					const rows = buildSettingRow('Sniping', 'ChannelList');
-					return interaction.update({ embeds: [buildSettingEmbed('Sniping', 'ChannelList')], components: [...catRows, ...rows].slice(0,5) });
+					return interaction.update({
+						embeds: [buildSettingEmbed('Sniping', 'ChannelList')],
+						components: [...catRows, ...rows].slice(0, 5),
+					});
 				}
 				if (cat === 'Leveling' && key === 'LevelingChannels') {
 					const newMode = mode === 'whitelist' ? 'whitelist' : 'blacklist';
-					if (config.levelingMode !== newMode) { config.levelingMode = newMode; await saveConfig(); try { await logConfigChange(interaction.client, { user: interaction.user, change: `Set Leveling mode to ${newMode}.` }); } catch {} }
+					if (config.levelingMode !== newMode) {
+						config.levelingMode = newMode;
+						await saveConfig();
+						try {
+							await logConfigChange(interaction.client, {
+								user: interaction.user,
+								change: `Set Leveling mode to ${newMode}.`,
+							});
+						} catch {}
+					}
 					const catRows = buildCategorySelect(cat);
 					const rows = buildSettingRow('Leveling', 'LevelingChannels');
-					return interaction.update({ embeds: [buildSettingEmbed('Leveling', 'LevelingChannels')], components: [...catRows, ...rows].slice(0,5) });
+					return interaction.update({
+						embeds: [buildSettingEmbed('Leveling', 'LevelingChannels')],
+						components: [...catRows, ...rows].slice(0, 5),
+					});
 				}
 				return;
 			}
@@ -86,9 +134,13 @@ ActiveMenus.registerHandler('configMenu', async (interaction, session) => {
 			return;
 		}
 	} catch (err) {
-		try { require('../../utils/logger').error('[configMenu] handler error', { err: err.message }); } catch {}
+		try {
+			require('../../utils/logger').error('[configMenu] handler error', { err: err.message });
+		} catch {}
 		if (interaction.isRepliable() && !interaction.replied) {
-			try { await interaction.reply({ content: 'Error handling config interaction.', flags: 1<<6 }); } catch {}
+			try {
+				await interaction.reply({ content: 'Error handling config interaction.', flags: 1 << 6 });
+			} catch {}
 		}
 	}
 });
